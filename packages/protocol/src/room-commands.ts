@@ -1,0 +1,82 @@
+import { z } from 'zod';
+
+import {
+  IdSchema,
+  PositiveAmountSchema,
+  ProtocolVersionSchema,
+  StateVersionSchema,
+} from './primitives.js';
+
+const CommandIdentityShape = {
+  protocolVersion: ProtocolVersionSchema,
+  commandId: IdSchema,
+  roomId: IdSchema,
+  playerId: IdSchema,
+  expectedVersion: StateVersionSchema,
+} as const;
+
+export const RoomSettingsSchema = z.object({
+  roomName: z.string().trim().min(1),
+  maxPlayers: z.number().int().min(2).max(10).safe(),
+  initialChips: PositiveAmountSchema,
+  smallBlind: PositiveAmountSchema,
+  actionTimeoutSeconds: z.number().int().positive().safe(),
+  handReadyTimeoutSeconds: z.number().int().positive().safe(),
+  blindGrowth: z.object({
+    enabled: z.boolean(),
+    intervalHands: z.number().int().positive().safe(),
+    multiplier: z.number().finite().gt(1),
+  }),
+  zeroChipPolicy: z.enum(['request-chips', 'eliminate']),
+});
+
+export const CreateRoomCommandSchema = z.object({
+  ...CommandIdentityShape,
+  type: z.literal('room.create'),
+  hostNickname: z.string().trim().min(1),
+  settings: RoomSettingsSchema,
+});
+
+export const JoinRoomCommandSchema = z.object({
+  ...CommandIdentityShape,
+  type: z.literal('room.join'),
+  nickname: z.string().trim().min(1),
+});
+
+export const SetLobbyReadyCommandSchema = z.object({
+  ...CommandIdentityShape,
+  type: z.literal('room.set-lobby-ready'),
+  ready: z.boolean(),
+});
+
+export const StartFirstHandCommandSchema = z.object({
+  ...CommandIdentityShape,
+  type: z.literal('room.start-first-hand'),
+  handId: IdSchema,
+});
+
+const simpleCommand = <T extends string>(type: T) =>
+  z.object({ ...CommandIdentityShape, type: z.literal(type) });
+
+export const PauseRoomCommandSchema = simpleCommand('room.pause');
+export const ResumeRoomCommandSchema = simpleCommand('room.resume');
+export const ExitRoomCommandSchema = simpleCommand('room.exit');
+export const CloseRoomCommandSchema = simpleCommand('room.close');
+
+export const RoomCommandSchema = z.discriminatedUnion('type', [
+  CreateRoomCommandSchema,
+  JoinRoomCommandSchema,
+  SetLobbyReadyCommandSchema,
+  StartFirstHandCommandSchema,
+  PauseRoomCommandSchema,
+  ResumeRoomCommandSchema,
+  ExitRoomCommandSchema,
+  CloseRoomCommandSchema,
+]);
+
+export type RoomSettingsMessage = z.infer<typeof RoomSettingsSchema>;
+export type CreateRoomCommand = z.infer<typeof CreateRoomCommandSchema>;
+export type JoinRoomCommand = z.infer<typeof JoinRoomCommandSchema>;
+export type SetLobbyReadyCommand = z.infer<typeof SetLobbyReadyCommandSchema>;
+export type StartFirstHandCommand = z.infer<typeof StartFirstHandCommandSchema>;
+export type RoomCommand = z.infer<typeof RoomCommandSchema>;
