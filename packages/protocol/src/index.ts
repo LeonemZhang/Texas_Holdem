@@ -1,1 +1,1 @@
-export const PROTOCOL_PACKAGE = '@texas-holdem/protocol';
+export * from './system.js';

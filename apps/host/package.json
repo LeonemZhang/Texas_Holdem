@@ -1,0 +1,24 @@
+{
+  "name": "@texas-holdem/host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm --filter @texas-holdem/protocol build",
+    "dev": "tsx watch src/index.ts",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@texas-holdem/protocol": "workspace:*",
+    "fastify": "5.11.0",
+    "socket.io": "4.8.3"
+  },
+  "devDependencies": {
+    "socket.io-client": "4.8.3",
+    "tsx": "4.20.6",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
