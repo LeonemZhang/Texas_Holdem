@@ -684,6 +684,68 @@ h1 {
   grid-column: 4;
 }
 
+.hand-ready-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(2 12 10 / 78%);
+  backdrop-filter: blur(8px);
+}
+
+.hand-ready-card {
+  width: min(100%, 34rem);
+  padding: clamp(1rem, 4vw, 2rem);
+  border: 1px solid rgb(167 243 208 / 25%);
+  border-radius: 1.25rem;
+  background: #071a16;
+  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 45%);
+}
+
+.hand-ready-card header,
+.hand-ready-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hand-ready-card h2,
+.hand-ready-card p {
+  margin: 0;
+}
+
+.hand-ready-card__timer {
+  display: grid;
+  place-items: center;
+  min-width: 4rem;
+  min-height: 4rem;
+  border: 2px solid #fbbf24;
+  border-radius: 50%;
+  color: #fde68a;
+  font-size: 1.2rem;
+}
+
+.hand-ready-card__requests {
+  margin: 1rem 0;
+  padding: 0.8rem;
+  border: 1px solid rgb(251 191 36 / 35%);
+  border-radius: 0.8rem;
+  color: #fde68a;
+  background: rgb(120 53 15 / 18%);
+}
+
+.hand-ready-card__requests ul {
+  margin: 0.45rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.hand-ready-card__choice {
+  margin-block: 1rem !important;
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -779,5 +841,15 @@ h1 {
 
   .raise-control {
     width: 100%;
+  }
+
+  .hand-ready-card header,
+  .hand-ready-card__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hand-ready-card__timer {
+    align-self: flex-start;
   }
 }
