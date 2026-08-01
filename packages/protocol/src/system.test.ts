@@ -27,6 +27,12 @@ describe('framework system protocol', () => {
         status: 'broken',
         protocolVersion: PROTOCOL_VERSION,
         serverVersion: '0.0.0',
+        connection: {
+          host: '127.0.0.1',
+          port: 32100,
+          joinUrl: 'http://127.0.0.1:32100',
+          socketPath: '/socket.io',
+        },
       }),
     ).toThrow();
   });

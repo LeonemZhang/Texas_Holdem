@@ -29,6 +29,40 @@ describe('host framework server', () => {
       status: 'ok',
       protocolVersion: PROTOCOL_VERSION,
       serverVersion: '0.0.0',
+      connection: {
+        host: '127.0.0.1',
+        port: 32100,
+        joinUrl: 'http://127.0.0.1:32100',
+        socketPath: '/socket.io',
+      },
+    });
+  });
+
+  it('reports the actual listen port and advertised LAN join address', async () => {
+    activeHost = await createHostServer({ advertisedHost: '10.126.126.1' });
+    await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const address = activeHost.app.server.address();
+    if (!address || typeof address === 'string')
+      throw new Error('Missing TCP address');
+
+    const health = await activeHost.app.inject({
+      method: 'GET',
+      url: '/health',
+    });
+    const bootstrap = await activeHost.app.inject({
+      method: 'GET',
+      url: '/api/bootstrap',
+    });
+
+    expect(health.json().connection).toEqual({
+      host: '10.126.126.1',
+      port: address.port,
+      joinUrl: `http://10.126.126.1:${address.port}`,
+      socketPath: '/socket.io',
+    });
+    expect(bootstrap.json()).toMatchObject({
+      protocolVersion: PROTOCOL_VERSION,
+      connection: health.json().connection,
     });
   });
 
