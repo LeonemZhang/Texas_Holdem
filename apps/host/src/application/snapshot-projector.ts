@@ -1,0 +1,154 @@
+import {
+  buildPots,
+  formatCard,
+  legalBettingActions,
+  type StartedHandState,
+} from '@texas-holdem/poker-core';
+import {
+  PlayerSnapshotSchema,
+  PROTOCOL_VERSION,
+  type PlayerSnapshot,
+} from '@texas-holdem/protocol';
+
+import type { ChipRequestBook } from '../domain/chip-requests.js';
+import type { HandReadyState } from '../domain/hand-ready.js';
+import type { RoomPlayer, RoomState } from '../domain/room.js';
+import type { TitleAward } from '../statistics/titles.js';
+
+export interface SnapshotPlayerStatistics {
+  readonly playerId: string;
+  readonly currentChips: number;
+  readonly participatedHands: number;
+  readonly wonHands: number;
+  readonly showdownWinRate: number | null;
+}
+
+export interface SnapshotProjectionInput {
+  readonly room: RoomState;
+  readonly viewerPlayerId: string;
+  readonly sequence: number;
+  readonly completedHands?: number;
+  readonly hand?: StartedHandState | null;
+  readonly handReady?: HandReadyState | null;
+  readonly chipRequests?: ChipRequestBook | null;
+  readonly statistics?: readonly SnapshotPlayerStatistics[];
+  readonly titles?: readonly TitleAward[];
+}
+
+function handPlayer(
+  hand: StartedHandState | null,
+  playerId: string,
+): StartedHandState['players'][number] | undefined {
+  return hand?.players.find((player) => player.playerId === playerId);
+}
+
+function publicStatus(
+  roomPlayer: RoomPlayer,
+  hand: StartedHandState | null,
+): PlayerSnapshot['room']['players'][number]['status'] {
+  if (roomPlayer.status !== 'active') return roomPlayer.status;
+  return handPlayer(hand, roomPlayer.playerId)?.status ?? roomPlayer.status;
+}
+
+export function projectPlayerSnapshot(
+  input: SnapshotProjectionInput,
+): PlayerSnapshot {
+  const viewer = input.room.players.find(
+    ({ playerId }) => playerId === input.viewerPlayerId,
+  );
+  if (!viewer) {
+    throw new RangeError(
+      `Snapshot viewer is not in room: ${input.viewerPlayerId}`,
+    );
+  }
+  const hand = input.hand ?? null;
+  const ready = input.handReady ?? null;
+  const requests = input.chipRequests ?? null;
+  const currentViewer = handPlayer(hand, input.viewerPlayerId);
+  const currentChips = (player: RoomPlayer) =>
+    handPlayer(hand, player.playerId)?.stack ?? player.chips;
+  const statistics =
+    input.statistics ??
+    input.room.players.map((player) => ({
+      playerId: player.playerId,
+      currentChips: currentChips(player),
+      participatedHands: 0,
+      wonHands: 0,
+      showdownWinRate: null,
+    }));
+
+  return PlayerSnapshotSchema.parse({
+    protocolVersion: PROTOCOL_VERSION,
+    roomId: input.room.roomId,
+    playerId: input.viewerPlayerId,
+    sequence: input.sequence,
+    stateVersion: input.room.version,
+    room: {
+      roomName: input.room.settings.roomName,
+      phase: input.room.phase,
+      smallBlind: input.room.settings.smallBlind,
+      bigBlind: input.room.settings.bigBlind,
+      completedHands: input.completedHands ?? 0,
+      players: input.room.players.map((player) => ({
+        playerId: player.playerId,
+        nickname: player.nickname,
+        seatIndex: player.seatIndex,
+        chips: currentChips(player),
+        status: publicStatus(player, hand),
+        isHost: player.playerId === input.room.hostPlayerId,
+      })),
+    },
+    game: hand
+      ? {
+          handId: hand.handId,
+          street: hand.street,
+          buttonPlayerId: hand.positions.button.playerId,
+          smallBlindPlayerId: hand.positions.smallBlind.playerId,
+          bigBlindPlayerId: hand.positions.bigBlind.playerId,
+          currentActorId: hand.betting.currentActorId,
+          communityCards: hand.communityCards.map(formatCard),
+          pots: buildPots(
+            hand.players.map((player) => ({
+              playerId: player.playerId,
+              amount: player.totalCommitted,
+              folded: player.status === 'folded',
+            })),
+          ).map(({ amount, eligiblePlayerIds }) => ({
+            amount,
+            eligiblePlayerIds,
+          })),
+          ownHoleCards: currentViewer
+            ? currentViewer.holeCards.map(formatCard)
+            : null,
+          legalActions:
+            hand.betting.currentActorId === input.viewerPlayerId
+              ? legalBettingActions(hand.betting, input.viewerPlayerId)
+              : null,
+        }
+      : null,
+    handReady: ready
+      ? {
+          deadlineMs: ready.deadlineMs,
+          ownChoice:
+            ready.players.find(
+              ({ playerId }) => playerId === input.viewerPlayerId,
+            )?.choice ?? 'sitting-out',
+          pendingRequests: (requests?.requests ?? [])
+            .filter(({ status }) => status === 'pending')
+            .map(
+              ({ requestId, requesterId, targetPlayerId, amount, status }) => ({
+                requestId,
+                requesterId,
+                targetPlayerId,
+                amount,
+                status,
+              }),
+            ),
+        }
+      : null,
+    statistics: {
+      players: statistics,
+      titles: input.titles ?? [],
+    },
+  });
+}
