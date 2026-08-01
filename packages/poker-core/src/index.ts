@@ -2,6 +2,7 @@ export * from './cards/card.js';
 export * from './cards/deck.js';
 export * from './cards/shuffle.js';
 export * from './betting/state.js';
+export * from './betting/all-in.js';
 export * from './betting/basic-actions.js';
 export * from './betting/raise.js';
 export * from './evaluator/combinations.js';
