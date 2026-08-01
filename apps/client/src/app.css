@@ -1074,6 +1074,54 @@ h1 {
   gap: 1rem;
 }
 
+.desktop-room-setup,
+.host-share {
+  margin-top: 1rem;
+}
+
+.desktop-room-setup__adapter {
+  display: grid;
+  font-weight: 800;
+  gap: 0.35rem;
+}
+
+.desktop-room-setup__adapter select {
+  min-height: 44px;
+  padding: 0.55rem;
+  border: 1px solid rgb(167 243 208 / 28%);
+  border-radius: 0.7rem;
+  color: inherit;
+  background: #071a16;
+  font: inherit;
+}
+
+.host-share {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid rgb(167 243 208 / 22%);
+  border-radius: 1.2rem;
+  background: rgb(6 78 59 / 22%);
+  gap: 1rem;
+}
+
+.host-share h2 {
+  margin: 0;
+}
+
+.host-share a {
+  color: #6ee7b7;
+  font-weight: 800;
+}
+
+.host-share svg {
+  flex: 0 0 auto;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: white;
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -1214,6 +1262,11 @@ h1 {
   .connection-banner,
   .connection-guard__footer {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .host-share {
+    align-items: flex-start;
     flex-direction: column;
   }
 }
