@@ -9,6 +9,8 @@ import {
   runSqliteMigrations,
 } from './persistence/sqlite-database.js';
 import { SqliteGameRuntimeStore } from './persistence/sqlite-game-runtime-store.js';
+import { UdpDiscoveryResponder } from '@texas-holdem/lan-discovery';
+import { currentDiscoverySummary } from './application/discovery-summary.js';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultStaticDirectory = resolve(currentDirectory, '../../client/dist');
@@ -17,9 +19,22 @@ const address = process.env.HOST_ADDRESS ?? '0.0.0.0';
 const advertisedHost = process.env.HOST_ADVERTISED_ADDRESS ?? '127.0.0.1';
 const staticDirectory = process.env.CLIENT_DIST_DIR ?? defaultStaticDirectory;
 const dataDirectory = process.env.HOST_DATA_DIR?.trim() || null;
+const discoveryPort = Number.parseInt(
+  process.env.HOST_DISCOVERY_PORT ?? '32101',
+  10,
+);
 
 if (!Number.isSafeInteger(port) || port <= 0 || port > 65_535) {
   throw new Error(`Invalid HOST_PORT: ${process.env.HOST_PORT ?? ''}`);
+}
+if (
+  !Number.isSafeInteger(discoveryPort) ||
+  discoveryPort <= 0 ||
+  discoveryPort > 65_535
+) {
+  throw new Error(
+    `Invalid HOST_DISCOVERY_PORT: ${process.env.HOST_DISCOVERY_PORT ?? ''}`,
+  );
 }
 
 const database = dataDirectory
@@ -61,9 +76,22 @@ const stopAutomaticUpdates = runtime.onAutomaticStateChange((roomId) => {
     host.publisher.publishSnapshot(snapshot);
   }
 });
+const discovery = new UdpDiscoveryResponder({
+  discoveryPort,
+  advertisedAddress: advertisedHost,
+  httpPort: port,
+  roomSummary: () => currentDiscoverySummary(runtime),
+});
 
 try {
   await host.app.listen({ host: address, port });
+  try {
+    await discovery.start();
+  } catch (error) {
+    process.stderr.write(
+      `LAN discovery unavailable; direct IP remains enabled: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
   process.stdout.write(`Texas Hold’em host listening on ${address}:${port}\n`);
 } catch (error) {
   await host.close();
@@ -74,6 +102,7 @@ async function shutdown() {
   stopPersistence();
   stopAutomaticUpdates();
   runtime.dispose();
+  await discovery.close();
   await host.close();
   database?.close();
   process.exitCode = 0;

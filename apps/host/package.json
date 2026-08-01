@@ -13,6 +13,7 @@
   "dependencies": {
     "@fastify/cors": "11.3.0",
     "@fastify/static": "10.1.2",
+    "@texas-holdem/lan-discovery": "workspace:^",
     "@texas-holdem/poker-core": "workspace:*",
     "@texas-holdem/protocol": "workspace:*",
     "fastify": "5.11.0",
