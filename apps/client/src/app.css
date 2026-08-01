@@ -322,6 +322,74 @@ h1 {
   margin-right: 0.5rem;
 }
 
+.lobby {
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid rgb(167 243 208 / 18%);
+  border-radius: 1.25rem;
+  background: rgb(6 78 59 / 22%);
+}
+
+.lobby__heading,
+.lobby__actions,
+.lobby-player,
+.lobby-player__badges {
+  display: flex;
+  align-items: center;
+}
+
+.lobby__heading,
+.lobby__actions,
+.lobby-player {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.lobby__heading h2,
+.lobby__heading p,
+.lobby__actions p {
+  margin: 0;
+}
+
+.lobby__heading p:last-child,
+.lobby__actions p,
+.lobby-player__seat {
+  color: #a7f3d0;
+}
+
+.lobby__count,
+.lobby-player__badges span,
+.lobby-player__badges em {
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: rgb(167 243 208 / 12%);
+  font-size: 0.8rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.lobby__players {
+  display: grid;
+  margin: 1.5rem 0;
+  padding: 0;
+  gap: 0.65rem;
+  list-style: none;
+}
+
+.lobby-player {
+  padding: 0.85rem 1rem;
+  border: 1px solid rgb(167 243 208 / 12%);
+  border-radius: 0.8rem;
+  background: rgb(4 17 14 / 45%);
+}
+
+.lobby-player--ready {
+  border-color: rgb(52 211 153 / 55%);
+}
+
+.lobby-player__badges {
+  gap: 0.4rem;
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -359,5 +427,16 @@ h1 {
   .room-form__grid,
   .room-form__growth {
     grid-template-columns: 1fr;
+  }
+
+  .lobby__heading,
+  .lobby-player {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .lobby__actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
