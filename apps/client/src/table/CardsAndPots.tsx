@@ -50,6 +50,7 @@ export function CardsAndPots({
   communityCards,
   pots,
 }: CardsAndPotsProps) {
+  let sidePotIndex = 0;
   return (
     <div className="cards-and-pots">
       <div className="community-cards" aria-label="公共牌牌面">
@@ -63,12 +64,20 @@ export function CardsAndPots({
       </div>
 
       <dl className="pot-list" aria-label="底池列表">
-        {pots.map((pot, index) => (
-          <div className="pot-chip" key={`${index}-${pot.amount}`}>
-            <dt>{index === 0 ? '主池' : `边池 ${index}`}</dt>
-            <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
-          </div>
-        ))}
+        {pots.map((pot, index) => {
+          const label =
+            index === 0
+              ? '主池'
+              : pot.eligiblePlayerIds.length < 2
+                ? '待匹配'
+                : `边池 ${++sidePotIndex}`;
+          return (
+            <div className="pot-chip" key={`${index}-${pot.amount}`}>
+              <dt>{label}</dt>
+              <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
+            </div>
+          );
+        })}
       </dl>
 
       <div className="hole-cards" aria-label="我的底牌">

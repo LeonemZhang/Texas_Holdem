@@ -32,7 +32,7 @@ describe('CardsAndPots', () => {
     );
     expect(screen.getByText('主池')).toBeInTheDocument();
     expect(screen.getByText('边池 1')).toBeInTheDocument();
-    expect(screen.getByText('边池 2')).toBeInTheDocument();
+    expect(screen.getByText('待匹配')).toBeInTheDocument();
     expect(screen.queryByText(/赢家/)).not.toBeInTheDocument();
     expect(screen.getAllByLabelText(/未公开/)).toHaveLength(7);
   });
