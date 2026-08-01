@@ -179,7 +179,7 @@ export function GameRoom({
   const statistics = snapshot.statistics.players.map((player) => ({
     ...player,
     nickname: names.get(player.playerId) ?? player.playerId,
-    initialChips: player.currentChips,
+    initialChips: snapshot.room.initialChips,
     largestSingleHandProfit: 0,
     largestWonPot: 0,
     showdownCount: 0,

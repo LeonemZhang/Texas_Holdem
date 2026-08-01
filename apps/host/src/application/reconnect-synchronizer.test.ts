@@ -36,6 +36,7 @@ function snapshot(sequence: number): PlayerSnapshot {
     room: {
       roomName: 'Friends',
       phase: 'lobby',
+      initialChips: 100,
       smallBlind: 1,
       bigBlind: 2,
       completedHands: 0,

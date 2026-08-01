@@ -86,6 +86,7 @@ export function projectPlayerSnapshot(
     room: {
       roomName: input.room.settings.roomName,
       phase: input.room.phase,
+      initialChips: input.room.settings.initialChips,
       smallBlind: input.room.settings.smallBlind,
       bigBlind: input.room.settings.bigBlind,
       completedHands: input.completedHands ?? 0,

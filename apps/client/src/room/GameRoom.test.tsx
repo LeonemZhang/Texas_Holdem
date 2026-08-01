@@ -15,6 +15,7 @@ const snapshot: PlayerSnapshot = {
   room: {
     roomName: 'Friends',
     phase: 'lobby',
+    initialChips: 100,
     smallBlind: 1,
     bigBlind: 2,
     completedHands: 0,
@@ -274,6 +275,7 @@ describe('GameRoom', () => {
       screen.getByRole('heading', { name: '牌局战报' }),
     ).toBeInTheDocument();
     expect(screen.getByText('#1 Bob')).toBeInTheDocument();
+    expect(screen.getByText('+1')).toBeInTheDocument();
     expect(window.innerWidth).toBe(360);
   });
 });

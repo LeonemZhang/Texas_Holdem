@@ -12,6 +12,7 @@ const snapshot = {
   room: {
     roomName: 'Friends',
     phase: 'playing',
+    initialChips: 100,
     smallBlind: 1,
     bigBlind: 2,
     completedHands: 0,
@@ -74,6 +75,7 @@ describe('PlayerSnapshotSchema', () => {
   it('parses public state, own private cards, and server legal actions', () => {
     expect(PlayerSnapshotSchema.parse(snapshot)).toMatchObject({
       playerId: 'p1',
+      room: { initialChips: 100 },
       game: { ownHoleCards: ['As', 'Kd'], legalActions: { callAmount: 1 } },
     });
   });

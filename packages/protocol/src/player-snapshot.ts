@@ -47,6 +47,7 @@ export const PlayerSnapshotSchema = z.object({
   room: z.object({
     roomName: z.string().trim().min(1),
     phase: z.enum(['lobby', 'playing', 'hand-ready', 'paused', 'closed']),
+    initialChips: AmountSchema,
     smallBlind: AmountSchema,
     bigBlind: AmountSchema,
     completedHands: AmountSchema,
