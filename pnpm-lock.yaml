@@ -54,6 +54,9 @@ importers:
       react-dom:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
+      socket.io-client:
+        specifier: 4.8.3
+        version: 4.8.3
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 7.0.0
