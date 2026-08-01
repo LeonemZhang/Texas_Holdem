@@ -12,8 +12,11 @@ import {
 export interface PublicRoomSummary {
   readonly roomId: string;
   readonly roomName: string;
+  readonly hostNickname: string;
   readonly playerCount: number;
   readonly maxPlayers: number;
+  readonly smallBlind: number;
+  readonly bigBlind: number;
   readonly phase: RoomDiscoveryResponse['phase'];
 }
 

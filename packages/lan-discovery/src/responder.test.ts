@@ -36,8 +36,11 @@ describe('UdpDiscoveryResponder', () => {
       roomSummary: () => ({
         roomId: 'room-1',
         roomName: 'Friends',
+        hostNickname: 'Alice',
         playerCount: 2,
         maxPlayers: 10,
+        smallBlind: 1,
+        bigBlind: 2,
         phase: 'lobby',
       }),
     });
@@ -79,8 +82,11 @@ describe('UdpDiscoveryResponder', () => {
       roomSummary: () => ({
         roomId: 'room-1',
         roomName: 'Friends',
+        hostNickname: 'Alice',
         playerCount: 2,
         maxPlayers: 10,
+        smallBlind: 1,
+        bigBlind: 2,
         phase: 'lobby',
       }),
     });

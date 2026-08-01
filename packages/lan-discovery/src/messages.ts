@@ -24,16 +24,23 @@ export const RoomDiscoveryResponseSchema = z
     type: z.literal('room'),
     roomId: z.string().trim().min(1).max(128),
     roomName: z.string().trim().min(1).max(200),
+    hostNickname: z.string().trim().min(1).max(100),
     hostAddress: z.ipv4(),
     httpPort: z.number().int().min(1).max(65_535),
     playerCount: z.number().int().min(1).max(10),
     maxPlayers: z.number().int().min(2).max(10),
+    smallBlind: z.number().int().positive().safe(),
+    bigBlind: z.number().int().positive().safe(),
     phase: z.enum(['lobby', 'playing', 'hand-ready', 'paused']),
   })
   .strict()
   .refine((response) => response.playerCount <= response.maxPlayers, {
     message: 'Player count cannot exceed room capacity',
     path: ['playerCount'],
+  })
+  .refine((response) => response.bigBlind === response.smallBlind * 2, {
+    message: 'Big blind must be twice the small blind',
+    path: ['bigBlind'],
   });
 
 export type DiscoveryRequest = z.infer<typeof DiscoveryRequestSchema>;

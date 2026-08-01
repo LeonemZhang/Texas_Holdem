@@ -200,6 +200,77 @@ h1 {
   color: #fda4af;
 }
 
+.room-browser {
+  margin-top: 1rem;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid rgb(167 243 208 / 18%);
+  border-radius: 1.25rem;
+  background: rgb(4 17 14 / 42%);
+}
+
+.room-browser__heading,
+.room-list__title,
+.room-list__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.room-browser h2 {
+  margin: 0;
+}
+
+.room-browser__empty {
+  margin: 1.5rem 0 0;
+  color: #a7f3d0;
+}
+
+.room-list {
+  display: grid;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  gap: 0.75rem;
+  list-style: none;
+}
+
+.room-list__item {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid rgb(167 243 208 / 16%);
+  border-radius: 1rem;
+  background: rgb(6 78 59 / 20%);
+}
+
+.room-list__title span,
+.room-list dt,
+.room-list__footer span {
+  color: #a7f3d0;
+  font-size: 0.8rem;
+}
+
+.room-list dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 1rem 0;
+  gap: 0.75rem;
+}
+
+.room-list dl div {
+  min-width: 0;
+}
+
+.room-list dt,
+.room-list dd {
+  margin: 0;
+}
+
+.room-list dd {
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
 @media (max-width: 420px) {
   .page-shell {
     padding: 1.25rem 1rem 2rem;
@@ -217,5 +288,14 @@ h1 {
   .connection-home__desktop-actions {
     width: 100%;
     flex-direction: column;
+  }
+
+  .room-browser__heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-list dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

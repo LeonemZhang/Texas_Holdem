@@ -11,6 +11,10 @@
     "./health": {
       "types": "./src/health.ts",
       "default": "./dist/health.js"
+    },
+    "./messages": {
+      "types": "./src/messages.ts",
+      "default": "./dist/messages.js"
     }
   },
   "scripts": {

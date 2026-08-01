@@ -25,10 +25,13 @@ const room = {
   type: 'room' as const,
   roomId: 'room-1',
   roomName: 'Friends',
+  hostNickname: 'Alice',
   hostAddress: '10.126.126.1',
   httpPort: 32100,
   playerCount: 2,
   maxPlayers: 10,
+  smallBlind: 1,
+  bigBlind: 2,
   phase: 'lobby' as const,
 };
 
