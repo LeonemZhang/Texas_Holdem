@@ -5,6 +5,11 @@ import { join } from 'node:path';
 import { io as createSocketClient } from 'socket.io-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InMemorySessionAuthenticator } from './application/session-authenticator.js';
+import { projectPlayerSnapshot } from './application/snapshot-projector.js';
+import { createRoom } from './domain/room.js';
+import { joinRoom } from './domain/join-room.js';
+import { setLobbyReady } from './domain/lobby-ready.js';
+import { startFirstHand } from './domain/start-first-hand.js';
 import { createHostServer, type HostServer } from './server.js';
 
 let activeHost: HostServer | undefined;
@@ -215,6 +220,128 @@ describe('host framework server', () => {
       expect(dispatch).not.toHaveBeenCalled();
     } finally {
       clients.forEach((client) => client.disconnect());
+    }
+  });
+
+  it('broadcasts public events but sends private snapshots only to their player', async () => {
+    const sessions = new InMemorySessionAuthenticator();
+    sessions.register(
+      { roomId: 'room-1', playerId: 'host' },
+      'host-secret-token',
+    );
+    sessions.register(
+      { roomId: 'room-1', playerId: 'bob' },
+      'bob-secret-token-1',
+    );
+    activeHost = await createHostServer({ sessionAuthenticator: sessions });
+    const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const client = (playerId: string, token: string) =>
+      createSocketClient(address, {
+        transports: ['websocket'],
+        auth: {
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId,
+          token,
+        },
+      });
+    const hostClient = client('host', 'host-secret-token');
+    const bobClient = client('bob', 'bob-secret-token-1');
+
+    try {
+      await Promise.all(
+        [hostClient, bobClient].map(
+          (socket) =>
+            new Promise<void>((resolve, reject) => {
+              socket.on('connect', () => resolve());
+              socket.on('connect_error', reject);
+            }),
+        ),
+      );
+      const hostEvent = new Promise<unknown>((resolve) =>
+        hostClient.once('event:domain', resolve),
+      );
+      const bobEvent = new Promise<unknown>((resolve) =>
+        bobClient.once('event:domain', resolve),
+      );
+      activeHost.publisher.publishEvent({
+        protocolVersion: PROTOCOL_VERSION,
+        eventId: 'event-1',
+        roomId: 'room-1',
+        sequence: 1,
+        stateVersion: 1,
+        type: 'room.control-changed',
+        phase: 'playing',
+      });
+      expect(await Promise.all([hostEvent, bobEvent])).toEqual([
+        expect.objectContaining({ eventId: 'event-1' }),
+        expect.objectContaining({ eventId: 'event-1' }),
+      ]);
+
+      let room = createRoom({
+        roomId: 'room-1',
+        hostPlayerId: 'host',
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 100,
+          blind: { kind: 'preset', smallBlind: 1 },
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      });
+      room = joinRoom(room, { playerId: 'bob', nickname: 'Bob' });
+      room = setLobbyReady(room, 'host', true);
+      room = setLobbyReady(room, 'bob', true);
+      const started = startFirstHand(room, 'host', 'hand-1', {
+        next: () => 0.5,
+      });
+      const hostSnapshot = new Promise<unknown>((resolve) =>
+        hostClient.once('state:snapshot', resolve),
+      );
+      const bobSnapshot = new Promise<unknown>((resolve) =>
+        bobClient.once('state:snapshot', resolve),
+      );
+      activeHost.publisher.publishSnapshot(
+        projectPlayerSnapshot({
+          room: started.room,
+          viewerPlayerId: 'host',
+          sequence: 1,
+          hand: started.hand,
+        }),
+      );
+      activeHost.publisher.publishSnapshot(
+        projectPlayerSnapshot({
+          room: started.room,
+          viewerPlayerId: 'bob',
+          sequence: 1,
+          hand: started.hand,
+        }),
+      );
+      const [hostState, bobState] = (await Promise.all([
+        hostSnapshot,
+        bobSnapshot,
+      ])) as [
+        { playerId: string; game: { ownHoleCards: string[] } },
+        { playerId: string; game: { ownHoleCards: string[] } },
+      ];
+      expect(hostState.playerId).toBe('host');
+      expect(bobState.playerId).toBe('bob');
+      expect(hostState.game.ownHoleCards).not.toEqual(
+        bobState.game.ownHoleCards,
+      );
+      expect(JSON.stringify(hostState)).not.toContain(
+        bobState.game.ownHoleCards[0],
+      );
+      expect(JSON.stringify(bobState)).not.toContain(
+        hostState.game.ownHoleCards[0],
+      );
+    } finally {
+      hostClient.disconnect();
+      bobClient.disconnect();
     }
   });
 });

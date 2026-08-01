@@ -22,6 +22,11 @@ import type {
   SessionAuthenticator,
   SessionIdentity,
 } from './application/session-authenticator.js';
+import {
+  privatePlayerChannel,
+  publicRoomChannel,
+  SocketPublisher,
+} from './application/socket-publisher.js';
 
 export const HOST_SERVER_VERSION = '0.0.0';
 
@@ -36,6 +41,7 @@ export interface CreateHostServerOptions {
 export interface HostServer {
   app: FastifyInstance;
   io: SocketIOServer;
+  publisher: SocketPublisher;
   close(): Promise<void>;
 }
 
@@ -46,6 +52,7 @@ export async function createHostServer(
   const io = new SocketIOServer(app.server, {
     serveClient: false,
   });
+  const publisher = new SocketPublisher(io);
 
   const connection = () => {
     const address = app.server.address();
@@ -104,6 +111,12 @@ export async function createHostServer(
       parsedAuthentication.success && options.sessionAuthenticator
         ? options.sessionAuthenticator.authenticate(parsedAuthentication.data)
         : null;
+    if (identity) {
+      void socket.join([
+        publicRoomChannel(identity.roomId),
+        privatePlayerChannel(identity.roomId, identity.playerId),
+      ]);
+    }
 
     socket.on('system:hello', (rawRequest: unknown, acknowledge: unknown) => {
       const request = SystemHelloRequestSchema.safeParse(rawRequest);
@@ -172,6 +185,7 @@ export async function createHostServer(
   return {
     app,
     io,
+    publisher,
     async close() {
       await new Promise<void>((resolve) => {
         io.close(() => resolve());
