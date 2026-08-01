@@ -390,6 +390,93 @@ h1 {
   gap: 0.4rem;
 }
 
+.poker-table-page {
+  width: min(100%, 78rem);
+  min-width: 0;
+  margin: 0 auto;
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  overflow-x: clip;
+}
+
+.poker-table-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  margin-bottom: 0.75rem;
+  gap: 0.75rem;
+}
+
+.poker-table-page__header h1,
+.poker-table-page__header p {
+  margin: 0;
+}
+
+.poker-table-page__status {
+  min-width: 0;
+  color: #a7f3d0;
+  text-align: right;
+}
+
+.poker-table {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 4 / 3;
+  border: clamp(0.5rem, 2vw, 1rem) solid #342318;
+  border-radius: 35%;
+  background:
+    radial-gradient(circle at 50% 45%, rgb(16 185 129 / 18%), transparent 48%),
+    #064e3b;
+  box-shadow:
+    inset 0 0 0 2px rgb(251 191 36 / 22%),
+    0 1rem 3rem rgb(0 0 0 / 28%);
+}
+
+.poker-table__seats {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  min-width: 0;
+}
+
+.poker-table__felt {
+  position: absolute;
+  inset: 24% 13%;
+  display: grid;
+  place-content: center;
+  min-width: 0;
+  text-align: center;
+}
+
+.poker-table__cards,
+.poker-table__pots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  gap: clamp(0.2rem, 1vw, 0.65rem);
+}
+
+.poker-table__pots {
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.poker-table-controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid rgb(167 243 208 / 18%);
+  border-radius: 1rem;
+  background: rgb(4 17 14 / 92%);
+  backdrop-filter: blur(12px);
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -438,5 +525,22 @@ h1 {
   .lobby__actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .poker-table-page {
+    padding: 0.5rem;
+  }
+
+  .poker-table-page__header {
+    align-items: flex-start;
+  }
+
+  .poker-table {
+    aspect-ratio: 3 / 4;
+    border-radius: 28%;
+  }
+
+  .poker-table__felt {
+    inset: 29% 9%;
   }
 }
