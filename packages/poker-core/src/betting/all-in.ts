@@ -4,6 +4,7 @@ import {
   requireCurrentActor,
   type BettingRoundState,
 } from './state.js';
+import { assertRaiseReopenedFor } from './reopen.js';
 
 export function applyAllIn(
   state: BettingRoundState,
@@ -15,6 +16,9 @@ export function applyAllIn(
   }
   const target = actor.streetCommitted + actor.stack;
   const raisesCurrentBet = target > state.currentBet;
+  if (raisesCurrentBet) {
+    assertRaiseReopenedFor(state, actor);
+  }
   const increment = target - state.currentBet;
   const isFullRaise =
     raisesCurrentBet && increment >= state.minimumRaiseIncrement;

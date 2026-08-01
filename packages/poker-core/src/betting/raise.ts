@@ -5,6 +5,7 @@ import {
   requireCurrentActor,
   type BettingRoundState,
 } from './state.js';
+import { assertRaiseReopenedFor } from './reopen.js';
 
 export function applyRaiseTo(
   state: BettingRoundState,
@@ -12,6 +13,7 @@ export function applyRaiseTo(
   amount: number,
 ): BettingRoundState {
   const actor = requireCurrentActor(state, playerId);
+  assertRaiseReopenedFor(state, actor);
   assertChipAmount(amount, 'Raise target');
   if (amount <= state.currentBet) {
     throw new RangeError('Raise target must exceed the current bet');
