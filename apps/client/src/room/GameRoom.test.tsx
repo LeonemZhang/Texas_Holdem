@@ -142,6 +142,44 @@ describe('GameRoom', () => {
     );
   });
 
+  it('keeps the real room link and QR code visible to the seated host', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () =>
+        consumeSnapshot({ ...snapshot, playerId: 'host' }),
+      ),
+      disconnect: vi.fn(),
+      sendCommand: vi.fn(),
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'host',
+          token: 'host-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+      />,
+    );
+
+    expect(await screen.findByTitle('加入房间二维码')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', {
+        name: 'http://10.126.126.1:32100/?room=room-1',
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('keeps chip requests and statistics operable in the mobile hand-ready flow', async () => {
     const handReadySnapshot: PlayerSnapshot = {
       ...snapshot,

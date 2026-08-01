@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 import {
   PROTOCOL_VERSION,
@@ -214,6 +215,20 @@ export function GameRoom({
             })
           }
         />
+        {own?.isHost ? (
+          <section className="host-share" aria-labelledby="game-invite-title">
+            <div>
+              <p className="connection-home__kicker">邀请朋友加入</p>
+              <h2 id="game-invite-title">房间连接地址</h2>
+              <a href={session.joinUrl}>{session.joinUrl}</a>
+            </div>
+            <QRCodeSVG
+              value={session.joinUrl}
+              size={144}
+              title="加入房间二维码"
+            />
+          </section>
+        ) : null}
         <button
           className="button button--secondary"
           type="button"
