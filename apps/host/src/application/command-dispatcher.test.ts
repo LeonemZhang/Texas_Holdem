@@ -63,11 +63,26 @@ describe('CommandDispatcher', () => {
     expect(handle).not.toHaveBeenCalled();
   });
 
-  it('accepts a valid command but intentionally has no idempotency cache yet', () => {
+  it('returns the original response without applying a repeated player command', () => {
     const handle = vi.fn(() => ({ stateVersion: 1, sequence: 1 }));
     const dispatcher = new CommandDispatcher(registry(), () => true, handle);
-    expect(dispatcher.dispatch(command).status).toBe('accepted');
-    expect(dispatcher.dispatch(command).status).toBe('accepted');
+    const first = dispatcher.dispatch(command);
+    const repeated = dispatcher.dispatch(command);
+    expect(first.status).toBe('accepted');
+    expect(repeated).toBe(first);
+    expect(handle).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates command idempotency keys between players', () => {
+    const handle = vi
+      .fn()
+      .mockReturnValueOnce({ stateVersion: 1, sequence: 1 })
+      .mockReturnValueOnce({ stateVersion: 2, sequence: 2 });
+    const dispatcher = new CommandDispatcher(registry(), () => true, handle);
+    const hostResult = dispatcher.dispatch(command);
+    const guestResult = dispatcher.dispatch({ ...command, playerId: 'guest' });
+    expect(hostResult).not.toBe(guestResult);
+    expect(guestResult).toMatchObject({ stateVersion: 2, sequence: 2 });
     expect(handle).toHaveBeenCalledTimes(2);
   });
 });

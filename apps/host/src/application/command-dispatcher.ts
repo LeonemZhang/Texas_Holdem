@@ -32,6 +32,8 @@ export type CommandAuthorizer = (
 ) => boolean;
 
 export class CommandDispatcher {
+  private readonly results = new Map<string, CommandResponse>();
+
   constructor(
     private readonly rooms: RoomRepository,
     private readonly authorize: CommandAuthorizer,
@@ -60,27 +62,32 @@ export class CommandDispatcher {
       };
     }
     const command = parsed.data;
+    const resultKey = `${command.playerId}\u0000${command.commandId}`;
+    const previousResult = this.results.get(resultKey);
+    if (previousResult) {
+      return previousResult;
+    }
     const room = this.rooms.get(command.roomId);
     if (!room && command.type !== 'room.create') {
-      return {
+      return this.remember(resultKey, {
         protocolVersion: PROTOCOL_VERSION,
         commandId: command.commandId,
         status: 'rejected',
         error: { code: 'NOT_FOUND', message: 'Room not found' },
-      };
+      });
     }
     if (room && command.expectedVersion !== room.version) {
-      return {
+      return this.remember(resultKey, {
         protocolVersion: PROTOCOL_VERSION,
         commandId: command.commandId,
         status: 'conflict',
         expectedVersion: command.expectedVersion,
         currentVersion: room.version,
         error: { code: 'CONFLICT', message: 'Room state version changed' },
-      };
+      });
     }
     if (!this.authorize(command, room)) {
-      return {
+      return this.remember(resultKey, {
         protocolVersion: PROTOCOL_VERSION,
         commandId: command.commandId,
         status: 'unauthorized',
@@ -88,15 +95,20 @@ export class CommandDispatcher {
           code: 'UNAUTHORIZED',
           message: 'Command identity is not authorized',
         },
-      };
+      });
     }
     const result = this.handle(command, room);
-    return {
+    return this.remember(resultKey, {
       protocolVersion: PROTOCOL_VERSION,
       commandId: command.commandId,
       status: 'accepted',
       stateVersion: result.stateVersion,
       sequence: result.sequence,
-    };
+    });
+  }
+
+  private remember(key: string, response: CommandResponse): CommandResponse {
+    this.results.set(key, response);
+    return response;
   }
 }
