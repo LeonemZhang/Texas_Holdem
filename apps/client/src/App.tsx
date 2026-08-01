@@ -2,6 +2,7 @@ import { PageShell } from '@texas-holdem/ui';
 import { useEffect, useState } from 'react';
 import { ConnectionHome } from './home/ConnectionHome';
 import { getRuntimeAdapter, type RuntimeInfo } from './runtime';
+import { UiSmokePreview } from './test/UiSmokePreview';
 
 export function App() {
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
@@ -10,6 +11,11 @@ export function App() {
   useEffect(() => {
     void getRuntimeAdapter().getRuntimeInfo().then(setRuntime);
   }, []);
+
+  const preview = import.meta.env.DEV
+    ? new URLSearchParams(window.location.search).get('preview')
+    : null;
+  if (preview) return <UiSmokePreview page={preview} />;
 
   return (
     <PageShell

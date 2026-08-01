@@ -1067,6 +1067,13 @@ h1 {
   }
 }
 
+.ui-smoke-stack {
+  display: grid;
+  width: min(100% - 1rem, 64rem);
+  margin: 0.5rem auto;
+  gap: 1rem;
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
