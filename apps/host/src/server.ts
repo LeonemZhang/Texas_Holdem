@@ -71,6 +71,12 @@ export async function createHostServer(
   const publisher = new SocketPublisher(io);
   await app.register(fastifyCors, { origin: true });
 
+  const publishRoomSnapshots = (roomId: string) => {
+    for (const snapshot of options.roomSnapshotsProvider?.(roomId) ?? []) {
+      publisher.publishSnapshot(snapshot);
+    }
+  };
+
   const connection = () => {
     const address = app.server.address();
     const actualPort =
@@ -126,10 +132,12 @@ export async function createHostServer(
           });
         }
         try {
-          return options.roomSessionService!.create(
+          const session = options.roomSessionService!.create(
             parsed.data,
             connection().joinUrl,
           );
+          publishRoomSnapshots(session.roomId);
+          return session;
         } catch (error) {
           return reply.code(409).send({
             error: {
@@ -151,11 +159,13 @@ export async function createHostServer(
           });
         }
         try {
-          return options.roomSessionService!.join(
+          const session = options.roomSessionService!.join(
             roomId,
             parsed.data,
             connection().joinUrl,
           );
+          publishRoomSnapshots(session.roomId);
+          return session;
         } catch (error) {
           return reply.code(409).send({
             error: {
@@ -251,11 +261,7 @@ export async function createHostServer(
         const response = options.commandDispatcher.dispatch(rawCommand);
         acknowledge(response);
         if (response.status === 'accepted') {
-          for (const snapshot of options.roomSnapshotsProvider?.(
-            identity.roomId,
-          ) ?? []) {
-            publisher.publishSnapshot(snapshot);
-          }
+          publishRoomSnapshots(identity.roomId);
         }
       } catch {
         acknowledge({

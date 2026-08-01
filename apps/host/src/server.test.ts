@@ -29,6 +29,9 @@ afterEach(async () => {
 describe('host framework server', () => {
   it('creates and joins a room through HTTP then sends the authenticated snapshot', async () => {
     const runtime = new GameRuntime();
+    const roomSnapshotsProvider = vi.fn((roomId: string) =>
+      runtime.snapshotsForRoom(roomId),
+    );
     activeHost = await createHostServer({
       roomSessionService: runtime,
       commandDispatcher: runtime,
@@ -36,7 +39,7 @@ describe('host framework server', () => {
       reconnectSynchronizer: runtime.reconnect,
       snapshotProvider: (roomId, playerId) =>
         runtime.snapshot(roomId, playerId),
-      roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
+      roomSnapshotsProvider,
     });
     const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
     const created = await activeHost.app.inject({
@@ -78,6 +81,8 @@ describe('host framework server', () => {
       playerId: string;
       token: string;
     }>();
+    expect(roomSnapshotsProvider).toHaveBeenCalledTimes(2);
+    expect(roomSnapshotsProvider).toHaveBeenLastCalledWith(hostSession.roomId);
     const client = createSocketClient(address, {
       autoConnect: false,
       transports: ['websocket'],
