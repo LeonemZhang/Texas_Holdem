@@ -7,3 +7,4 @@ export * from './evaluator/best-hand.js';
 export * from './evaluator/five-card-analysis.js';
 export * from './evaluator/five-card-distribution.js';
 export * from './evaluator/hand-rank.js';
+export * from './seating/seats.js';
