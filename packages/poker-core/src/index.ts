@@ -21,4 +21,5 @@ export * from './pots/odd-chips.js';
 export * from './hand/start-hand.js';
 export * from './hand/preflop-reducer.js';
 export * from './hand/streets.js';
+export * from './hand/hand-reducer.js';
 export * from './seating/positions.js';
