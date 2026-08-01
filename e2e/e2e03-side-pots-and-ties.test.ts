@@ -70,6 +70,7 @@ describe('LUNA-E2E03 all-ins, side pots, ties, and odd chips', () => {
           chips: 0,
           status: 'all-in',
           isHost: index === 0,
+          lobbyReady: true,
         })),
       },
       game: {

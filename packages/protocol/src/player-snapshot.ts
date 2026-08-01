@@ -35,6 +35,7 @@ export const PublicPlayerSchema = z.object({
     'disconnected',
   ]),
   isHost: z.boolean(),
+  lobbyReady: z.boolean(),
 });
 
 export const PlayerSnapshotSchema = z.object({

@@ -23,6 +23,7 @@ const snapshot = {
         chips: 99,
         status: 'active',
         isHost: true,
+        lobbyReady: true,
       },
       {
         playerId: 'p2',
@@ -31,6 +32,7 @@ const snapshot = {
         chips: 98,
         status: 'active',
         isHost: false,
+        lobbyReady: true,
       },
     ],
   },

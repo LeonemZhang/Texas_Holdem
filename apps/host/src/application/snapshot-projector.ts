@@ -96,6 +96,7 @@ export function projectPlayerSnapshot(
         chips: currentChips(player),
         status: publicStatus(player, hand),
         isHost: player.playerId === input.room.hostPlayerId,
+        lobbyReady: player.lobbyReady,
       })),
     },
     game: hand

@@ -47,6 +47,7 @@ function snapshot(sequence: number): PlayerSnapshot {
           chips: 100,
           status: 'waiting',
           isHost: true,
+          lobbyReady: false,
         },
       ],
     },

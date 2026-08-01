@@ -93,6 +93,7 @@ function snapshot(
         chips: player.chips,
         status: player.status,
         isHost: player.playerId === room.hostPlayerId,
+        lobbyReady: player.lobbyReady,
       })),
     },
     game: null,
