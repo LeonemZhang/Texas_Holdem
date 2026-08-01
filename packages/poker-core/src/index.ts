@@ -17,4 +17,5 @@ export * from './seating/seats.js';
 export * from './pots/tiers.js';
 export * from './pots/pots.js';
 export * from './pots/distribution.js';
+export * from './pots/odd-chips.js';
 export * from './seating/positions.js';
