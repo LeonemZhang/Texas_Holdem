@@ -94,7 +94,17 @@ export const PlayerSnapshotSchema = z.object({
         currentChips: AmountSchema,
         participatedHands: AmountSchema,
         wonHands: AmountSchema,
+        largestSingleHandProfit: AmountSchema,
+        largestWonPot: AmountSchema,
+        showdownCount: AmountSchema,
         showdownWinRate: z.number().min(0).max(1).nullable(),
+        actions: z.object({
+          fold: AmountSchema,
+          check: AmountSchema,
+          call: AmountSchema,
+          raiseTo: AmountSchema,
+          allIn: AmountSchema,
+        }),
       }),
     ),
     titles: z.array(

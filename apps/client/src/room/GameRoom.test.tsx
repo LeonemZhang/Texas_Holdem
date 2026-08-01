@@ -226,14 +226,22 @@ describe('GameRoom', () => {
             currentChips: 99,
             participatedHands: 1,
             wonHands: 0,
+            largestSingleHandProfit: 0,
+            largestWonPot: 0,
+            showdownCount: 0,
             showdownWinRate: null,
+            actions: { fold: 1, check: 0, call: 0, raiseTo: 0, allIn: 0 },
           },
           {
             playerId: 'bob',
             currentChips: 101,
             participatedHands: 1,
             wonHands: 1,
+            largestSingleHandProfit: 1,
+            largestWonPot: 3,
+            showdownCount: 0,
             showdownWinRate: null,
+            actions: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },
           },
         ],
         titles: [],
@@ -296,6 +304,8 @@ describe('GameRoom', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('#1 Bob')).toBeInTheDocument();
     expect(screen.getByText('+1')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('1 / 0 / 0 / 0 / 0')).toBeInTheDocument();
     expect(window.innerWidth).toBe(360);
   });
 });

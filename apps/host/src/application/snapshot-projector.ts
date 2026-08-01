@@ -20,7 +20,17 @@ export interface SnapshotPlayerStatistics {
   readonly currentChips: number;
   readonly participatedHands: number;
   readonly wonHands: number;
+  readonly largestSingleHandProfit: number;
+  readonly largestWonPot: number;
+  readonly showdownCount: number;
   readonly showdownWinRate: number | null;
+  readonly actions: {
+    readonly fold: number;
+    readonly check: number;
+    readonly call: number;
+    readonly raiseTo: number;
+    readonly allIn: number;
+  };
 }
 
 export interface SnapshotProjectionInput {
@@ -74,7 +84,11 @@ export function projectPlayerSnapshot(
       currentChips: currentChips(player),
       participatedHands: 0,
       wonHands: 0,
+      largestSingleHandProfit: 0,
+      largestWonPot: 0,
+      showdownCount: 0,
       showdownWinRate: null,
+      actions: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },
     }));
 
   return PlayerSnapshotSchema.parse({

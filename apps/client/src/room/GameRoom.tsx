@@ -176,10 +176,6 @@ export function GameRoom({
     ...player,
     nickname: names.get(player.playerId) ?? player.playerId,
     initialChips: snapshot.room.initialChips,
-    largestSingleHandProfit: 0,
-    largestWonPot: 0,
-    showdownCount: 0,
-    actions: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },
   }));
 
   if (snapshot.room.phase === 'lobby') {

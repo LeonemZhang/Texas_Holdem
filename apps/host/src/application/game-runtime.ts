@@ -294,8 +294,19 @@ export class GameRuntime implements RoomSessionBootstrapService {
         participatedHands:
           rebuilt.basic[player.playerId]?.participatedHands ?? 0,
         wonHands: rebuilt.basic[player.playerId]?.wonHands ?? 0,
+        largestSingleHandProfit:
+          rebuilt.outcomes[player.playerId]?.largestSingleHandProfit ?? 0,
+        largestWonPot: rebuilt.basic[player.playerId]?.largestWonPot ?? 0,
+        showdownCount: rebuilt.outcomes[player.playerId]?.showdownCount ?? 0,
         showdownWinRate:
           rebuilt.outcomes[player.playerId]?.showdownWinRate ?? null,
+        actions: rebuilt.basic[player.playerId]?.actionCounts ?? {
+          fold: 0,
+          check: 0,
+          call: 0,
+          raiseTo: 0,
+          allIn: 0,
+        },
       })),
       titles: rebuilt.titles,
     });
