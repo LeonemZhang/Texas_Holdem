@@ -72,4 +72,21 @@ export const HOST_MIGRATIONS: readonly SqliteMigration[] = Object.freeze([
       `);
     },
   },
+  {
+    version: 2,
+    name: 'create_command_results',
+    up: (database) => {
+      database.exec(`
+        CREATE TABLE command_results (
+          room_id TEXT NOT NULL,
+          player_id TEXT NOT NULL,
+          command_id TEXT NOT NULL,
+          response_json TEXT NOT NULL CHECK (json_valid(response_json)),
+          created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
+          PRIMARY KEY (room_id, player_id, command_id),
+          FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE
+        ) STRICT
+      `);
+    },
+  },
 ]);
