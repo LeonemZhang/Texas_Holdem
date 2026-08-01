@@ -14,7 +14,7 @@ export interface DesktopRoomSetupProps {
   readonly onHosted: (
     service: HostServiceInfo,
     room: CreateRoomFormValue,
-  ) => void;
+  ) => Promise<HostServiceInfo>;
 }
 
 export function DesktopRoomSetup({ runtime, onHosted }: DesktopRoomSetupProps) {
@@ -50,8 +50,7 @@ export function DesktopRoomSetup({ runtime, onHosted }: DesktopRoomSetupProps) {
         port: 32_100,
         advertisedAddress: selectedAddress,
       });
-      setService(hosted);
-      onHosted(hosted, room);
+      setService(await onHosted(hosted, room));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '房主服务启动失败');
     } finally {

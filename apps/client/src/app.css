@@ -200,6 +200,51 @@ h1 {
   color: #fda4af;
 }
 
+.nickname-join,
+.game-room-loading {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border: 1px solid rgb(167 243 208 / 18%);
+  border-radius: 1rem;
+  background: rgb(6 78 59 / 22%);
+}
+
+.nickname-join {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.nickname-join h2 {
+  margin: 0 auto 0 0;
+}
+
+.nickname-join label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+
+.nickname-join input {
+  min-height: 44px;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgb(167 243 208 / 30%);
+  border-radius: 0.75rem;
+  color: inherit;
+  background: rgb(4 17 14 / 72%);
+  font: inherit;
+}
+
+.game-room-shell,
+.game-room-loading {
+  width: min(100%, 72rem);
+  margin-inline: auto;
+}
+
+.game-room-shell {
+  padding: clamp(0.5rem, 2vw, 1.5rem);
+}
+
 .room-browser {
   margin-top: 1rem;
   padding: clamp(1rem, 3vw, 2rem);
@@ -1215,7 +1260,9 @@ h1 {
   }
 
   .connection-home__heading,
-  .join-form__row {
+  .join-form__row,
+  .nickname-join {
+    align-items: stretch;
     flex-direction: column;
   }
 

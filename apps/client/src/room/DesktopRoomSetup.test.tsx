@@ -37,7 +37,12 @@ function runtime(): RuntimeAdapter {
 describe('DesktopRoomSetup', () => {
   it('lets the host select a virtual adapter and starts with its actual address', async () => {
     const adapter = runtime();
-    render(<DesktopRoomSetup runtime={adapter} onHosted={vi.fn()} />);
+    render(
+      <DesktopRoomSetup
+        runtime={adapter}
+        onHosted={vi.fn(async (service) => service)}
+      />,
+    );
     expect(
       await screen.findByRole('option', { name: 'Virtual LAN · 10.126.126.1' }),
     ).toBeInTheDocument();
