@@ -72,6 +72,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
   readonly #completedHands = new Map<string, number>();
   readonly #results = new Map<string, CommandResponse>();
   readonly #handReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #actionTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #automaticListeners = new Set<(roomId: string) => void>();
   readonly #dispatcher = new CommandDispatcher(
     this.rooms,
@@ -113,6 +114,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     }
     this.startNextHandIfReady(command.roomId, false);
     this.scheduleHandReadyTimeout(command.roomId);
+    this.scheduleActionTimeout(command.roomId);
     const sequence = (this.#sequences.get(command.roomId) ?? 0) + 1;
     this.#sequences.set(command.roomId, sequence);
     const sequenced = Object.freeze({
@@ -136,7 +138,9 @@ export class GameRuntime implements RoomSessionBootstrapService {
 
   dispose(): void {
     for (const timer of this.#handReadyTimers.values()) clearTimeout(timer);
+    for (const timer of this.#actionTimers.values()) clearTimeout(timer);
     this.#handReadyTimers.clear();
+    this.#actionTimers.clear();
     this.#automaticListeners.clear();
   }
 
@@ -334,9 +338,58 @@ export class GameRuntime implements RoomSessionBootstrapService {
       if (!this.startNextHandIfReady(roomId, true)) return;
       this.#sequences.set(roomId, (this.#sequences.get(roomId) ?? 0) + 1);
       this.#automaticListeners.forEach((listener) => listener(roomId));
+      this.scheduleActionTimeout(roomId);
     }, delayMs);
     timer.unref?.();
     this.#handReadyTimers.set(roomId, timer);
+  }
+
+  private scheduleActionTimeout(roomId: string): void {
+    const existing = this.#actionTimers.get(roomId);
+    if (existing) clearTimeout(existing);
+    this.#actionTimers.delete(roomId);
+    const room = this.rooms.get(roomId);
+    const hand = this.#roomHandler.getCurrentHand(roomId);
+    const actorId = hand?.betting.currentActorId;
+    if (!room || room.phase !== 'playing' || !hand || !actorId) return;
+    const legal = hand.betting.players.find(
+      ({ playerId }) => playerId === actorId,
+    );
+    if (!legal) return;
+    const timer = setTimeout(() => {
+      this.#actionTimers.delete(roomId);
+      const currentRoom = this.rooms.get(roomId);
+      const currentHand = this.#roomHandler.getCurrentHand(roomId);
+      if (
+        !currentRoom ||
+        currentRoom.phase !== 'playing' ||
+        currentHand?.handId !== hand.handId ||
+        currentHand.betting.currentActorId !== actorId
+      ) {
+        return;
+      }
+      const actor = currentHand.betting.players.find(
+        ({ playerId }) => playerId === actorId,
+      );
+      if (!actor) return;
+      const commandType =
+        actor.streetCommitted === currentHand.betting.currentBet
+          ? 'game.check'
+          : 'game.fold';
+      const response = this.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: randomUUID(),
+        roomId,
+        playerId: actorId,
+        expectedVersion: currentRoom.version,
+        type: commandType,
+      });
+      if (response.status === 'accepted') {
+        this.#automaticListeners.forEach((listener) => listener(roomId));
+      }
+    }, room.settings.actionTimeoutSeconds * 1_000);
+    timer.unref?.();
+    this.#actionTimers.set(roomId, timer);
   }
 
   private commandResultKey(input: unknown): string | null {

@@ -150,4 +150,47 @@ describe('GameRuntime', () => {
     expect(automatic).toHaveBeenCalledWith(context.host.roomId);
     runtime.dispose();
   });
+
+  it('folds a player who does not act before the configured turn deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const runtime = new GameRuntime();
+    const host = runtime.create(
+      {
+        hostNickname: 'Alice',
+        settings: { ...settings, actionTimeoutSeconds: 1 },
+      },
+      'http://10.126.126.1:32100',
+    );
+    const guest = runtime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      'http://10.126.126.1:32100',
+    );
+    const send = (playerId: string, command: Record<string, unknown>) =>
+      runtime.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: crypto.randomUUID(),
+        roomId: host.roomId,
+        playerId,
+        expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+        ...command,
+      });
+    send(host.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(guest.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(host.playerId, {
+      type: 'room.start-first-hand',
+      handId: 'timed-hand',
+    });
+    const automatic = vi.fn();
+    runtime.onAutomaticStateChange(automatic);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(runtime.snapshot(host.roomId, host.playerId)).toMatchObject({
+      room: { phase: 'hand-ready', completedHands: 1 },
+    });
+    expect(automatic).toHaveBeenCalledWith(host.roomId);
+    runtime.dispose();
+  });
 });
