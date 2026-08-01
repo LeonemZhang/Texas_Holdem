@@ -164,4 +164,47 @@ export const HOST_MIGRATIONS: readonly SqliteMigration[] = Object.freeze([
       `);
     },
   },
+  {
+    version: 5,
+    name: 'create_statistics_fact_store',
+    up: (database) => {
+      database.exec(`
+        CREATE TABLE hand_summaries (
+          room_id TEXT NOT NULL,
+          hand_id TEXT NOT NULL,
+          sequence INTEGER NOT NULL,
+          summary_json TEXT NOT NULL CHECK (json_valid(summary_json)),
+          created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
+          PRIMARY KEY (room_id, hand_id),
+          UNIQUE (room_id, sequence),
+          FOREIGN KEY (room_id, sequence)
+            REFERENCES events(room_id, sequence) ON DELETE CASCADE
+        ) STRICT;
+
+        CREATE TABLE statistics_facts (
+          room_id TEXT NOT NULL,
+          fact_id TEXT NOT NULL,
+          hand_id TEXT NOT NULL,
+          fact_type TEXT NOT NULL CHECK (
+            fact_type IN (
+              'player.action', 'showdown.heads-up-loss',
+              'showdown.river-comeback'
+            )
+          ),
+          payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+          created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
+          PRIMARY KEY (room_id, fact_id),
+          FOREIGN KEY (room_id, hand_id)
+            REFERENCES hand_summaries(room_id, hand_id) ON DELETE CASCADE
+        ) STRICT;
+
+        CREATE TABLE statistics_cache (
+          room_id TEXT PRIMARY KEY,
+          cache_json TEXT NOT NULL CHECK (json_valid(cache_json)),
+          rebuilt_at_ms INTEGER NOT NULL CHECK (rebuilt_at_ms >= 0),
+          FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE
+        ) STRICT;
+      `);
+    },
+  },
 ]);
