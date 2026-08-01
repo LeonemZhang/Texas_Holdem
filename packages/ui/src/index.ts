@@ -1,1 +1,1 @@
-export const UI_PACKAGE = '@texas-holdem/ui';
+export * from './page-shell.js';
