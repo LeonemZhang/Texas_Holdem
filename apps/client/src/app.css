@@ -932,6 +932,63 @@ h1 {
   grid-template-columns: minmax(7rem, auto) 1fr auto;
 }
 
+.host-controls {
+  padding: 1rem;
+  border: 1px solid rgb(251 191 36 / 24%);
+  border-radius: 1rem;
+  background: rgb(120 53 15 / 12%);
+}
+
+.host-controls h2,
+.host-controls p {
+  margin: 0;
+}
+
+.host-controls__actions {
+  display: flex;
+  align-items: end;
+  margin-top: 0.85rem;
+  gap: 0.65rem;
+}
+
+.host-controls button,
+.host-controls select {
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgb(251 191 36 / 28%);
+  border-radius: 0.65rem;
+  color: inherit;
+  background: #071a16;
+  font: inherit;
+}
+
+.host-controls label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.host-controls__danger {
+  color: #fecdd3 !important;
+  border-color: rgb(251 113 133 / 45%) !important;
+}
+
+.host-confirmation {
+  margin-top: 0.85rem;
+  padding: 0.8rem;
+  border: 1px solid rgb(251 113 133 / 40%);
+  border-radius: 0.7rem;
+  background: rgb(159 18 57 / 16%);
+}
+
+.host-confirmation p {
+  margin: 0.4rem 0 0.7rem;
+  color: #fecdd3;
+}
+
+.host-confirmation button {
+  margin-right: 0.5rem;
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -1057,5 +1114,15 @@ h1 {
 
   .statistics-ranking__actions {
     grid-column: auto;
+  }
+
+  .host-controls__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .host-controls label,
+  .host-controls button {
+    width: 100%;
   }
 }
