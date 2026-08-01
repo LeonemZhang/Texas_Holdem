@@ -89,4 +89,56 @@ export const HOST_MIGRATIONS: readonly SqliteMigration[] = Object.freeze([
       `);
     },
   },
+  {
+    version: 3,
+    name: 'create_chip_ledger',
+    up: (database) => {
+      database.exec(`
+        CREATE TABLE chip_requests (
+          room_id TEXT NOT NULL,
+          request_id TEXT NOT NULL,
+          after_hand_id TEXT NOT NULL,
+          requester_id TEXT NOT NULL,
+          target_player_id TEXT,
+          amount INTEGER NOT NULL CHECK (amount > 0),
+          note TEXT,
+          status TEXT NOT NULL CHECK (
+            status IN ('pending', 'rejected', 'revoked', 'completed')
+          ),
+          rejected_by_json TEXT NOT NULL CHECK (json_valid(rejected_by_json)),
+          updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0),
+          PRIMARY KEY (room_id, request_id),
+          FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE,
+          FOREIGN KEY (room_id, requester_id)
+            REFERENCES players(room_id, player_id),
+          FOREIGN KEY (room_id, target_player_id)
+            REFERENCES players(room_id, player_id)
+        ) STRICT;
+
+        CREATE TABLE chip_transfers (
+          room_id TEXT NOT NULL,
+          transfer_id TEXT NOT NULL,
+          from_player_id TEXT NOT NULL,
+          to_player_id TEXT NOT NULL,
+          amount INTEGER NOT NULL CHECK (amount > 0),
+          source TEXT NOT NULL CHECK (source IN ('direct', 'request-approval')),
+          request_id TEXT,
+          created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
+          PRIMARY KEY (room_id, transfer_id),
+          FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE,
+          FOREIGN KEY (room_id, from_player_id)
+            REFERENCES players(room_id, player_id),
+          FOREIGN KEY (room_id, to_player_id)
+            REFERENCES players(room_id, player_id),
+          FOREIGN KEY (room_id, request_id)
+            REFERENCES chip_requests(room_id, request_id),
+          CHECK (from_player_id <> to_player_id),
+          CHECK (
+            (source = 'direct' AND request_id IS NULL) OR
+            (source = 'request-approval' AND request_id IS NOT NULL)
+          )
+        ) STRICT;
+      `);
+    },
+  },
 ]);
