@@ -94,6 +94,54 @@ describe('GameRoom', () => {
     );
   });
 
+  it('exposes the same authoritative command port to desktop close handling', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const sendCommand = vi.fn().mockResolvedValue({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: 'close-1',
+      status: 'accepted',
+      stateVersion: 3,
+      sequence: 3,
+    });
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => consumeSnapshot(snapshot)),
+      disconnect: vi.fn(),
+      sendCommand,
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    let commandPort:
+      ((command: Record<string, unknown>) => Promise<boolean>) | null = null;
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+        onCommandPortChange={(port) => {
+          commandPort = port;
+        }}
+      />,
+    );
+
+    await screen.findByRole('heading', { name: 'Friends' });
+    expect(commandPort).not.toBeNull();
+    await commandPort!({ type: 'room.exit' });
+    expect(sendCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'room.exit', expectedVersion: 2 }),
+    );
+  });
+
   it('keeps chip requests and statistics operable in the mobile hand-ready flow', async () => {
     const handReadySnapshot: PlayerSnapshot = {
       ...snapshot,

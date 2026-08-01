@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   PROTOCOL_VERSION,
@@ -30,6 +30,9 @@ export interface GameRoomProps {
     session: RoomSessionResponse,
   ) => ConnectionAdapter;
   readonly onExited?: () => void;
+  readonly onCommandPortChange?: (
+    port: ((command: Record<string, unknown>) => Promise<boolean>) | null,
+  ) => void;
 }
 
 function defaultConnection(session: RoomSessionResponse): ConnectionAdapter {
@@ -41,6 +44,7 @@ export function GameRoom({
   session,
   connectionFactory = defaultConnection,
   onExited,
+  onCommandPortChange,
 }: GameRoomProps) {
   const connection = useMemo(
     () => connectionFactory(session),
@@ -78,27 +82,38 @@ export function GameRoom({
     };
   }, [connection, session]);
 
-  const send = async (command: Record<string, unknown>) => {
-    if (!snapshot || sending) return;
-    setSending(true);
-    setError(null);
-    try {
-      const response = await connection.sendCommand({
-        protocolVersion: PROTOCOL_VERSION,
-        roomId: session.roomId,
-        playerId: session.playerId,
-        expectedVersion: snapshot.stateVersion,
-        ...command,
-      });
-      if (response.status !== 'accepted') {
-        setError(response.error.message);
+  const send = useCallback(
+    async (command: Record<string, unknown>): Promise<boolean> => {
+      if (!snapshot || sending) return false;
+      setSending(true);
+      setError(null);
+      try {
+        const response = await connection.sendCommand({
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: session.roomId,
+          playerId: session.playerId,
+          expectedVersion: snapshot.stateVersion,
+          ...command,
+        });
+        if (response.status !== 'accepted') {
+          setError(response.error.message);
+          return false;
+        }
+        return true;
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : '命令发送失败');
+        return false;
+      } finally {
+        setSending(false);
       }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '命令发送失败');
-    } finally {
-      setSending(false);
-    }
-  };
+    },
+    [connection, sending, session, snapshot],
+  );
+
+  useEffect(() => {
+    onCommandPortChange?.(send);
+    return () => onCommandPortChange?.(null);
+  }, [onCommandPortChange, send]);
 
   const sendBetting = (intent: BettingActionIntent) => void send(intent);
   const sendHostControl = (intent: HostControlIntent) => {

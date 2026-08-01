@@ -1,5 +1,5 @@
 import { PageShell } from '@texas-holdem/ui';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import type { RoomSessionResponse } from '@texas-holdem/protocol';
 
@@ -50,6 +50,9 @@ export function App() {
   const [joinTarget, setJoinTarget] = useState<JoinTarget | null>(null);
   const [session, setSession] = useState<RoomSessionResponse | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const roomCommand = useRef<
+    ((command: Record<string, unknown>) => Promise<boolean>) | null
+  >(null);
   const adapter = getRuntimeAdapter();
 
   useEffect(() => {
@@ -61,9 +64,10 @@ export function App() {
       else setJoinTarget({ baseUrl: window.location.origin, roomId });
     }
     const stopPlayerExit = adapter.onPlayerExitRequested(async () => {
-      // GameRoom performs the explicit exit from its own action.
+      await roomCommand.current?.({ type: 'room.exit' });
     });
     const stopHostClose = adapter.onHostCloseRequested(async () => {
+      await roomCommand.current?.({ type: 'room.close' });
       await adapter.stopHostService();
     });
     return () => {
@@ -148,6 +152,9 @@ export function App() {
     return (
       <GameRoom
         session={session}
+        onCommandPortChange={(port) => {
+          roomCommand.current = port;
+        }}
         onExited={() => {
           browserReconnectSessionStore().clear(session.roomId);
           setSession(null);
