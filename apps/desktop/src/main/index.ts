@@ -114,15 +114,23 @@ async function createMainWindow() {
   if (developmentUrl) {
     await window.loadURL(developmentUrl);
   } else {
-    await window.loadFile(join(__dirname, '../../../client/dist/index.html'));
+    await window.loadFile(
+      app.isPackaged
+        ? join(process.resourcesPath, 'client/index.html')
+        : join(__dirname, '../../../client/dist/index.html'),
+    );
   }
 }
 
 void app.whenReady().then(async () => {
-  const hostEntryPath = join(__dirname, '../../../host/dist/index.js');
+  const hostEntryPath = app.isPackaged
+    ? join(process.resourcesPath, 'host/index.mjs')
+    : join(__dirname, '../host/index.mjs');
   const hostController = new HostProcessController({
     dataDirectory: join(app.getPath('userData'), 'rooms'),
-    staticDirectory: join(__dirname, '../../../client/dist'),
+    staticDirectory: app.isPackaged
+      ? join(process.resourcesPath, 'client')
+      : join(__dirname, '../../../client/dist'),
     spawn: ({ env }) =>
       utilityProcess.fork(hostEntryPath, [], {
         env: { ...process.env, ...env },

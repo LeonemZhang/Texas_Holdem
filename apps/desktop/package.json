@@ -6,13 +6,16 @@
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "pnpm build && wait-on tcp:5173 && cross-env CLIENT_DEV_URL=http://localhost:5173 electron .",
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && esbuild ../host/src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/host/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package:win": "electron-builder --win dir --x64"
   },
   "devDependencies": {
     "cross-env": "10.0.0",
     "electron": "43.2.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.1",
     "typescript": "6.0.3",
     "vitest": "4.1.10",
     "wait-on": "9.1.0"
@@ -20,5 +23,32 @@
   "dependencies": {
     "@texas-holdem/lan-discovery": "workspace:*",
     "zod": "4.3.6"
+  },
+  "build": {
+    "appId": "com.leonemzhang.texasholdem",
+    "productName": "Texas Holdem",
+    "asar": true,
+    "directories": {
+      "output": "../../release"
+    },
+    "files": [
+      "dist/main/**/*",
+      "dist/preload/**/*",
+      "dist/shared/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../client/dist",
+        "to": "client"
+      },
+      {
+        "from": "dist/host",
+        "to": "host"
+      }
+    ],
+    "win": {
+      "target": "dir"
+    }
   }
 }

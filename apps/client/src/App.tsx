@@ -1,12 +1,17 @@
 import { PageShell } from '@texas-holdem/ui';
 import { useEffect, useState } from 'react';
 import { ConnectionHome } from './home/ConnectionHome';
+import { NetworkDiagnostics } from './home/NetworkDiagnostics';
 import {
   RoomDiscoveryList,
   type RoomDiscoveryListItem,
 } from './home/RoomDiscoveryList';
 import { DesktopRoomSetup } from './room/DesktopRoomSetup';
-import { getRuntimeAdapter, type RuntimeInfo } from './runtime';
+import {
+  getRuntimeAdapter,
+  type HostServiceInfo,
+  type RuntimeInfo,
+} from './runtime';
 import { UiSmokePreview } from './test/UiSmokePreview';
 
 export function App() {
@@ -15,6 +20,7 @@ export function App() {
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [rooms, setRooms] = useState<readonly RoomDiscoveryListItem[]>([]);
   const [refreshingRooms, setRefreshingRooms] = useState(false);
+  const [hostService, setHostService] = useState<HostServiceInfo | null>(null);
   const adapter = getRuntimeAdapter();
 
   useEffect(() => {
@@ -75,21 +81,28 @@ export function App() {
         <DesktopRoomSetup
           runtime={adapter}
           onHosted={(service) => {
+            setHostService(service);
             setJoinAddress(service.joinUrl);
             void adapter.setWindowRoomContext({ inRoom: true, isHost: true });
           }}
         />
       ) : null}
       {runtime?.kind === 'desktop' ? (
-        <RoomDiscoveryList
-          rooms={rooms}
-          refreshing={refreshingRooms}
-          onRefresh={() => void refreshRooms()}
-          onJoin={(room) => {
-            setJoinAddress(`http://${room.hostAddress}:${room.httpPort}`);
-            void adapter.setWindowRoomContext({ inRoom: true, isHost: false });
-          }}
-        />
+        <>
+          <RoomDiscoveryList
+            rooms={rooms}
+            refreshing={refreshingRooms}
+            onRefresh={() => void refreshRooms()}
+            onJoin={(room) => {
+              setJoinAddress(`http://${room.hostAddress}:${room.httpPort}`);
+              void adapter.setWindowRoomContext({
+                inRoom: true,
+                isHost: false,
+              });
+            }}
+          />
+          <NetworkDiagnostics runtime={adapter} hostService={hostService} />
+        </>
       ) : null}
       {joinAddress ? (
         <p className="connection-target" role="status">

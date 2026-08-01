@@ -21,6 +21,7 @@
     "pretest": "pnpm --filter \"./packages/*\" build",
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",
+    "package:win": "pnpm build && pnpm --filter @texas-holdem/desktop package:win",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "devDependencies": {

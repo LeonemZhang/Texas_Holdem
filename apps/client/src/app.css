@@ -1122,6 +1122,83 @@ h1 {
   background: white;
 }
 
+.network-diagnostics {
+  margin-top: 1rem;
+  border: 1px solid rgb(96 165 250 / 22%);
+  border-radius: 1rem;
+  background: rgb(30 64 175 / 10%);
+}
+
+.network-diagnostics summary {
+  padding: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.network-diagnostics__content {
+  padding: 0 1rem 1rem;
+}
+
+.network-diagnostics__content header,
+.network-ports {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.network-diagnostics h2 {
+  margin: 0;
+}
+
+.network-diagnostics button {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgb(147 197 253 / 35%);
+  border-radius: 0.6rem;
+  color: inherit;
+  background: #071a16;
+}
+
+.network-adapters {
+  display: grid;
+  padding: 0;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.network-adapters li,
+.network-ports div {
+  display: grid;
+  padding: 0.65rem;
+  border-radius: 0.6rem;
+  background: rgb(4 17 14 / 45%);
+}
+
+.network-adapters small,
+.network-ports dt {
+  color: #bfdbfe;
+}
+
+.network-ports {
+  align-items: stretch;
+}
+
+.network-ports div {
+  flex: 1;
+}
+
+.network-ports dd {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.network-diagnostics__tip {
+  margin-bottom: 0;
+  color: #bfdbfe;
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -1267,6 +1344,12 @@ h1 {
 
   .host-share {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .network-diagnostics__content header,
+  .network-ports {
+    align-items: stretch;
     flex-direction: column;
   }
 }
