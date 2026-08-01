@@ -150,4 +150,31 @@ describe('GameCommandHandler', () => {
         ?.players.find(({ playerId }) => playerId === allInPlayer)?.status,
     ).toBe('all-in');
   });
+
+  it('settles an uncontested hand, conserves chips, and enters timed hand readiness', () => {
+    const { rooms, runtime } = playingRoom();
+    const handler = new GameCommandHandler(rooms, runtime, () => 5_000);
+    const hand = runtime.getCurrentHand('room-1')!;
+    const actor = hand.betting.currentActorId!;
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'fold-and-settle',
+        playerId: actor,
+        type: 'game.fold',
+      },
+      rooms.get('room-1'),
+    );
+
+    const room = rooms.get('room-1')!;
+    expect(room.phase).toBe('hand-ready');
+    expect(room.players.reduce((sum, player) => sum + player.chips, 0)).toBe(
+      200,
+    );
+    expect(runtime.getHandReady('room-1')).toMatchObject({
+      afterHandId: 'hand-1',
+      startedAtMs: 5_000,
+      deadlineMs: 35_000,
+    });
+  });
 });
