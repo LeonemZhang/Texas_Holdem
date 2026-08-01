@@ -60,6 +60,7 @@ describe('LUNA-E2E03 all-ins, side pots, ties, and odd chips', () => {
       room: {
         roomName: '朋友局',
         phase: 'playing',
+        initialChips: 100,
         smallBlind: 1,
         bigBlind: 2,
         completedHands: 0,

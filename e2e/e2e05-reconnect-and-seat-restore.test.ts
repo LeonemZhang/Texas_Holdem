@@ -83,6 +83,7 @@ function snapshot(
     room: {
       roomName: room.settings.roomName,
       phase: room.phase,
+      initialChips: room.settings.initialChips,
       smallBlind: 1,
       bigBlind: 2,
       completedHands: 1,
