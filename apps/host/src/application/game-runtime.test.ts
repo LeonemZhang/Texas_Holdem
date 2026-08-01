@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
+import type { HandSummaryEvent } from '@texas-holdem/poker-core';
 
 import { GameRuntime } from './game-runtime.js';
+import type {
+  StatisticsFactStorePort,
+  StoredStatisticsFact,
+} from './statistics-store.js';
+import type { StatisticsFactEvent } from '../statistics/fact-statistics.js';
 
 const settings = {
   roomName: 'Friends',
@@ -192,5 +198,39 @@ describe('GameRuntime', () => {
     });
     expect(automatic).toHaveBeenCalledWith(host.roomId);
     runtime.dispose();
+  });
+
+  it('restores completed hands and full statistics from the injected fact store', () => {
+    const summaries: HandSummaryEvent[] = [];
+    const facts: StatisticsFactEvent[] = [];
+    const store: StatisticsFactStorePort = {
+      saveSummary: (_roomId, _sequence, summary) => summaries.push(summary),
+      saveFacts: (_roomId, stored: readonly StoredStatisticsFact[]) =>
+        facts.push(...stored.map(({ event }) => event)),
+      loadSummaries: () => summaries,
+      loadFacts: () => facts,
+    };
+    const runtime = new GameRuntime({ statisticsStore: store });
+    const context = reachHandReady(runtime);
+    const before = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!;
+    const exported = runtime.exportState(context.host.roomId)!;
+    expect(before.room.completedHands).toBe(1);
+    expect(
+      before.statistics.players.some(({ actions }) => actions.fold === 1),
+    ).toBe(true);
+    runtime.dispose();
+
+    const recovered = new GameRuntime({ statisticsStore: store });
+    recovered.restore(exported, exported.sequence);
+    const after = recovered.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    );
+    expect(after?.room.completedHands).toBe(1);
+    expect(after?.statistics).toEqual(before.statistics);
+    recovered.dispose();
   });
 });

@@ -9,6 +9,7 @@ import {
   runSqliteMigrations,
 } from './persistence/sqlite-database.js';
 import { SqliteGameRuntimeStore } from './persistence/sqlite-game-runtime-store.js';
+import { SqliteStatisticsStore } from './persistence/sqlite-statistics-store.js';
 import { UdpDiscoveryResponder } from '@texas-holdem/lan-discovery';
 import { currentDiscoverySummary } from './application/discovery-summary.js';
 
@@ -46,11 +47,13 @@ const database = dataDirectory
     })()
   : null;
 const runtimeStore = database ? new SqliteGameRuntimeStore(database) : null;
+const statisticsStore = database ? new SqliteStatisticsStore(database) : null;
 const runtime = new GameRuntime(
   runtimeStore
     ? {
         sessionFallback: (credentials) =>
           runtimeStore.authenticate(credentials),
+        ...(statisticsStore ? { statisticsStore } : {}),
       }
     : {},
 );

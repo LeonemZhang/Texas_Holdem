@@ -13,6 +13,7 @@ import {
 import { GameCommandHandler } from './game-command-handler.js';
 import {
   rebuildStatistics,
+  type StatisticsFactStorePort,
   type StoredStatisticsFact,
 } from './statistics-store.js';
 import {
@@ -28,6 +29,7 @@ import { InMemorySessionAuthenticator } from './session-authenticator.js';
 import { projectPlayerSnapshot } from './snapshot-projector.js';
 import type { HandSummaryEvent } from '@texas-holdem/poker-core';
 import type { RoomRecoveryState } from './persistence-ports.js';
+import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
 
 export interface RoomSessionBootstrapService {
   currentRoomId(): string | null;
@@ -67,9 +69,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     Date.now,
     {
       onPlayerAction: (event) => {
-        const facts = this.#facts.get(event.handId) ?? [];
-        facts.push({ factId: randomUUID(), event });
-        this.#facts.set(event.handId, facts);
+        this.recordPlayerAction(event);
       },
       onHandSettled: (summary) => this.recordSummary(summary),
     },
@@ -82,6 +82,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
   readonly #automaticListeners = new Set<(roomId: string) => void>();
   readonly #committedListeners = new Set<(roomId: string) => void>();
   readonly #reconnectTokens = new Map<string, Map<string, string>>();
+  readonly #statisticsStore: StatisticsFactStorePort | null;
   readonly #dispatcher = new CommandDispatcher(
     this.rooms,
     (command, room) =>
@@ -101,9 +102,11 @@ export class GameRuntime implements RoomSessionBootstrapService {
           InMemorySessionAuthenticator['authenticate']
         >[0],
       ) => ReturnType<InMemorySessionAuthenticator['authenticate']>;
+      readonly statisticsStore?: StatisticsFactStorePort;
     } = {},
   ) {
     this.sessions = new InMemorySessionAuthenticator(options.sessionFallback);
+    this.#statisticsStore = options.statisticsStore ?? null;
   }
 
   dispatch(input: unknown): CommandResponse {
@@ -168,6 +171,12 @@ export class GameRuntime implements RoomSessionBootstrapService {
     }
     this.#roomHandler.restoreState(state);
     this.#sequences.set(state.room.roomId, sequence);
+    if (this.#statisticsStore) {
+      this.#completedHands.set(
+        state.room.roomId,
+        this.#statisticsStore.loadSummaries(state.room.roomId).length,
+      );
+    }
     this.scheduleHandReadyTimeout(state.room.roomId);
     this.scheduleActionTimeout(state.room.roomId);
   }
@@ -265,10 +274,22 @@ export class GameRuntime implements RoomSessionBootstrapService {
         room.settings.initialChips,
       ]),
     );
-    const summaries = this.#summaries.get(roomId) ?? [];
-    const facts = summaries.flatMap(
-      (summary) => this.#facts.get(summary.handId) ?? [],
+    const summaries = this.#statisticsStore
+      ? this.#statisticsStore.loadSummaries(roomId)
+      : (this.#summaries.get(roomId) ?? []);
+    const currentHandId = this.#roomHandler.getCurrentHand(roomId)?.handId;
+    const currentHandAlreadySummarized = summaries.some(
+      ({ handId }) => handId === currentHandId,
     );
+    const facts = [
+      ...(this.#statisticsStore
+        ?.loadFacts(roomId)
+        .map((event) => ({ event })) ??
+        summaries.flatMap((summary) => this.#facts.get(summary.handId) ?? [])),
+      ...(currentHandId && !currentHandAlreadySummarized
+        ? (this.#facts.get(currentHandId) ?? [])
+        : []),
+    ];
     const rebuilt = rebuildStatistics(
       {
         saveSummary: () => undefined,
@@ -341,9 +362,6 @@ export class GameRuntime implements RoomSessionBootstrapService {
           this.#roomHandler.getCurrentHand(roomId)?.handId === summary.handId,
       );
     if (!room) return;
-    const summaries = this.#summaries.get(room) ?? [];
-    summaries.push(summary);
-    this.#summaries.set(room, summaries);
     if (summary.reason === 'showdown' && summary.participants.length === 2) {
       const winner = summary.winnerIds[0];
       const loser = summary.participants.find(
@@ -364,6 +382,31 @@ export class GameRuntime implements RoomSessionBootstrapService {
         this.#facts.set(summary.handId, facts);
       }
     }
+    if (this.#statisticsStore) {
+      const createdAtMs = Date.now();
+      this.#statisticsStore.saveSummary(
+        room,
+        (this.#sequences.get(room) ?? 0) + 1,
+        summary,
+        createdAtMs,
+      );
+      this.#statisticsStore.saveFacts(
+        room,
+        this.#facts.get(summary.handId) ?? [],
+        createdAtMs,
+      );
+      this.#facts.delete(summary.handId);
+      return;
+    }
+    const summaries = this.#summaries.get(room) ?? [];
+    summaries.push(summary);
+    this.#summaries.set(room, summaries);
+  }
+
+  private recordPlayerAction(event: PlayerActionEvent): void {
+    const facts = this.#facts.get(event.handId) ?? [];
+    facts.push({ factId: randomUUID(), event });
+    this.#facts.set(event.handId, facts);
   }
 
   private startNextHandIfReady(
