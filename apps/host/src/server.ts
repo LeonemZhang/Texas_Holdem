@@ -6,7 +6,10 @@ import {
   type HealthResponse,
   type SystemHelloResponse,
 } from '@texas-holdem/protocol';
+import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { Server as SocketIOServer } from 'socket.io';
 
 export const HOST_SERVER_VERSION = '0.0.0';
@@ -22,7 +25,7 @@ export interface HostServer {
 }
 
 export async function createHostServer(
-  _options: CreateHostServerOptions = {},
+  options: CreateHostServerOptions = {},
 ): Promise<HostServer> {
   const app = Fastify({ logger: false });
   const io = new SocketIOServer(app.server, {
@@ -41,11 +44,19 @@ export async function createHostServer(
     serverVersion: HOST_SERVER_VERSION,
   }));
 
-  app.get('/', async () => ({
-    message: 'Texas Hold’em host service is running',
-    protocolVersion: PROTOCOL_VERSION,
-  }));
-
+  if (
+    options.staticDirectory &&
+    existsSync(join(options.staticDirectory, 'index.html'))
+  ) {
+    await app.register(fastifyStatic, {
+      root: options.staticDirectory,
+    });
+  } else {
+    app.get('/', async () => ({
+      message: 'Texas Hold’em host service is running',
+      protocolVersion: PROTOCOL_VERSION,
+    }));
+  }
   io.on('connection', (socket) => {
     socket.on('system:hello', (rawRequest: unknown, acknowledge: unknown) => {
       const request = SystemHelloRequestSchema.safeParse(rawRequest);

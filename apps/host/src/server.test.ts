@@ -1,4 +1,7 @@
 import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { io as createSocketClient } from 'socket.io-client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createHostServer, type HostServer } from './server.js';
@@ -27,6 +30,21 @@ describe('host framework server', () => {
       protocolVersion: PROTOCOL_VERSION,
       serverVersion: '0.0.0',
     });
+  });
+
+  it('serves a built client directory when supplied', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'texas-holdem-client-'));
+    await writeFile(join(directory, 'index.html'), '<h1>client smoke</h1>');
+
+    try {
+      activeHost = await createHostServer({ staticDirectory: directory });
+      const response = await activeHost.app.inject({ method: 'GET', url: '/' });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toContain('client smoke');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('acknowledges a valid Socket.IO system hello', async () => {
