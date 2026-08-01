@@ -65,6 +65,13 @@ export class RoomCommandHandler {
     return this.#hands.get(roomId) ?? null;
   }
 
+  replaceCurrentHand(roomId: string, hand: StartedHandState): void {
+    if (hand.handId !== this.#hands.get(roomId)?.handId) {
+      throw new RangeError('Replacement hand does not match the active hand');
+    }
+    this.#hands.set(roomId, hand);
+  }
+
   getHandReady(roomId: string): HandReadyState | null {
     return this.#handReady.get(roomId) ?? null;
   }
