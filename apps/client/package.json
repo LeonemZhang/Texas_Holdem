@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@texas-holdem/lan-discovery": "workspace:*",
     "@texas-holdem/protocol": "workspace:*",
     "@texas-holdem/ui": "workspace:*",
     "react": "19.2.8",

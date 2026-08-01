@@ -42,6 +42,9 @@ importers:
 
   apps/client:
     dependencies:
+      '@texas-holdem/lan-discovery':
+        specifier: workspace:*
+        version: link:../../packages/lan-discovery
       '@texas-holdem/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@texas-holdem/lan-discovery/health': fileURLToPath(
+        new URL('../../packages/lan-discovery/src/health.ts', import.meta.url),
+      ),
       '@texas-holdem/protocol': fileURLToPath(
         new URL('../../packages/protocol/src/index.ts', import.meta.url),
       ),
