@@ -3,3 +3,4 @@ export * from './cards/deck.js';
 export * from './cards/shuffle.js';
 export * from './evaluator/combinations.js';
 export * from './evaluator/five-card-analysis.js';
+export * from './evaluator/hand-rank.js';
