@@ -7,7 +7,9 @@ describe('WindowCloseCoordinator for ordinary players', () => {
     const event = { preventDefault: vi.fn() };
     const port = {
       confirmPlayerExit: vi.fn(async () => true),
+      confirmHostClose: vi.fn(async () => true),
       requestPlayerExit: vi.fn(),
+      requestHostClose: vi.fn(),
       closeWindow: vi.fn(),
     };
     const coordinator = new WindowCloseCoordinator(port);
@@ -26,7 +28,9 @@ describe('WindowCloseCoordinator for ordinary players', () => {
   it('keeps the window open when the player cancels', async () => {
     const port = {
       confirmPlayerExit: vi.fn(async () => false),
+      confirmHostClose: vi.fn(async () => true),
       requestPlayerExit: vi.fn(),
+      requestHostClose: vi.fn(),
       closeWindow: vi.fn(),
     };
     const coordinator = new WindowCloseCoordinator(port);
@@ -43,10 +47,31 @@ describe('WindowCloseCoordinator for ordinary players', () => {
     const event = { preventDefault: vi.fn() };
     const coordinator = new WindowCloseCoordinator({
       confirmPlayerExit: vi.fn(async () => true),
+      confirmHostClose: vi.fn(async () => true),
       requestPlayerExit: vi.fn(),
+      requestHostClose: vi.fn(),
       closeWindow: vi.fn(),
     });
     coordinator.handleClose(event);
     expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('uses a separate confirmed close-room path for the host', async () => {
+    const event = { preventDefault: vi.fn() };
+    const port = {
+      confirmPlayerExit: vi.fn(async () => true),
+      confirmHostClose: vi.fn(async () => true),
+      requestPlayerExit: vi.fn(),
+      requestHostClose: vi.fn(),
+      closeWindow: vi.fn(),
+    };
+    const coordinator = new WindowCloseCoordinator(port);
+    coordinator.setContext({ inRoom: true, isHost: true });
+    coordinator.handleClose(event);
+    await vi.waitFor(() =>
+      expect(port.requestHostClose).toHaveBeenCalledOnce(),
+    );
+    expect(port.requestPlayerExit).not.toHaveBeenCalled();
+    expect(event.preventDefault).toHaveBeenCalledOnce();
   });
 });

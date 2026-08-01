@@ -23,6 +23,7 @@ export interface RuntimeAdapter {
   ): () => void;
   setWindowRoomContext(context: WindowRoomContext): Promise<void>;
   onPlayerExitRequested(listener: () => void | Promise<void>): () => void;
+  onHostCloseRequested(listener: () => void | Promise<void>): () => void;
 }
 
 export interface WindowRoomContext {
@@ -82,6 +83,9 @@ const browserAdapter: RuntimeAdapter = {
   },
   async setWindowRoomContext() {},
   onPlayerExitRequested() {
+    return () => undefined;
+  },
+  onHostCloseRequested() {
     return () => undefined;
   },
 };

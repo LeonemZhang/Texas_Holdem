@@ -30,6 +30,7 @@ function runtime(): RuntimeAdapter {
     onHostServiceExited: () => () => undefined,
     setWindowRoomContext: async () => undefined,
     onPlayerExitRequested: () => () => undefined,
+    onHostCloseRequested: () => () => undefined,
   };
 }
 

@@ -19,9 +19,17 @@ export function App() {
 
   useEffect(() => {
     void adapter.getRuntimeInfo().then(setRuntime);
-    return adapter.onPlayerExitRequested(async () => {
+    const stopPlayerExit = adapter.onPlayerExitRequested(async () => {
       // The game shell supplies room.exit before this callback completes.
     });
+    const stopHostClose = adapter.onHostCloseRequested(async () => {
+      // The game shell supplies room.close before stopping the host process.
+      await adapter.stopHostService();
+    });
+    return () => {
+      stopPlayerExit();
+      stopHostClose();
+    };
   }, []);
 
   const refreshRooms = async () => {

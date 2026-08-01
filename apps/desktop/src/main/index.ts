@@ -83,8 +83,23 @@ async function createMainWindow() {
       });
       return result.response === 0;
     },
+    confirmHostClose: async () => {
+      const result = await dialog.showMessageBox(window, {
+        type: 'warning',
+        title: '关闭房间',
+        message: '是否关闭房间和当前对局？',
+        detail: '确认后将先正常关闭房间并保存状态；取消可继续游戏。',
+        buttons: ['关闭房间', '取消'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      return result.response === 0;
+    },
     requestPlayerExit: () =>
       window.webContents.send('window:player-exit-requested'),
+    requestHostClose: () =>
+      window.webContents.send('window:host-close-requested'),
     closeWindow: () => window.close(),
   });
   window.on('close', (event) => windowCloseCoordinator?.handleClose(event));

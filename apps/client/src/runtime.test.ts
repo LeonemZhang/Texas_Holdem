@@ -30,6 +30,7 @@ describe('runtime adapter', () => {
       onHostServiceExited: () => () => undefined,
       setWindowRoomContext: async () => undefined,
       onPlayerExitRequested: () => () => undefined,
+      onHostCloseRequested: () => () => undefined,
     };
 
     await expect(getRuntimeAdapter().getRuntimeInfo()).resolves.toEqual({

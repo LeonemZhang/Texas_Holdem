@@ -42,6 +42,14 @@ const bridge: DesktopBridge = Object.freeze({
     ipcRenderer.on('window:player-exit-requested', handler);
     return () => ipcRenderer.off('window:player-exit-requested', handler);
   },
+  onHostCloseRequested: (listener: () => void | Promise<void>) => {
+    const handler = async () => {
+      await listener();
+      await ipcRenderer.invoke('window:complete-close');
+    };
+    ipcRenderer.on('window:host-close-requested', handler);
+    return () => ipcRenderer.off('window:host-close-requested', handler);
+  },
 });
 
 function zHostExitEvent(value: unknown): HostServiceExitEvent | null {

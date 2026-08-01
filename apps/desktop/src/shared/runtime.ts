@@ -19,6 +19,7 @@ export interface DesktopBridge {
   ): () => void;
   setWindowRoomContext(context: WindowRoomContext): Promise<void>;
   onPlayerExitRequested(listener: () => void | Promise<void>): () => void;
+  onHostCloseRequested(listener: () => void | Promise<void>): () => void;
 }
 
 export const DiscoveryScanInputSchema = z.object({
