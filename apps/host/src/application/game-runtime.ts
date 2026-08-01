@@ -50,7 +50,10 @@ export class GameRuntime implements RoomSessionBootstrapService {
   });
   readonly #gameHandler = new GameCommandHandler(this.rooms, this.#roomHandler);
   readonly #sequences = new Map<string, number>();
+  readonly #completedHands = new Map<string, number>();
   readonly #results = new Map<string, CommandResponse>();
+  readonly #handReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #automaticListeners = new Set<(roomId: string) => void>();
   readonly #dispatcher = new CommandDispatcher(
     this.rooms,
     (command, room) =>
@@ -69,18 +72,53 @@ export class GameRuntime implements RoomSessionBootstrapService {
       const previous = this.#results.get(resultKey);
       if (previous) return previous;
     }
+    const previousRoom =
+      typeof input === 'object' &&
+      input !== null &&
+      'roomId' in input &&
+      typeof input.roomId === 'string'
+        ? this.rooms.get(input.roomId)
+        : null;
     const response = this.#dispatcher.dispatch(input);
     if (response.status !== 'accepted') return response;
     const command = input as ClientCommand;
+    const afterCommand = this.rooms.get(command.roomId);
+    if (
+      previousRoom?.phase === 'playing' &&
+      afterCommand?.phase === 'hand-ready'
+    ) {
+      this.#completedHands.set(
+        command.roomId,
+        (this.#completedHands.get(command.roomId) ?? 0) + 1,
+      );
+    }
+    this.startNextHandIfReady(command.roomId, false);
+    this.scheduleHandReadyTimeout(command.roomId);
     const sequence = (this.#sequences.get(command.roomId) ?? 0) + 1;
     this.#sequences.set(command.roomId, sequence);
-    const sequenced = Object.freeze({ ...response, sequence });
+    const sequenced = Object.freeze({
+      ...response,
+      stateVersion:
+        this.rooms.get(command.roomId)?.version ?? response.stateVersion,
+      sequence,
+    });
     if (resultKey) this.#results.set(resultKey, sequenced);
     return sequenced;
   }
 
   currentRoomId(): string | null {
     return this.rooms.listRoomIds()[0] ?? null;
+  }
+
+  onAutomaticStateChange(listener: (roomId: string) => void): () => void {
+    this.#automaticListeners.add(listener);
+    return () => this.#automaticListeners.delete(listener);
+  }
+
+  dispose(): void {
+    for (const timer of this.#handReadyTimers.values()) clearTimeout(timer);
+    this.#handReadyTimers.clear();
+    this.#automaticListeners.clear();
   }
 
   create(
@@ -149,6 +187,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       hand: this.#roomHandler.getCurrentHand(roomId),
       handReady: this.#roomHandler.getHandReady(roomId),
       chipRequests: this.#roomHandler.getChipRequests(roomId),
+      completedHands: this.#completedHands.get(roomId) ?? 0,
     });
   }
 
@@ -171,6 +210,50 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return betting.success
       ? this.#gameHandler.handle(betting.data, room)
       : this.#roomHandler.handle(command, room);
+  }
+
+  private startNextHandIfReady(
+    roomId: string,
+    deadlineElapsed: boolean,
+  ): boolean {
+    const room = this.rooms.get(roomId);
+    const ready = this.#roomHandler.getHandReady(roomId);
+    if (!room || !ready || room.phase !== 'hand-ready') return false;
+    const completedHands = this.#completedHands.get(roomId) ?? 0;
+    const growth = room.settings.blindGrowth;
+    const growthSteps = growth.enabled
+      ? Math.floor(completedHands / growth.intervalHands)
+      : 0;
+    const smallBlind = Math.max(
+      1,
+      Math.floor(room.settings.smallBlind * growth.multiplier ** growthSteps),
+    );
+    const started = this.#roomHandler.startNextHandIfReady(roomId, {
+      handId: randomUUID(),
+      nowMs: Date.now(),
+      deadlineElapsed,
+      smallBlind,
+    });
+    if (!started) return false;
+    const timer = this.#handReadyTimers.get(roomId);
+    if (timer) clearTimeout(timer);
+    this.#handReadyTimers.delete(roomId);
+    return true;
+  }
+
+  private scheduleHandReadyTimeout(roomId: string): void {
+    if (this.#handReadyTimers.has(roomId)) return;
+    const ready = this.#roomHandler.getHandReady(roomId);
+    if (!ready) return;
+    const delayMs = Math.max(0, ready.deadlineMs - Date.now());
+    const timer = setTimeout(() => {
+      this.#handReadyTimers.delete(roomId);
+      if (!this.startNextHandIfReady(roomId, true)) return;
+      this.#sequences.set(roomId, (this.#sequences.get(roomId) ?? 0) + 1);
+      this.#automaticListeners.forEach((listener) => listener(roomId));
+    }, delayMs);
+    timer.unref?.();
+    this.#handReadyTimers.set(roomId, timer);
   }
 
   private commandResultKey(input: unknown): string | null {

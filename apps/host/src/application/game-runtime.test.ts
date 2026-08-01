@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
 
@@ -14,6 +14,43 @@ const settings = {
   blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
   zeroChipPolicy: 'request-chips' as const,
 };
+
+afterEach(() => vi.useRealTimers());
+
+function reachHandReady(runtime: GameRuntime, handReadyTimeoutSeconds = 30) {
+  const host = runtime.create(
+    {
+      hostNickname: 'Alice',
+      settings: { ...settings, handReadyTimeoutSeconds },
+    },
+    'http://10.126.126.1:32100',
+  );
+  const guest = runtime.join(
+    host.roomId,
+    { nickname: 'Bob' },
+    'http://10.126.126.1:32100',
+  );
+  let commandNumber = 0;
+  const send = (playerId: string, command: Record<string, unknown>) =>
+    runtime.dispatch({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: `command-${++commandNumber}`,
+      roomId: host.roomId,
+      playerId,
+      expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+      ...command,
+    });
+  send(host.playerId, { type: 'room.set-lobby-ready', ready: true });
+  send(guest.playerId, { type: 'room.set-lobby-ready', ready: true });
+  send(host.playerId, { type: 'room.start-first-hand', handId: 'hand-1' });
+  const actorId = runtime.snapshot(host.roomId, host.playerId)!.game!
+    .currentActorId!;
+  send(actorId, { type: 'game.fold' });
+  expect(runtime.snapshot(host.roomId, host.playerId)?.room.phase).toBe(
+    'hand-ready',
+  );
+  return { host, guest, send };
+}
 
 describe('GameRuntime', () => {
   it('creates authenticated host and guest sessions and projects command updates', () => {
@@ -57,5 +94,51 @@ describe('GameRuntime', () => {
         .snapshot(host.roomId, host.playerId)
         ?.room.players.find(({ playerId }) => playerId === guest.playerId),
     ).toMatchObject({ lobbyReady: true });
+    runtime.dispose();
+  });
+
+  it('starts the next hand immediately when every player becomes ready', () => {
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime);
+    context.send(context.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    context.send(context.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+
+    const snapshot = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    );
+    expect(snapshot).toMatchObject({
+      room: { phase: 'playing', completedHands: 1 },
+      game: { street: 'preflop' },
+      handReady: null,
+    });
+    expect(snapshot?.game?.handId).not.toBe('hand-1');
+    runtime.dispose();
+  });
+
+  it('normalizes readiness and starts automatically when the deadline elapses', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime, 1);
+    const automatic = vi.fn();
+    runtime.onAutomaticStateChange(automatic);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId),
+    ).toMatchObject({
+      room: { phase: 'playing', completedHands: 1 },
+      handReady: null,
+    });
+    expect(automatic).toHaveBeenCalledWith(context.host.roomId);
+    runtime.dispose();
   });
 });

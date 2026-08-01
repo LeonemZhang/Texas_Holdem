@@ -26,6 +26,11 @@ const host = await createHostServer({
   snapshotProvider: (roomId, playerId) => runtime.snapshot(roomId, playerId),
   roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
 });
+const stopAutomaticUpdates = runtime.onAutomaticStateChange((roomId) => {
+  for (const snapshot of runtime.snapshotsForRoom(roomId)) {
+    host.publisher.publishSnapshot(snapshot);
+  }
+});
 
 try {
   await host.app.listen({ host: address, port });
@@ -36,6 +41,8 @@ try {
 }
 
 async function shutdown() {
+  stopAutomaticUpdates();
+  runtime.dispose();
   await host.close();
   process.exitCode = 0;
 }

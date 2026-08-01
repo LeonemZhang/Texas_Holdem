@@ -5,6 +5,7 @@ import {
   createChipRequestBook,
   rejectChipRequest,
   revokeChipRequest,
+  revokePendingChipRequests,
   type ChipRequestBook,
 } from '../domain/chip-requests.js';
 import { approveChipRequest, giveChips } from '../domain/chip-transfers.js';
@@ -12,7 +13,11 @@ import type {
   BeginHandReadyResult,
   HandReadyState,
 } from '../domain/hand-ready.js';
-import { setHandReadyChoice } from '../domain/hand-ready-actions.js';
+import {
+  canBeginNextHand,
+  normalizeHandReadyAtDeadline,
+  setHandReadyChoice,
+} from '../domain/hand-ready-actions.js';
 import { joinRoom } from '../domain/join-room.js';
 import { setLobbyReady } from '../domain/lobby-ready.js';
 import { leaveRoom } from '../domain/player-status.js';
@@ -29,6 +34,7 @@ import {
   type PresetSmallBlind,
 } from '../domain/room-settings.js';
 import { startFirstHand } from '../domain/start-first-hand.js';
+import { startNextRoomHand } from '../domain/start-next-hand.js';
 import type {
   ClientCommand,
   CommandHandler,
@@ -87,6 +93,44 @@ export class RoomCommandHandler {
       result.room.roomId,
       createChipRequestBook(result.handReady),
     );
+  }
+
+  startNextHandIfReady(
+    roomId: string,
+    input: {
+      readonly handId: string;
+      readonly nowMs: number;
+      readonly deadlineElapsed: boolean;
+      readonly smallBlind: number;
+    },
+  ): RoomState | null {
+    const room = this.rooms.get(roomId);
+    const previousHand = this.#hands.get(roomId);
+    const context = this.requireHandReady(roomId);
+    if (!room || !previousHand) return null;
+    let ready = context.ready;
+    let requests = context.requests;
+    if (input.deadlineElapsed) {
+      ready = normalizeHandReadyAtDeadline(room, ready, input.nowMs);
+      requests = revokePendingChipRequests(requests);
+      this.#handReady.set(roomId, ready);
+      this.#chipRequests.set(roomId, requests);
+    }
+    const pendingRequests = requests.requests.filter(
+      ({ status }) => status === 'pending',
+    ).length;
+    if (!canBeginNextHand(ready, pendingRequests)) return null;
+    const started = startNextRoomHand(room, ready, requests, {
+      handId: input.handId,
+      previousButtonIndex: previousHand.positions.button.index,
+      smallBlind: input.smallBlind,
+      randomSource: this.randomSource,
+    });
+    this.rooms.save(started.room);
+    this.#hands.set(roomId, started.hand);
+    this.#handReady.delete(roomId);
+    this.#chipRequests.delete(roomId);
+    return started.room;
   }
 
   private accepted(room: RoomState): CommandHandlerResult {
