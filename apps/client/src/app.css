@@ -477,6 +477,78 @@ h1 {
   backdrop-filter: blur(12px);
 }
 
+.table-seats {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.table-seat {
+  position: absolute;
+  display: grid;
+  width: clamp(5.2rem, 13vw, 8.5rem);
+  min-height: 3.4rem;
+  padding: clamp(0.35rem, 1vw, 0.65rem);
+  transform: translate(-50%, -50%);
+  border: 2px solid rgb(167 243 208 / 20%);
+  border-radius: 0.8rem;
+  background: #071a16;
+  box-shadow: 0 0.4rem 1rem rgb(0 0 0 / 30%);
+  text-align: center;
+}
+
+.table-seat__name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(0.7rem, 1.8vw, 0.9rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-seat__name i {
+  display: inline-grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-left: 0.3rem;
+  border-radius: 50%;
+  color: #111827;
+  background: #fbbf24;
+  font-size: 0.7rem;
+  font-style: normal;
+}
+
+.table-seat strong {
+  color: #fbbf24;
+}
+
+.table-seat small {
+  color: #a7f3d0;
+}
+
+.table-seat--acting {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 3px rgb(251 191 36 / 20%);
+}
+
+.table-seat--disconnected,
+.table-seat--folded,
+.table-seat--sitting-out,
+.table-seat--eliminated,
+.table-seat--left {
+  opacity: 0.58;
+}
+
+.table-seat--all-in {
+  border-color: #fb7185;
+}
+
+.table-seat--own {
+  background: #0b2b23;
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -542,5 +614,16 @@ h1 {
 
   .poker-table__felt {
     inset: 29% 9%;
+  }
+
+  .table-seat {
+    width: 4.8rem;
+    min-height: 3rem;
+    padding: 0.25rem;
+  }
+
+  .table-seat small,
+  .table-seat strong {
+    font-size: 0.68rem;
   }
 }
