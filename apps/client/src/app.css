@@ -746,6 +746,91 @@ h1 {
   margin-block: 1rem !important;
 }
 
+.chip-exchange {
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid rgb(167 243 208 / 18%);
+  border-radius: 1.25rem;
+  background: rgb(6 78 59 / 22%);
+}
+
+.chip-exchange > header,
+.chip-exchange__forms,
+.chip-records li,
+.chip-records__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.chip-exchange h2,
+.chip-exchange h3,
+.chip-exchange p {
+  margin-top: 0;
+}
+
+.chip-exchange__locked,
+.chip-confirmation {
+  margin: 1rem 0;
+  padding: 0.85rem;
+  border: 1px solid rgb(251 191 36 / 35%);
+  border-radius: 0.8rem;
+  color: #fde68a;
+  background: rgb(120 53 15 / 18%);
+}
+
+.chip-exchange__forms {
+  align-items: stretch;
+  margin: 1rem 0;
+}
+
+.chip-exchange__forms form {
+  display: grid;
+  flex: 1;
+  padding: 0.85rem;
+  border: 1px solid rgb(167 243 208 / 15%);
+  border-radius: 0.8rem;
+  gap: 0.65rem;
+}
+
+.chip-exchange input,
+.chip-exchange select,
+.chip-exchange button {
+  min-height: 44px;
+  border: 1px solid rgb(167 243 208 / 25%);
+  border-radius: 0.65rem;
+  color: inherit;
+  background: #071a16;
+  font: inherit;
+}
+
+.chip-exchange input,
+.chip-exchange select {
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.5rem;
+}
+
+.chip-confirmation button,
+.chip-records button {
+  margin-right: 0.4rem;
+  padding: 0.45rem 0.7rem;
+}
+
+.chip-records ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.chip-records li {
+  padding: 0.65rem;
+  border-radius: 0.65rem;
+  background: rgb(4 17 14 / 45%);
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -851,5 +936,12 @@ h1 {
 
   .hand-ready-card__timer {
     align-self: flex-start;
+  }
+
+  .chip-exchange > header,
+  .chip-exchange__forms,
+  .chip-records li {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
