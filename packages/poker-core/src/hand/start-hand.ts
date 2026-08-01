@@ -28,9 +28,11 @@ export interface HandPlayerState {
   readonly holeCards: readonly [Card, Card];
 }
 
+export type HandStreet = 'preflop' | 'flop' | 'turn' | 'river';
+
 export interface StartedHandState {
   readonly handId: string;
-  readonly street: 'preflop';
+  readonly street: HandStreet;
   readonly positions: TablePositions;
   readonly players: readonly HandPlayerState[];
   readonly communityCards: readonly Card[];
