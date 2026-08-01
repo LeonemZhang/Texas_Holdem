@@ -831,6 +831,107 @@ h1 {
   background: rgb(4 17 14 / 45%);
 }
 
+.statistics-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: min(100%, 34rem);
+  padding: clamp(1rem, 3vw, 1.5rem);
+  overflow-y: auto;
+  border-left: 1px solid rgb(167 243 208 / 22%);
+  background: #071a16;
+  box-shadow: -1rem 0 3rem rgb(0 0 0 / 35%);
+}
+
+.statistics-drawer > header,
+.statistics-ranking > li > strong,
+.fun-titles li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.statistics-drawer h2,
+.statistics-drawer h3 {
+  margin-top: 0;
+}
+
+.statistics-drawer > header button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: rgb(167 243 208 / 10%);
+  font-size: 1.5rem;
+}
+
+.statistics-ranking,
+.fun-titles ul {
+  display: grid;
+  padding: 0;
+  gap: 0.65rem;
+  list-style: none;
+}
+
+.statistics-ranking > li,
+.fun-titles li {
+  padding: 0.8rem;
+  border: 1px solid rgb(167 243 208 / 14%);
+  border-radius: 0.75rem;
+  background: rgb(6 78 59 / 18%);
+}
+
+.statistics-ranking > li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.4rem 0.75rem;
+}
+
+.statistics-ranking dl {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0.4rem 0 0;
+  gap: 0.4rem;
+}
+
+.statistics-ranking dl div {
+  padding: 0.35rem;
+  border-radius: 0.4rem;
+  background: rgb(4 17 14 / 42%);
+}
+
+.statistics-ranking dt,
+.statistics-ranking dd {
+  margin: 0;
+}
+
+.statistics-ranking dt {
+  color: #a7f3d0;
+  font-size: 0.72rem;
+}
+
+.statistics-ranking__actions {
+  grid-column: 1 / -1;
+}
+
+.statistics-positive {
+  color: #6ee7b7;
+}
+
+.statistics-negative {
+  color: #fda4af;
+}
+
+.fun-titles li {
+  display: grid;
+  grid-template-columns: minmax(7rem, auto) 1fr auto;
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
@@ -943,5 +1044,18 @@ h1 {
   .chip-records li {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .statistics-drawer {
+    width: 100%;
+    border-left: 0;
+  }
+
+  .statistics-ranking dl {
+    grid-template-columns: 1fr;
+  }
+
+  .statistics-ranking__actions {
+    grid-column: auto;
   }
 }
