@@ -15,7 +15,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@texas-holdem/protocol": "workspace:*"
+    "@texas-holdem/protocol": "workspace:*",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "typescript": "6.0.3",
