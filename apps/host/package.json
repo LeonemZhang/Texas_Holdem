@@ -15,7 +15,8 @@
     "@texas-holdem/poker-core": "workspace:*",
     "@texas-holdem/protocol": "workspace:*",
     "fastify": "5.11.0",
-    "socket.io": "4.8.3"
+    "socket.io": "4.8.3",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "socket.io-client": "4.8.3",

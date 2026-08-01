@@ -118,6 +118,9 @@ importers:
       socket.io:
         specifier: 4.8.3
         version: 4.8.3
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       socket.io-client:
         specifier: 4.8.3
