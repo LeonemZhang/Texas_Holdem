@@ -53,5 +53,32 @@ export class SqliteRoomLifecycleStore {
         updatedAtMs,
         updatedAtMs,
       );
+    const upsertPlayer = this.database.prepare(
+      `
+      INSERT INTO players (
+        room_id, player_id, nickname, seat_index, chips, status,
+        is_host, lobby_ready
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(room_id, player_id) DO UPDATE SET
+        nickname = excluded.nickname,
+        seat_index = excluded.seat_index,
+        chips = excluded.chips,
+        status = excluded.status,
+        is_host = excluded.is_host,
+        lobby_ready = excluded.lobby_ready
+    `,
+    );
+    for (const player of room.players) {
+      upsertPlayer.run(
+        room.roomId,
+        player.playerId,
+        player.nickname,
+        player.seatIndex,
+        player.chips,
+        player.status,
+        player.playerId === room.hostPlayerId ? 1 : 0,
+        player.lobbyReady ? 1 : 0,
+      );
+    }
   }
 }
