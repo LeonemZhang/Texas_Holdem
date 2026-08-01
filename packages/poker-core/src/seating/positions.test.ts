@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assignHeadsUpPositions,
+  assignTablePositions,
   headsUpActionOrderForStreet,
 } from './positions.js';
 import type { Seat } from './seats.js';
@@ -29,5 +30,54 @@ describe('table positions', () => {
     const positions = assignHeadsUpPositions(active(2, 7), 2);
     expect(positions.button.index).toBe(7);
     expect(positions.bigBlind.index).toBe(2);
+  });
+
+  it('uses the heads-up rule through the unified 2-to-10 entry point', () => {
+    const positions = assignTablePositions(active(1, 8), null);
+    expect([
+      positions.button.index,
+      positions.smallBlind.index,
+      positions.bigBlind.index,
+    ]).toEqual([1, 1, 8]);
+  });
+
+  it('assigns standard three-player positions clockwise', () => {
+    const positions = assignTablePositions(active(0, 3, 8), 9);
+    expect([
+      positions.button.index,
+      positions.smallBlind.index,
+      positions.bigBlind.index,
+    ]).toEqual([0, 3, 8]);
+  });
+
+  it('supports ten players and wraps position assignment', () => {
+    const positions = assignTablePositions(
+      active(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+      7,
+    );
+    expect([
+      positions.button.index,
+      positions.smallBlind.index,
+      positions.bigBlind.index,
+    ]).toEqual([8, 9, 0]);
+  });
+
+  it('skips an ineligible middle seat while rotating positions', () => {
+    const seats: readonly Seat[] = [
+      ...active(0, 2, 6),
+      { index: 4, playerId: 'away', status: 'sitting-out' },
+    ];
+    const positions = assignTablePositions(seats, 0);
+    expect([
+      positions.button.index,
+      positions.smallBlind.index,
+      positions.bigBlind.index,
+    ]).toEqual([2, 6, 0]);
+  });
+
+  it('rejects a table outside the 2-to-10 active-player boundary', () => {
+    expect(() => assignTablePositions(active(0), null)).toThrow(
+      'A table requires 2 to 10 active seats, received 1',
+    );
   });
 });

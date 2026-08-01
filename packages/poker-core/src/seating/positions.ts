@@ -1,4 +1,8 @@
-import { nextEligibleSeat, type Seat } from './seats.js';
+import {
+  eligibleSeatsClockwise,
+  nextEligibleSeat,
+  type Seat,
+} from './seats.js';
 
 export interface TablePositions {
   readonly button: Seat;
@@ -31,6 +35,29 @@ export function assignHeadsUpPositions(
       : nextEligibleSeat(seats, previousButtonIndex)!;
   const bigBlind = nextEligibleSeat(seats, button.index)!;
   return freezePositions(button, button, bigBlind);
+}
+
+export function assignTablePositions(
+  seats: readonly Seat[],
+  previousButtonIndex: number | null,
+): TablePositions {
+  const activeCount = seats.filter(({ status }) => status === 'active').length;
+  if (activeCount < 2 || activeCount > 10) {
+    throw new RangeError(
+      `A table requires 2 to 10 active seats, received ${activeCount}`,
+    );
+  }
+  if (activeCount === 2) {
+    return assignHeadsUpPositions(seats, previousButtonIndex);
+  }
+
+  const button =
+    previousButtonIndex === null
+      ? eligibleSeatsClockwise(seats, 9)[0]!
+      : nextEligibleSeat(seats, previousButtonIndex)!;
+  const smallBlind = nextEligibleSeat(seats, button.index)!;
+  const bigBlind = nextEligibleSeat(seats, smallBlind.index)!;
+  return freezePositions(button, smallBlind, bigBlind);
 }
 
 export type BettingStreet = 'preflop' | 'flop' | 'turn' | 'river';
