@@ -1,0 +1,173 @@
+import { useState, type FormEvent } from 'react';
+
+import {
+  RoomSettingsSchema,
+  type RoomSettingsMessage,
+} from '@texas-holdem/protocol';
+
+export interface CreateRoomFormValue {
+  readonly hostNickname: string;
+  readonly settings: RoomSettingsMessage;
+}
+
+export interface CreateRoomFormProps {
+  readonly onCreate: (value: CreateRoomFormValue) => void;
+}
+
+const blindOptions = [1, 5, 10, 25, 50, 100] as const;
+
+export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
+  const [smallBlind, setSmallBlind] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const hostNickname = String(form.get('hostNickname') ?? '').trim();
+    if (!hostNickname) {
+      setError('请输入房主昵称');
+      return;
+    }
+    const parsed = RoomSettingsSchema.safeParse({
+      roomName: String(form.get('roomName') ?? ''),
+      maxPlayers: Number(form.get('maxPlayers')),
+      initialChips: Number(form.get('initialChips')),
+      smallBlind,
+      actionTimeoutSeconds: Number(form.get('actionTimeoutSeconds')),
+      handReadyTimeoutSeconds: Number(form.get('handReadyTimeoutSeconds')),
+      blindGrowth: {
+        enabled: form.get('blindGrowthEnabled') === 'on',
+        intervalHands: Number(form.get('blindGrowthIntervalHands')),
+        multiplier: Number(form.get('blindGrowthMultiplier')),
+      },
+      zeroChipPolicy: form.get('zeroChipPolicy'),
+    });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? '房间设置无效');
+      return;
+    }
+    setError(null);
+    onCreate({ hostNickname, settings: parsed.data });
+  };
+
+  return (
+    <form className="room-form" onSubmit={submit} noValidate>
+      <header>
+        <p className="connection-home__kicker">房主设置</p>
+        <h2>创建朋友牌桌</h2>
+      </header>
+      <div className="room-form__grid">
+        <label>
+          房主昵称
+          <input name="hostNickname" defaultValue="Alice" />
+        </label>
+        <label>
+          房间名称
+          <input name="roomName" defaultValue="朋友局" />
+        </label>
+        <label>
+          最大人数
+          <select name="maxPlayers" defaultValue="10">
+            {Array.from({ length: 9 }, (_, index) => index + 2).map((count) => (
+              <option key={count} value={count}>
+                {count} 人
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          初始筹码
+          <input
+            name="initialChips"
+            type="number"
+            min="1"
+            step="1"
+            defaultValue="1000"
+          />
+        </label>
+        <label>
+          小盲
+          <select
+            name="smallBlind"
+            value={smallBlind}
+            onChange={(event) => setSmallBlind(Number(event.target.value))}
+          >
+            {blindOptions.map((blind) => (
+              <option key={blind} value={blind}>
+                {blind}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          大盲（小盲 × 2）
+          <input
+            aria-label="大盲（小盲 × 2）"
+            value={smallBlind * 2}
+            readOnly
+          />
+        </label>
+        <label>
+          单次行动秒数
+          <input
+            name="actionTimeoutSeconds"
+            type="number"
+            min="1"
+            step="1"
+            defaultValue="30"
+          />
+        </label>
+        <label>
+          每手准备秒数
+          <input
+            name="handReadyTimeoutSeconds"
+            type="number"
+            min="1"
+            step="1"
+            defaultValue="30"
+          />
+        </label>
+        <fieldset className="room-form__growth">
+          <legend>按手数增长盲注</legend>
+          <label className="room-form__checkbox">
+            <input name="blindGrowthEnabled" type="checkbox" defaultChecked />
+            启用增长
+          </label>
+          <label>
+            每多少手
+            <input
+              name="blindGrowthIntervalHands"
+              type="number"
+              min="1"
+              step="1"
+              defaultValue="10"
+            />
+          </label>
+          <label>
+            增长倍率
+            <select name="blindGrowthMultiplier" defaultValue="2">
+              <option value="1.5">× 1.5</option>
+              <option value="2">× 2</option>
+              <option value="3">× 3</option>
+            </select>
+          </label>
+        </fieldset>
+        <label>
+          筹码耗尽时
+          <select name="zeroChipPolicy" defaultValue="request-chips">
+            <option value="request-chips">请求其他玩家给予筹码</option>
+            <option value="eliminate">直接出局</option>
+          </select>
+        </label>
+      </div>
+      {error ? (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <button type="submit" className="button button--primary">
+        创建房间
+      </button>
+    </form>
+  );
+}
