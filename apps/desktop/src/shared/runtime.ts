@@ -17,6 +17,8 @@ export interface DesktopBridge {
   onHostServiceExited(
     listener: (event: HostServiceExitEvent) => void,
   ): () => void;
+  setWindowRoomContext(context: WindowRoomContext): Promise<void>;
+  onPlayerExitRequested(listener: () => void | Promise<void>): () => void;
 }
 
 export const DiscoveryScanInputSchema = z.object({
@@ -44,6 +46,13 @@ export interface HostServiceExitEvent {
   readonly expected: boolean;
   readonly exitCode: number;
 }
+
+export const WindowRoomContextSchema = z.object({
+  inRoom: z.boolean(),
+  isHost: z.boolean(),
+});
+
+export type WindowRoomContext = z.infer<typeof WindowRoomContextSchema>;
 
 export interface DesktopNetworkInterface {
   readonly name: string;

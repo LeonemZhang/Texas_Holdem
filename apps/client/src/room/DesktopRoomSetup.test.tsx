@@ -28,6 +28,8 @@ function runtime(): RuntimeAdapter {
     })),
     stopHostService: async () => undefined,
     onHostServiceExited: () => () => undefined,
+    setWindowRoomContext: async () => undefined,
+    onPlayerExitRequested: () => () => undefined,
   };
 }
 

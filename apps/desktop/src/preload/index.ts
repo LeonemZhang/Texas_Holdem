@@ -2,10 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   DiscoveryScanInputSchema,
   HostStartInputSchema,
+  WindowRoomContextSchema,
   type DesktopBridge,
   type DiscoveryScanInput,
   type HostServiceExitEvent,
   type HostStartInput,
+  type WindowRoomContext,
 } from '../shared/runtime';
 
 const bridge: DesktopBridge = Object.freeze({
@@ -26,6 +28,19 @@ const bridge: DesktopBridge = Object.freeze({
     };
     ipcRenderer.on('host:exited', handler);
     return () => ipcRenderer.off('host:exited', handler);
+  },
+  setWindowRoomContext: (context: WindowRoomContext) =>
+    ipcRenderer.invoke(
+      'window:set-room-context',
+      WindowRoomContextSchema.parse(context),
+    ),
+  onPlayerExitRequested: (listener: () => void | Promise<void>) => {
+    const handler = async () => {
+      await listener();
+      await ipcRenderer.invoke('window:complete-close');
+    };
+    ipcRenderer.on('window:player-exit-requested', handler);
+    return () => ipcRenderer.off('window:player-exit-requested', handler);
   },
 });
 

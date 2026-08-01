@@ -19,6 +19,9 @@ export function App() {
 
   useEffect(() => {
     void adapter.getRuntimeInfo().then(setRuntime);
+    return adapter.onPlayerExitRequested(async () => {
+      // The game shell supplies room.exit before this callback completes.
+    });
   }, []);
 
   const refreshRooms = async () => {
@@ -55,12 +58,18 @@ export function App() {
         runtimeKind={runtime?.kind ?? 'browser'}
         onCreateRoom={() => setCreatingRoom(true)}
         onRefreshRooms={() => void refreshRooms()}
-        onJoinAddress={setJoinAddress}
+        onJoinAddress={(address) => {
+          setJoinAddress(address);
+          void adapter.setWindowRoomContext({ inRoom: true, isHost: false });
+        }}
       />
       {runtime?.kind === 'desktop' && creatingRoom ? (
         <DesktopRoomSetup
           runtime={adapter}
-          onHosted={(service) => setJoinAddress(service.joinUrl)}
+          onHosted={(service) => {
+            setJoinAddress(service.joinUrl);
+            void adapter.setWindowRoomContext({ inRoom: true, isHost: true });
+          }}
         />
       ) : null}
       {runtime?.kind === 'desktop' ? (
@@ -68,9 +77,10 @@ export function App() {
           rooms={rooms}
           refreshing={refreshingRooms}
           onRefresh={() => void refreshRooms()}
-          onJoin={(room) =>
-            setJoinAddress(`http://${room.hostAddress}:${room.httpPort}`)
-          }
+          onJoin={(room) => {
+            setJoinAddress(`http://${room.hostAddress}:${room.httpPort}`);
+            void adapter.setWindowRoomContext({ inRoom: true, isHost: false });
+          }}
         />
       ) : null}
       {joinAddress ? (

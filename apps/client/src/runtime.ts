@@ -21,6 +21,13 @@ export interface RuntimeAdapter {
   onHostServiceExited(
     listener: (event: HostServiceExitEvent) => void,
   ): () => void;
+  setWindowRoomContext(context: WindowRoomContext): Promise<void>;
+  onPlayerExitRequested(listener: () => void | Promise<void>): () => void;
+}
+
+export interface WindowRoomContext {
+  readonly inRoom: boolean;
+  readonly isHost: boolean;
 }
 
 export interface DesktopNetworkInterface {
@@ -71,6 +78,10 @@ const browserAdapter: RuntimeAdapter = {
   },
   async stopHostService() {},
   onHostServiceExited() {
+    return () => undefined;
+  },
+  async setWindowRoomContext() {},
+  onPlayerExitRequested() {
     return () => undefined;
   },
 };
