@@ -1,0 +1,40 @@
+{
+  "name": "texas-holdem",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22.12.0 <25"
+  },
+  "volta": {
+    "node": "24.14.0",
+    "pnpm": "10.0.0"
+  },
+  "scripts": {
+    "predev": "pnpm --filter \"./packages/*\" build",
+    "dev": "concurrently --kill-others-on-fail --names client,host,desktop --prefix-colors cyan,green,magenta \"pnpm --filter @texas-holdem/client dev\" \"pnpm --filter @texas-holdem/host dev\" \"pnpm --filter @texas-holdem/desktop dev\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "pretest": "pnpm --filter \"./packages/*\" build",
+    "test": "pnpm -r --if-present test",
+    "build": "pnpm -r --if-present build",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.1.2",
+    "concurrently": "10.0.4",
+    "eslint": "10.8.0",
+    "globals": "17.8.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.10"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-win32-x64-msvc": "1.2.1"
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+.idea/
+dist/
+coverage/
+.vite/
+*.log
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
+release/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
