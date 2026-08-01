@@ -8,6 +8,7 @@ export interface PlayerActionEvent {
   readonly handId: string;
   readonly playerId: string;
   readonly action: RecordedPlayerAction;
+  readonly street: 'preflop' | 'flop' | 'turn' | 'river';
 }
 
 export type BasicStatisticsEvent = HandSummaryEvent | PlayerActionEvent;
@@ -28,6 +29,8 @@ export interface BasicPlayerStatistics {
   readonly wonHands: number;
   readonly actionCounts: ActionCounts;
   readonly largestWonPot: number;
+  readonly totalWonPotChips: number;
+  readonly preflopFoldCount: number;
 }
 
 function emptyStats(
@@ -45,6 +48,8 @@ function emptyStats(
     wonHands: 0,
     actionCounts: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },
     largestWonPot: 0,
+    totalWonPotChips: 0,
+    preflopFoldCount: 0,
   };
 }
 
@@ -86,6 +91,9 @@ export function reduceBasicStatistics(
           ...player.actionCounts,
           [event.action]: player.actionCounts[event.action] + 1,
         },
+        preflopFoldCount:
+          player.preflopFoldCount +
+          (event.action === 'fold' && event.street === 'preflop' ? 1 : 0),
       };
       continue;
     }
@@ -109,6 +117,8 @@ export function reduceBasicStatistics(
         participatedHands: player.participatedHands + 1,
         wonHands: player.wonHands + (winners.has(playerId) ? 1 : 0),
         largestWonPot,
+        totalWonPotChips:
+          player.totalWonPotChips + (event.payouts[playerId] ?? 0),
       };
     }
   }

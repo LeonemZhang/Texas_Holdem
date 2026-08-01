@@ -27,8 +27,20 @@ const summary: HandSummaryEvent = {
 
 describe('reduceBasicStatistics', () => {
   const events: readonly BasicStatisticsEvent[] = [
-    { type: 'player.action', handId: 'h1', playerId: 'a', action: 'fold' },
-    { type: 'player.action', handId: 'h1', playerId: 'b', action: 'raiseTo' },
+    {
+      type: 'player.action',
+      handId: 'h1',
+      playerId: 'a',
+      action: 'fold',
+      street: 'preflop',
+    },
+    {
+      type: 'player.action',
+      handId: 'h1',
+      playerId: 'b',
+      action: 'raiseTo',
+      street: 'preflop',
+    },
     summary,
   ];
 
@@ -40,6 +52,7 @@ describe('reduceBasicStatistics', () => {
       wonHands: 0,
       actionCounts: { fold: 1 },
       largestWonPot: 0,
+      preflopFoldCount: 1,
     });
     expect(result.b).toMatchObject({
       currentChips: 110,
@@ -47,6 +60,7 @@ describe('reduceBasicStatistics', () => {
       wonHands: 1,
       actionCounts: { raiseTo: 1 },
       largestWonPot: 30,
+      totalWonPotChips: 30,
     });
   });
 
@@ -65,6 +79,7 @@ describe('reduceBasicStatistics', () => {
           handId: 'h1',
           playerId: 'client-injected',
           action: 'allIn',
+          street: 'preflop',
         },
       ]),
     ).toThrow('Statistics player not found: client-injected');

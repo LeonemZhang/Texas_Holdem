@@ -7,7 +7,13 @@ describe('reduceFactStatistics', () => {
     const result = reduceFactStatistics(
       ['a', 'b'],
       [
-        { type: 'player.action', handId: 'h1', playerId: 'a', action: 'allIn' },
+        {
+          type: 'player.action',
+          handId: 'h1',
+          playerId: 'a',
+          action: 'allIn',
+          street: 'preflop',
+        },
         {
           type: 'showdown.heads-up-loss',
           handId: 'h1',
