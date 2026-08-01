@@ -308,4 +308,48 @@ describe('GameRoom', () => {
     expect(screen.getByText('1 / 0 / 0 / 0 / 0')).toBeInTheDocument();
     expect(window.innerWidth).toBe(360);
   });
+
+  it('shows a terminal closed-room state and returns without another command', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const onExited = vi.fn();
+    const sendCommand = vi.fn();
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () =>
+        consumeSnapshot({
+          ...snapshot,
+          room: { ...snapshot.room, phase: 'closed' },
+        }),
+      ),
+      disconnect: vi.fn(),
+      sendCommand,
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+        onExited={onExited}
+      />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: '房间已关闭' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '返回联机首页' }));
+    expect(onExited).toHaveBeenCalledOnce();
+    expect(sendCommand).not.toHaveBeenCalled();
+  });
 });

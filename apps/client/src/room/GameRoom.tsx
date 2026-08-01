@@ -236,11 +236,39 @@ export function GameRoom({
           className="button button--secondary"
           type="button"
           onClick={() => {
-            void send({ type: 'room.exit' }).then(onExited);
+            void send({ type: 'room.exit' }).then((accepted) => {
+              if (accepted) onExited?.();
+            });
           }}
         >
           退出房间
         </button>
+      </div>
+    );
+  }
+
+  if (snapshot.room.phase === 'closed') {
+    return (
+      <div className="game-room-shell">
+        <section className="room-closed" aria-labelledby="room-closed-title">
+          <p className="connection-home__kicker">对局已结束</p>
+          <h1 id="room-closed-title">房间已关闭</h1>
+          <p>{snapshot.room.roomName} 已由房主关闭，牌局数据已保存。</p>
+          <div>
+            <button type="button" onClick={() => setStatisticsOpen(true)}>
+              查看最终统计
+            </button>
+            <button type="button" onClick={onExited}>
+              返回联机首页
+            </button>
+          </div>
+        </section>
+        <StatisticsPanel
+          open={statisticsOpen}
+          players={statistics}
+          titles={snapshot.statistics.titles}
+          onClose={() => setStatisticsOpen(false)}
+        />
       </div>
     );
   }

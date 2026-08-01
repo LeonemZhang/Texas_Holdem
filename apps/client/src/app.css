@@ -245,6 +245,30 @@ h1 {
   padding: clamp(0.5rem, 2vw, 1.5rem);
 }
 
+.room-closed {
+  display: grid;
+  max-width: 36rem;
+  margin: clamp(2rem, 12vh, 7rem) auto;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  gap: 1rem;
+  border: 1px solid rgb(232 201 107 / 35%);
+  border-radius: 1.25rem;
+  background: rgb(4 17 14 / 82%);
+  text-align: center;
+}
+
+.room-closed h1,
+.room-closed p {
+  margin: 0;
+}
+
+.room-closed > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
 .room-browser {
   margin-top: 1rem;
   padding: clamp(1rem, 3vw, 2rem);
