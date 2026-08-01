@@ -1,23 +1,36 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'node:path';
 import type { DesktopRuntimeInfo } from '../shared/runtime';
+import { DiscoveryScanInputSchema } from '../shared/runtime';
+import { listDesktopNetworkInterfaces, scanLanRooms } from './network-services';
 import { isTrustedRendererUrl } from './trusted-renderer';
 import { createWindowOptions } from './window-options';
 
 const developmentUrl = process.env.CLIENT_DEV_URL;
 
 function registerRuntimeHandler() {
-  ipcMain.handle('runtime:get-info', (event): DesktopRuntimeInfo => {
-    const senderUrl = event.senderFrame?.url;
+  const assertTrusted = (senderUrl: string | undefined) => {
     if (!senderUrl || !isTrustedRendererUrl(senderUrl, developmentUrl)) {
       throw new Error('Rejected IPC request from an untrusted renderer');
     }
+  };
+  ipcMain.handle('runtime:get-info', (event): DesktopRuntimeInfo => {
+    const senderUrl = event.senderFrame?.url;
+    assertTrusted(senderUrl);
 
     return {
       kind: 'desktop',
       appVersion: app.getVersion(),
       platform: process.platform,
     };
+  });
+  ipcMain.handle('network:list-interfaces', (event) => {
+    assertTrusted(event.senderFrame?.url);
+    return listDesktopNetworkInterfaces();
+  });
+  ipcMain.handle('network:scan-rooms', (event, rawInput: unknown) => {
+    assertTrusted(event.senderFrame?.url);
+    return scanLanRooms(DiscoveryScanInputSchema.parse(rawInput));
   });
 }
 

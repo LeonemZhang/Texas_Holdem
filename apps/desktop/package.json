@@ -16,5 +16,9 @@
     "typescript": "6.0.3",
     "vitest": "4.1.10",
     "wait-on": "9.1.0"
+  },
+  "dependencies": {
+    "@texas-holdem/lan-discovery": "workspace:*",
+    "zod": "4.3.6"
   }
 }
