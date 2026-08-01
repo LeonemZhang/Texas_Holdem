@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { io as createSocketClient } from 'socket.io-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InMemorySessionAuthenticator } from './application/session-authenticator.js';
+import { CommandDispatcher } from './application/command-dispatcher.js';
+import { InMemoryRoomRegistry } from './application/room-registry.js';
 import { projectPlayerSnapshot } from './application/snapshot-projector.js';
 import { InMemoryEventBuffer } from './application/event-buffer.js';
 import { ReconnectSynchronizer } from './application/reconnect-synchronizer.js';
@@ -400,6 +402,96 @@ describe('host framework server', () => {
       });
     } finally {
       client.disconnect();
+    }
+  });
+
+  it('keeps command idempotency isolated across multiple authenticated sockets', async () => {
+    const rooms = new InMemoryRoomRegistry();
+    rooms.save(
+      createRoom({
+        roomId: 'room-1',
+        hostPlayerId: 'host',
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 100,
+          blind: { kind: 'preset', smallBlind: 1 },
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      }),
+    );
+    const handle = vi.fn(() => ({ stateVersion: 1, sequence: 1 }));
+    const dispatcher = new CommandDispatcher(rooms, () => true, handle);
+    const sessions = new InMemorySessionAuthenticator();
+    sessions.register(
+      { roomId: 'room-1', playerId: 'host' },
+      'host-secret-token',
+    );
+    sessions.register(
+      { roomId: 'room-1', playerId: 'bob' },
+      'bob-secret-token-1',
+    );
+    activeHost = await createHostServer({
+      sessionAuthenticator: sessions,
+      commandDispatcher: dispatcher,
+    });
+    const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const connect = (playerId: string, token: string) =>
+      createSocketClient(address, {
+        transports: ['websocket'],
+        auth: {
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId,
+          token,
+        },
+      });
+    const hostClient = connect('host', 'host-secret-token');
+    const bobClient = connect('bob', 'bob-secret-token-1');
+    const submit = (
+      client: ReturnType<typeof createSocketClient>,
+      playerId: string,
+    ) =>
+      new Promise<unknown>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.emit(
+          'command:submit',
+          {
+            protocolVersion: PROTOCOL_VERSION,
+            commandId: 'shared-command-id',
+            roomId: 'room-1',
+            playerId,
+            expectedVersion: 0,
+            type: 'room.pause',
+          },
+          resolve,
+        );
+      });
+
+    try {
+      const responses = await Promise.all([
+        submit(hostClient, 'host'),
+        submit(hostClient, 'host'),
+        submit(bobClient, 'bob'),
+        submit(bobClient, 'bob'),
+      ]);
+      expect(
+        responses.every(
+          (response) =>
+            typeof response === 'object' &&
+            response !== null &&
+            'status' in response &&
+            response.status === 'accepted',
+        ),
+      ).toBe(true);
+      expect(handle).toHaveBeenCalledTimes(2);
+    } finally {
+      hostClient.disconnect();
+      bobClient.disconnect();
     }
   });
 });
