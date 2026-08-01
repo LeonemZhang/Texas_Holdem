@@ -62,6 +62,11 @@ describe('host framework server', () => {
       playerId: string;
       token: string;
     }>();
+    const currentRoom = await activeHost.app.inject({
+      method: 'GET',
+      url: '/api/rooms/current',
+    });
+    expect(currentRoom.json()).toMatchObject({ roomId: hostSession.roomId });
     const joined = await activeHost.app.inject({
       method: 'POST',
       url: `/api/rooms/${hostSession.roomId}/join`,

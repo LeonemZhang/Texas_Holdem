@@ -105,6 +105,14 @@ export async function createHostServer(
   }));
 
   if (options.roomSessionService) {
+    app.get('/api/rooms/current', async (_request, reply) => {
+      const roomId = options.roomSessionService!.currentRoomId();
+      return roomId
+        ? { protocolVersion: PROTOCOL_VERSION, roomId }
+        : reply.code(404).send({
+            error: { code: 'NOT_FOUND', message: '房主尚未创建房间' },
+          });
+    });
     app.post(
       '/api/rooms',
       async (request, reply): Promise<RoomSessionResponse | object> => {

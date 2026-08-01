@@ -24,6 +24,7 @@ import { InMemorySessionAuthenticator } from './session-authenticator.js';
 import { projectPlayerSnapshot } from './snapshot-projector.js';
 
 export interface RoomSessionBootstrapService {
+  currentRoomId(): string | null;
   create(
     request: CreateRoomSessionRequest,
     baseJoinUrl: string,
@@ -76,6 +77,10 @@ export class GameRuntime implements RoomSessionBootstrapService {
     const sequenced = Object.freeze({ ...response, sequence });
     if (resultKey) this.#results.set(resultKey, sequenced);
     return sequenced;
+  }
+
+  currentRoomId(): string | null {
+    return this.rooms.listRoomIds()[0] ?? null;
   }
 
   create(
