@@ -1,6 +1,6 @@
 import { freezeRoom, type RoomPlayerStatus, type RoomState } from './room.js';
 
-type ResumeStatus = Exclude<RoomPlayerStatus, 'disconnected'>;
+export type ResumeStatus = Exclude<RoomPlayerStatus, 'disconnected'>;
 
 export interface ReconnectIdentity {
   readonly playerId: string;
