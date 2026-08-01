@@ -72,3 +72,13 @@ export function headsUpActionOrderForStreet(
       : [positions.bigBlind, positions.button],
   );
 }
+
+export function actionOrderForStreet(
+  seats: readonly Seat[],
+  positions: TablePositions,
+  street: BettingStreet,
+): readonly Seat[] {
+  const afterIndex =
+    street === 'preflop' ? positions.bigBlind.index : positions.button.index;
+  return eligibleSeatsClockwise(seats, afterIndex);
+}

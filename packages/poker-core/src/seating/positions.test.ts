@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  actionOrderForStreet,
   assignHeadsUpPositions,
   assignTablePositions,
   headsUpActionOrderForStreet,
@@ -79,5 +80,51 @@ describe('table positions', () => {
     expect(() => assignTablePositions(active(0), null)).toThrow(
       'A table requires 2 to 10 active seats, received 1',
     );
+  });
+
+  it('uses the correct heads-up order before and after the flop', () => {
+    const seats = active(2, 7);
+    const positions = assignTablePositions(seats, null);
+    expect(
+      actionOrderForStreet(seats, positions, 'preflop').map(
+        ({ index }) => index,
+      ),
+    ).toEqual([2, 7]);
+    expect(
+      actionOrderForStreet(seats, positions, 'turn').map(({ index }) => index),
+    ).toEqual([7, 2]);
+  });
+
+  it('calculates every next actor at three- and ten-player tables', () => {
+    const three = active(0, 3, 8);
+    const threePositions = assignTablePositions(three, 9);
+    expect(
+      actionOrderForStreet(three, threePositions, 'preflop').map(
+        ({ index }) => index,
+      ),
+    ).toEqual([0, 3, 8]);
+    expect(
+      actionOrderForStreet(three, threePositions, 'river').map(
+        ({ index }) => index,
+      ),
+    ).toEqual([3, 8, 0]);
+
+    const ten = active(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+    const tenPositions = assignTablePositions(ten, 7);
+    expect(actionOrderForStreet(ten, tenPositions, 'preflop')[0]?.index).toBe(
+      1,
+    );
+    expect(actionOrderForStreet(ten, tenPositions, 'flop')[0]?.index).toBe(9);
+  });
+
+  it('skips a newly ineligible seat in the middle of action order', () => {
+    const seats: readonly Seat[] = [
+      ...active(0, 2, 6),
+      { index: 4, playerId: 'away', status: 'sitting-out' },
+    ];
+    const positions = assignTablePositions(seats, 0);
+    expect(
+      actionOrderForStreet(seats, positions, 'flop').map(({ index }) => index),
+    ).toEqual([6, 0, 2]);
   });
 });
