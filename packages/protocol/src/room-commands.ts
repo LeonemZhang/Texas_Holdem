@@ -1,19 +1,12 @@
 import { z } from 'zod';
 
 import {
+  CommandIdentitySchema,
   IdSchema,
   PositiveAmountSchema,
-  ProtocolVersionSchema,
-  StateVersionSchema,
 } from './primitives.js';
 
-const CommandIdentityShape = {
-  protocolVersion: ProtocolVersionSchema,
-  commandId: IdSchema,
-  roomId: IdSchema,
-  playerId: IdSchema,
-  expectedVersion: StateVersionSchema,
-} as const;
+const CommandIdentityShape = CommandIdentitySchema.shape;
 
 export const RoomSettingsSchema = z.object({
   roomName: z.string().trim().min(1),
