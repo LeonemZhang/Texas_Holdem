@@ -549,6 +549,88 @@ h1 {
   background: #0b2b23;
 }
 
+.cards-and-pots {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+  gap: 0.65rem;
+}
+
+.community-cards,
+.hole-cards,
+.pot-list {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  margin: 0;
+  gap: clamp(0.18rem, 0.8vw, 0.5rem);
+}
+
+.playing-card {
+  display: grid;
+  place-content: center;
+  width: clamp(2.15rem, 6vw, 4rem);
+  aspect-ratio: 5 / 7;
+  border: 1px solid #d1d5db;
+  border-radius: clamp(0.25rem, 0.8vw, 0.5rem);
+  color: #111827;
+  background: #f9fafb;
+  box-shadow: 0 0.25rem 0.5rem rgb(0 0 0 / 25%);
+  font-size: clamp(0.75rem, 2vw, 1.2rem);
+  line-height: 1;
+}
+
+.playing-card--red {
+  color: #dc2626;
+}
+
+.playing-card--back {
+  border-color: #93c5fd;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgb(255 255 255 / 12%) 0 2px,
+      transparent 2px 6px
+    ),
+    #1d4ed8;
+}
+
+.playing-card--back::after {
+  content: '未公开';
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+}
+
+.pot-list {
+  flex-wrap: wrap;
+}
+
+.pot-chip {
+  display: flex;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgb(251 191 36 / 30%);
+  border-radius: 999px;
+  color: #fde68a;
+  background: rgb(4 17 14 / 70%);
+  gap: 0.3rem;
+  font-size: clamp(0.65rem, 1.8vw, 0.85rem);
+}
+
+.pot-chip dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+.hole-cards {
+  position: absolute;
+  bottom: 7%;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+}
+
 .room-list dd {
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
