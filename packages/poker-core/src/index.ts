@@ -16,4 +16,5 @@ export * from './evaluator/hand-rank.js';
 export * from './seating/seats.js';
 export * from './pots/tiers.js';
 export * from './pots/pots.js';
+export * from './pots/distribution.js';
 export * from './seating/positions.js';
