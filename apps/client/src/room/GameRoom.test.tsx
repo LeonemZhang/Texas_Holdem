@@ -93,4 +93,101 @@ describe('GameRoom', () => {
       ),
     );
   });
+
+  it('keeps chip requests and statistics operable in the mobile hand-ready flow', async () => {
+    const handReadySnapshot: PlayerSnapshot = {
+      ...snapshot,
+      sequence: 5,
+      stateVersion: 5,
+      room: {
+        ...snapshot.room,
+        phase: 'hand-ready',
+        players: snapshot.room.players.map((player) => ({
+          ...player,
+          status: 'active' as const,
+        })),
+      },
+      handReady: {
+        deadlineMs: Date.now() + 30_000,
+        ownChoice: 'pending',
+        pendingRequests: [],
+      },
+      statistics: {
+        players: [
+          {
+            playerId: 'host',
+            currentChips: 99,
+            participatedHands: 1,
+            wonHands: 0,
+            showdownWinRate: null,
+          },
+          {
+            playerId: 'bob',
+            currentChips: 101,
+            participatedHands: 1,
+            wonHands: 1,
+            showdownWinRate: null,
+          },
+        ],
+        titles: [],
+      },
+    };
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const sendCommand = vi.fn().mockResolvedValue({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: 'command-2',
+      status: 'accepted',
+      stateVersion: 6,
+      sequence: 6,
+    });
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => consumeSnapshot(handReadySnapshot)),
+      disconnect: vi.fn(),
+      sendCommand,
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 360,
+    });
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '发起请求' }));
+    fireEvent.click(screen.getByRole('button', { name: /^确认$/ }));
+    await waitFor(() =>
+      expect(sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expectedVersion: 5,
+          type: 'chips.request',
+          audience: 'table',
+          amount: 100,
+        }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '查看统计' }));
+    expect(
+      screen.getByRole('heading', { name: '牌局战报' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('#1 Bob')).toBeInTheDocument();
+    expect(window.innerWidth).toBe(360);
+  });
 });
