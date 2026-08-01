@@ -1,6 +1,8 @@
 import {
   HealthResponseSchema,
+  CreateRoomSessionRequestSchema,
   JoinBootstrapResponseSchema,
+  JoinRoomSessionRequestSchema,
   PROTOCOL_VERSION,
   ResyncRequestSchema,
   SocketAuthenticationSchema,
@@ -8,6 +10,8 @@ import {
   SystemHelloResponseSchema,
   type HealthResponse,
   type JoinBootstrapResponse,
+  type PlayerSnapshot,
+  type RoomSessionResponse,
   type SystemHelloResponse,
 } from '@texas-holdem/protocol';
 import fastifyStatic from '@fastify/static';
@@ -19,6 +23,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import type { CommandResponse } from '@texas-holdem/protocol';
 
 import type { CommandDispatcher } from './application/command-dispatcher.js';
+import type { RoomSessionBootstrapService } from './application/game-runtime.js';
 import type { ReconnectSynchronizer } from './application/reconnect-synchronizer.js';
 import type {
   SessionAuthenticator,
@@ -39,6 +44,12 @@ export interface CreateHostServerOptions {
   commandDispatcher?: Pick<CommandDispatcher, 'dispatch'>;
   sessionAuthenticator?: SessionAuthenticator;
   reconnectSynchronizer?: ReconnectSynchronizer;
+  roomSessionService?: RoomSessionBootstrapService;
+  snapshotProvider?: (
+    roomId: string,
+    playerId: string,
+  ) => PlayerSnapshot | null;
+  roomSnapshotsProvider?: (roomId: string) => readonly PlayerSnapshot[];
 }
 
 export interface HostServer {
@@ -93,6 +104,59 @@ export async function createHostServer(
     serverVersion: HOST_SERVER_VERSION,
   }));
 
+  if (options.roomSessionService) {
+    app.post(
+      '/api/rooms',
+      async (request, reply): Promise<RoomSessionResponse | object> => {
+        const parsed = CreateRoomSessionRequestSchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.code(400).send({
+            error: { code: 'INVALID_MESSAGE', message: '房间设置无效' },
+          });
+        }
+        try {
+          return options.roomSessionService!.create(
+            parsed.data,
+            connection().joinUrl,
+          );
+        } catch (error) {
+          return reply.code(409).send({
+            error: {
+              code: 'CONFLICT',
+              message: error instanceof Error ? error.message : '创建房间失败',
+            },
+          });
+        }
+      },
+    );
+    app.post(
+      '/api/rooms/:roomId/join',
+      async (request, reply): Promise<RoomSessionResponse | object> => {
+        const parsed = JoinRoomSessionRequestSchema.safeParse(request.body);
+        const roomId = (request.params as { roomId?: unknown }).roomId;
+        if (!parsed.success || typeof roomId !== 'string' || !roomId.trim()) {
+          return reply.code(400).send({
+            error: { code: 'INVALID_MESSAGE', message: '加入信息无效' },
+          });
+        }
+        try {
+          return options.roomSessionService!.join(
+            roomId,
+            parsed.data,
+            connection().joinUrl,
+          );
+        } catch (error) {
+          return reply.code(409).send({
+            error: {
+              code: 'CONFLICT',
+              message: error instanceof Error ? error.message : '加入房间失败',
+            },
+          });
+        }
+      },
+    );
+  }
+
   if (
     options.staticDirectory &&
     existsSync(join(options.staticDirectory, 'index.html'))
@@ -119,6 +183,11 @@ export async function createHostServer(
         publicRoomChannel(identity.roomId),
         privatePlayerChannel(identity.roomId, identity.playerId),
       ]);
+      const snapshot = options.snapshotProvider?.(
+        identity.roomId,
+        identity.playerId,
+      );
+      if (snapshot) socket.emit('state:snapshot', snapshot);
     }
 
     socket.on('system:hello', (rawRequest: unknown, acknowledge: unknown) => {
@@ -168,7 +237,15 @@ export async function createHostServer(
         return;
       }
       try {
-        acknowledge(options.commandDispatcher.dispatch(rawCommand));
+        const response = options.commandDispatcher.dispatch(rawCommand);
+        acknowledge(response);
+        if (response.status === 'accepted') {
+          for (const snapshot of options.roomSnapshotsProvider?.(
+            identity.roomId,
+          ) ?? []) {
+            publisher.publishSnapshot(snapshot);
+          }
+        }
       } catch {
         acknowledge({
           protocolVersion: PROTOCOL_VERSION,

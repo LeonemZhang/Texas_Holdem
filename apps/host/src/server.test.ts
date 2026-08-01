@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { io as createSocketClient } from 'socket.io-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InMemorySessionAuthenticator } from './application/session-authenticator.js';
+import { GameRuntime } from './application/game-runtime.js';
 import { CommandDispatcher } from './application/command-dispatcher.js';
 import { InMemoryRoomRegistry } from './application/room-registry.js';
 import { projectPlayerSnapshot } from './application/snapshot-projector.js';
@@ -26,6 +27,76 @@ afterEach(async () => {
 });
 
 describe('host framework server', () => {
+  it('creates and joins a room through HTTP then sends the authenticated snapshot', async () => {
+    const runtime = new GameRuntime();
+    activeHost = await createHostServer({
+      roomSessionService: runtime,
+      commandDispatcher: runtime,
+      sessionAuthenticator: runtime.sessions,
+      reconnectSynchronizer: runtime.reconnect,
+      snapshotProvider: (roomId, playerId) =>
+        runtime.snapshot(roomId, playerId),
+      roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
+    });
+    const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const created = await activeHost.app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      payload: {
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    const hostSession = created.json<{
+      roomId: string;
+      playerId: string;
+      token: string;
+    }>();
+    const joined = await activeHost.app.inject({
+      method: 'POST',
+      url: `/api/rooms/${hostSession.roomId}/join`,
+      payload: { nickname: 'Bob' },
+    });
+    expect(joined.statusCode).toBe(200);
+    const guestSession = joined.json<{
+      roomId: string;
+      playerId: string;
+      token: string;
+    }>();
+    const client = createSocketClient(address, {
+      autoConnect: false,
+      transports: ['websocket'],
+      auth: {
+        protocolVersion: PROTOCOL_VERSION,
+        ...guestSession,
+      },
+    });
+    try {
+      const received = new Promise<unknown>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.on('state:snapshot', resolve);
+      });
+      client.connect();
+      await expect(received).resolves.toMatchObject({
+        roomId: hostSession.roomId,
+        playerId: guestSession.playerId,
+        room: { players: [{ nickname: 'Alice' }, { nickname: 'Bob' }] },
+      });
+    } finally {
+      client.disconnect();
+    }
+  });
+
   it('returns a versioned health response', async () => {
     activeHost = await createHostServer();
 
