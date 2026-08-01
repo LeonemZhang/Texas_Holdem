@@ -24,4 +24,5 @@ export * from './hand/streets.js';
 export * from './hand/hand-reducer.js';
 export * from './hand/uncontested.js';
 export * from './hand/showdown.js';
+export * from './hand/summary.js';
 export * from './seating/positions.js';
