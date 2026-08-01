@@ -12,6 +12,11 @@ export interface DesktopBridge {
   scanLanRooms(
     input: DiscoveryScanInput,
   ): Promise<readonly DesktopDiscoveredRoom[]>;
+  startHostService(input: HostStartInput): Promise<HostServiceInfo>;
+  stopHostService(): Promise<void>;
+  onHostServiceExited(
+    listener: (event: HostServiceExitEvent) => void,
+  ): () => void;
 }
 
 export const DiscoveryScanInputSchema = z.object({
@@ -20,6 +25,25 @@ export const DiscoveryScanInputSchema = z.object({
 });
 
 export type DiscoveryScanInput = z.infer<typeof DiscoveryScanInputSchema>;
+
+export const HostStartInputSchema = z.object({
+  port: z.number().int().min(1).max(65_535),
+  advertisedAddress: z.ipv4(),
+});
+
+export type HostStartInput = z.infer<typeof HostStartInputSchema>;
+
+export interface HostServiceInfo {
+  readonly port: number;
+  readonly advertisedAddress: string;
+  readonly joinUrl: string;
+  readonly dataDirectory: string;
+}
+
+export interface HostServiceExitEvent {
+  readonly expected: boolean;
+  readonly exitCode: number;
+}
 
 export interface DesktopNetworkInterface {
   readonly name: string;

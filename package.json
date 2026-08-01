@@ -12,8 +12,8 @@
     "pnpm": "10.0.0"
   },
   "scripts": {
-    "predev": "pnpm --filter \"./packages/*\" build",
-    "dev": "concurrently --kill-others-on-fail --names client,host,desktop --prefix-colors cyan,green,magenta \"pnpm --filter @texas-holdem/client dev\" \"pnpm --filter @texas-holdem/host dev\" \"pnpm --filter @texas-holdem/desktop dev\"",
+    "predev": "pnpm --filter \"./packages/*\" build && pnpm --filter @texas-holdem/host build && pnpm --filter @texas-holdem/client build",
+    "dev": "concurrently --kill-others-on-fail --names client,desktop --prefix-colors cyan,magenta \"pnpm --filter @texas-holdem/client dev\" \"pnpm --filter @texas-holdem/desktop dev\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
