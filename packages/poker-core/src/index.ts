@@ -4,6 +4,7 @@ export * from './cards/shuffle.js';
 export * from './betting/state.js';
 export * from './betting/all-in.js';
 export * from './betting/basic-actions.js';
+export * from './betting/betting-round.js';
 export * from './betting/raise.js';
 export * from './betting/reopen.js';
 export * from './evaluator/combinations.js';
