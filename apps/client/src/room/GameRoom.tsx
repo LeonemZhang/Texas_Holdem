@@ -118,10 +118,6 @@ export function GameRoom({
 
   const sendBetting = (intent: BettingActionIntent) => void send(intent);
   const sendHostControl = (intent: HostControlIntent) => {
-    if (intent.type === 'room.remove-player') {
-      setError('当前版本不支持房主主动移除玩家');
-      return;
-    }
     void send(intent);
   };
   const sendChipIntent = (intent: ChipExchangeIntent) => {
@@ -215,6 +211,17 @@ export function GameRoom({
             })
           }
         />
+        {own?.isHost ? (
+          <HostControls
+            isHost
+            hostPlayerId={session.playerId}
+            phase={snapshot.room.phase}
+            players={snapshot.room.players
+              .filter(({ status }) => status !== 'left')
+              .map(({ playerId, nickname }) => ({ playerId, nickname }))}
+            onCommand={sendHostControl}
+          />
+        ) : null}
         {own?.isHost ? (
           <section className="host-share" aria-labelledby="game-invite-title">
             <div>

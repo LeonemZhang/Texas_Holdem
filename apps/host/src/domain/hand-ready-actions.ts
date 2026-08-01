@@ -78,3 +78,13 @@ export function canBeginNextHand(
     state.players.every(({ choice }) => choice !== 'pending')
   );
 }
+
+export function removePlayerFromHandReady(
+  state: HandReadyState,
+  playerId: string,
+): HandReadyState {
+  return freezeHandReady({
+    ...state,
+    players: state.players.filter((player) => player.playerId !== playerId),
+  });
+}

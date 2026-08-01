@@ -156,6 +156,21 @@ export function revokeChipRequest(
   });
 }
 
+export function revokeChipRequestsForPlayer(
+  book: ChipRequestBook,
+  playerId: string,
+): ChipRequestBook {
+  return freezeChipRequestBook({
+    ...book,
+    requests: book.requests.map((request) =>
+      request.status === 'pending' &&
+      (request.requesterId === playerId || request.targetPlayerId === playerId)
+        ? { ...request, status: 'revoked' as const }
+        : request,
+    ),
+  });
+}
+
 export function rejectChipRequest(
   room: RoomState,
   book: ChipRequestBook,

@@ -145,12 +145,19 @@ describe('GameRoom', () => {
 
   it('keeps the real room link and QR code visible to the seated host', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const sendCommand = vi.fn().mockResolvedValue({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: 'remove-1',
+      status: 'accepted',
+      stateVersion: 3,
+      sequence: 3,
+    });
     const connection: ConnectionAdapter = {
       connect: vi.fn(async () =>
         consumeSnapshot({ ...snapshot, playerId: 'host' }),
       ),
       disconnect: vi.fn(),
-      sendCommand: vi.fn(),
+      sendCommand,
       requestResync: vi.fn(),
       onConnectionLost: vi.fn(() => () => undefined),
       onDomainEvent: vi.fn(() => () => undefined),
@@ -179,6 +186,19 @@ describe('GameRoom', () => {
         name: 'http://10.126.126.1:32100/?room=room-1',
       }),
     ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('移除玩家'), {
+      target: { value: 'bob' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '确认执行' }));
+    await waitFor(() =>
+      expect(sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'room.remove-player',
+          targetPlayerId: 'bob',
+          expectedVersion: 2,
+        }),
+      ),
+    );
   });
 
   it('keeps chip requests and statistics operable in the mobile hand-ready flow', async () => {

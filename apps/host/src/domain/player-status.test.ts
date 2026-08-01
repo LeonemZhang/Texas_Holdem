@@ -4,6 +4,7 @@ import { joinRoom } from './join-room.js';
 import {
   eliminateZeroChipPlayers,
   leaveRoom,
+  removePlayer,
   sitOutPlayerForHand,
 } from './player-status.js';
 import { createRoom } from './room.js';
@@ -70,5 +71,20 @@ describe('room player statuses', () => {
     expect(() => leaveRoom(room(), 'host')).toThrow(
       'The host must close the room instead of leaving',
     );
+  });
+
+  it('lets only the host remove another player between hands', () => {
+    const removed = removePlayer(room(), 'host', 'bob');
+    expect(removed.players[1]).toMatchObject({
+      playerId: 'bob',
+      status: 'left',
+      lobbyReady: false,
+    });
+    expect(() => removePlayer(room(), 'bob', 'host')).toThrow(
+      'Only the host can remove a player',
+    );
+    expect(() =>
+      removePlayer({ ...room(), phase: 'playing' }, 'host', 'bob'),
+    ).toThrow('Players can only be removed between hands');
   });
 });

@@ -5,6 +5,7 @@ import {
   createChipRequestBook,
   rejectChipRequest,
   revokeChipRequest,
+  revokeChipRequestsForPlayer,
   revokePendingChipRequests,
   type ChipRequestBook,
 } from '../domain/chip-requests.js';
@@ -16,11 +17,12 @@ import type {
 import {
   canBeginNextHand,
   normalizeHandReadyAtDeadline,
+  removePlayerFromHandReady,
   setHandReadyChoice,
 } from '../domain/hand-ready-actions.js';
 import { joinRoom } from '../domain/join-room.js';
 import { setLobbyReady } from '../domain/lobby-ready.js';
-import { leaveRoom } from '../domain/player-status.js';
+import { leaveRoom, removePlayer } from '../domain/player-status.js';
 import { createRoom, freezeRoom, type RoomState } from '../domain/room.js';
 import {
   closeRoom,
@@ -226,6 +228,28 @@ export class RoomCommandHandler {
       }
       case 'room.exit':
         return this.accepted(leaveRoom(room, command.playerId));
+      case 'room.remove-player': {
+        const nextRoom = removePlayer(
+          room,
+          command.playerId,
+          command.targetPlayerId,
+        );
+        if (room.phase === 'hand-ready') {
+          const context = this.requireHandReady(room.roomId);
+          this.#handReady.set(
+            room.roomId,
+            removePlayerFromHandReady(context.ready, command.targetPlayerId),
+          );
+          this.#chipRequests.set(
+            room.roomId,
+            revokeChipRequestsForPlayer(
+              context.requests,
+              command.targetPlayerId,
+            ),
+          );
+        }
+        return this.accepted(nextRoom);
+      }
       case 'room.close':
         return this.accepted(closeRoom(room, command.playerId).room);
       case 'hand-ready.set-choice': {

@@ -74,4 +74,18 @@ describe('HostControls', () => {
     fireEvent.click(screen.getByRole('button', { name: '确认执行' }));
     expect(onCommand).toHaveBeenCalledWith({ type: 'room.close' });
   });
+
+  it('defers player removal until the current hand has ended', () => {
+    render(
+      <HostControls
+        isHost
+        hostPlayerId="host"
+        phase="playing"
+        players={players}
+        onCommand={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: /移除玩家/ })).toBeDisabled();
+    expect(screen.getByText('每手结束后可移除')).toBeInTheDocument();
+  });
 });

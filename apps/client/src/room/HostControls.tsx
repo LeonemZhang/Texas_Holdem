@@ -41,6 +41,7 @@ export function HostControls({
           ({ playerId }) => playerId === dangerousIntent.targetPlayerId,
         )?.nickname
       : null;
+  const canRemovePlayer = phase === 'lobby' || phase === 'hand-ready';
 
   return (
     <section className="host-controls" aria-labelledby="host-controls-title">
@@ -69,6 +70,7 @@ export function HostControls({
           移除玩家
           <select
             defaultValue=""
+            disabled={!canRemovePlayer}
             onChange={(event) => {
               if (event.target.value)
                 setDangerousIntent({
@@ -89,6 +91,7 @@ export function HostControls({
                 </option>
               ))}
           </select>
+          {!canRemovePlayer ? <small>每手结束后可移除</small> : null}
         </label>
         <button
           className="host-controls__danger"

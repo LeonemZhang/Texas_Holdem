@@ -27,6 +27,29 @@ export function leaveRoom(room: RoomState, playerId: string): RoomState {
   return updateStatus(room, playerId, 'left');
 }
 
+export function removePlayer(
+  room: RoomState,
+  actorPlayerId: string,
+  targetPlayerId: string,
+): RoomState {
+  if (actorPlayerId !== room.hostPlayerId) {
+    throw new RangeError('Only the host can remove a player');
+  }
+  if (targetPlayerId === room.hostPlayerId) {
+    throw new RangeError('The host cannot remove themselves');
+  }
+  if (room.phase !== 'lobby' && room.phase !== 'hand-ready') {
+    throw new RangeError('Players can only be removed between hands');
+  }
+  const target = room.players.find(
+    ({ playerId }) => playerId === targetPlayerId,
+  );
+  if (!target || target.status === 'left') {
+    throw new RangeError(`Player cannot be removed: ${targetPlayerId}`);
+  }
+  return updateStatus(room, targetPlayerId, 'left');
+}
+
 export function sitOutPlayerForHand(
   room: RoomState,
   playerId: string,

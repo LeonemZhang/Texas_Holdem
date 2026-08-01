@@ -53,6 +53,37 @@ describe('RoomCommandHandler', () => {
     handler.handle(
       {
         ...identity,
+        commandId: 'remove',
+        type: 'room.remove-player',
+        targetPlayerId: 'bob',
+      },
+      room,
+    );
+    room = rooms.get('room-1');
+    expect(
+      room?.players.find(({ playerId }) => playerId === 'bob')?.status,
+    ).toBe('left');
+  });
+
+  it('maps first-hand start, pause and resume after the lobby is ready', () => {
+    const rooms = new InMemoryRoomRegistry();
+    const handler = new RoomCommandHandler(rooms, random);
+    handler.handle(createCommand(), null);
+    let room = rooms.get('room-1');
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'join',
+        playerId: 'bob',
+        type: 'room.join',
+        nickname: 'Bob',
+      },
+      room,
+    );
+    room = rooms.get('room-1');
+    handler.handle(
+      {
+        ...identity,
         commandId: 'host-ready',
         type: 'room.set-lobby-ready',
         ready: true,

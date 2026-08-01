@@ -55,6 +55,11 @@ export const PauseRoomCommandSchema = simpleCommand('room.pause');
 export const ResumeRoomCommandSchema = simpleCommand('room.resume');
 export const ExitRoomCommandSchema = simpleCommand('room.exit');
 export const CloseRoomCommandSchema = simpleCommand('room.close');
+export const RemovePlayerCommandSchema = z.object({
+  ...CommandIdentityShape,
+  type: z.literal('room.remove-player'),
+  targetPlayerId: IdSchema,
+});
 
 export const RoomCommandSchema = z.discriminatedUnion('type', [
   CreateRoomCommandSchema,
@@ -63,6 +68,7 @@ export const RoomCommandSchema = z.discriminatedUnion('type', [
   StartFirstHandCommandSchema,
   PauseRoomCommandSchema,
   ResumeRoomCommandSchema,
+  RemovePlayerCommandSchema,
   ExitRoomCommandSchema,
   CloseRoomCommandSchema,
 ]);
