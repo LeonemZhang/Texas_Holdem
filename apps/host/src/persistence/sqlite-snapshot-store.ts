@@ -107,6 +107,13 @@ export class SqliteSnapshotStore implements SnapshotStorePort {
           room_id, sequence, state_version, encoding, payload,
           checksum, created_at_ms
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(room_id, sequence) DO UPDATE SET
+          state_version = excluded.state_version,
+          encoding = excluded.encoding,
+          payload = excluded.payload,
+          checksum = excluded.checksum,
+          valid = 1,
+          created_at_ms = excluded.created_at_ms
       `,
       )
       .run(

@@ -12,6 +12,12 @@ export interface SessionAuthenticator {
 export class InMemorySessionAuthenticator implements SessionAuthenticator {
   readonly #tokens = new Map<string, SessionIdentity>();
 
+  constructor(
+    private readonly fallback?: (
+      credentials: SocketAuthentication,
+    ) => SessionIdentity | null,
+  ) {}
+
   register(identity: SessionIdentity, token: string): void {
     const normalized = token.trim();
     if (normalized.length < 16) {
@@ -30,8 +36,8 @@ export class InMemorySessionAuthenticator implements SessionAuthenticator {
 
   authenticate(credentials: SocketAuthentication): SessionIdentity | null {
     const identity = this.#tokens.get(credentials.token);
+    if (!identity) return this.fallback?.(credentials) ?? null;
     if (
-      !identity ||
       identity.roomId !== credentials.roomId ||
       identity.playerId !== credentials.playerId
     ) {

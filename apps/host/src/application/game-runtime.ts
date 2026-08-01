@@ -27,6 +27,7 @@ import { InMemoryRoomRegistry } from './room-registry.js';
 import { InMemorySessionAuthenticator } from './session-authenticator.js';
 import { projectPlayerSnapshot } from './snapshot-projector.js';
 import type { HandSummaryEvent } from '@texas-holdem/poker-core';
+import type { RoomRecoveryState } from './persistence-ports.js';
 
 export interface RoomSessionBootstrapService {
   currentRoomId(): string | null;
@@ -41,9 +42,14 @@ export interface RoomSessionBootstrapService {
   ): RoomSessionResponse;
 }
 
+export interface GameRuntimeStateExport extends RoomRecoveryState {
+  readonly sequence: number;
+  readonly reconnectTokens: Readonly<Record<string, string>>;
+}
+
 export class GameRuntime implements RoomSessionBootstrapService {
   readonly rooms = new InMemoryRoomRegistry();
-  readonly sessions = new InMemorySessionAuthenticator();
+  readonly sessions: InMemorySessionAuthenticator;
   readonly events = new InMemoryEventBuffer();
   readonly reconnect = new ReconnectSynchronizer(
     this.events,
@@ -74,6 +80,8 @@ export class GameRuntime implements RoomSessionBootstrapService {
   readonly #handReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #actionTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #automaticListeners = new Set<(roomId: string) => void>();
+  readonly #committedListeners = new Set<(roomId: string) => void>();
+  readonly #reconnectTokens = new Map<string, Map<string, string>>();
   readonly #dispatcher = new CommandDispatcher(
     this.rooms,
     (command, room) =>
@@ -85,6 +93,18 @@ export class GameRuntime implements RoomSessionBootstrapService {
       ) === true,
     (command, room) => this.handle(command, room),
   );
+
+  constructor(
+    options: {
+      readonly sessionFallback?: (
+        credentials: Parameters<
+          InMemorySessionAuthenticator['authenticate']
+        >[0],
+      ) => ReturnType<InMemorySessionAuthenticator['authenticate']>;
+    } = {},
+  ) {
+    this.sessions = new InMemorySessionAuthenticator(options.sessionFallback);
+  }
 
   dispatch(input: unknown): CommandResponse {
     const resultKey = this.commandResultKey(input);
@@ -124,6 +144,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       sequence,
     });
     if (resultKey) this.#results.set(resultKey, sequenced);
+    this.#committedListeners.forEach((listener) => listener(command.roomId));
     return sequenced;
   }
 
@@ -136,12 +157,43 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return () => this.#automaticListeners.delete(listener);
   }
 
+  onStateCommitted(listener: (roomId: string) => void): () => void {
+    this.#committedListeners.add(listener);
+    return () => this.#committedListeners.delete(listener);
+  }
+
+  restore(state: RoomRecoveryState, sequence: number): void {
+    if (this.rooms.listRoomIds().length > 0) {
+      throw new RangeError('Cannot restore over an active runtime');
+    }
+    this.#roomHandler.restoreState(state);
+    this.#sequences.set(state.room.roomId, sequence);
+    this.scheduleHandReadyTimeout(state.room.roomId);
+    this.scheduleActionTimeout(state.room.roomId);
+  }
+
+  exportState(roomId: string): GameRuntimeStateExport | null {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+    return Object.freeze({
+      room,
+      hand: this.#roomHandler.getCurrentHand(roomId),
+      handReady: this.#roomHandler.getHandReady(roomId),
+      chipRequests: this.#roomHandler.getChipRequests(roomId),
+      sequence: this.#sequences.get(roomId) ?? 0,
+      reconnectTokens: Object.freeze(
+        Object.fromEntries(this.#reconnectTokens.get(roomId) ?? []),
+      ),
+    });
+  }
+
   dispose(): void {
     for (const timer of this.#handReadyTimers.values()) clearTimeout(timer);
     for (const timer of this.#actionTimers.values()) clearTimeout(timer);
     this.#handReadyTimers.clear();
     this.#actionTimers.clear();
     this.#automaticListeners.clear();
+    this.#committedListeners.clear();
   }
 
   create(
@@ -168,6 +220,8 @@ export class GameRuntime implements RoomSessionBootstrapService {
       throw new Error('Room creation was rejected');
     }
     this.sessions.register({ roomId, playerId }, token);
+    this.rememberReconnectToken(roomId, playerId, token);
+    this.#committedListeners.forEach((listener) => listener(roomId));
     return this.sessionResponse(roomId, playerId, token, baseJoinUrl);
   }
 
@@ -195,6 +249,8 @@ export class GameRuntime implements RoomSessionBootstrapService {
       throw new Error('Joining the room was rejected');
     }
     this.sessions.register({ roomId, playerId }, token);
+    this.rememberReconnectToken(roomId, playerId, token);
+    this.#committedListeners.forEach((listener) => listener(roomId));
     return this.sessionResponse(roomId, playerId, token, baseJoinUrl);
   }
 
@@ -338,6 +394,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       if (!this.startNextHandIfReady(roomId, true)) return;
       this.#sequences.set(roomId, (this.#sequences.get(roomId) ?? 0) + 1);
       this.#automaticListeners.forEach((listener) => listener(roomId));
+      this.#committedListeners.forEach((listener) => listener(roomId));
       this.scheduleActionTimeout(roomId);
     }, delayMs);
     timer.unref?.();
@@ -390,6 +447,16 @@ export class GameRuntime implements RoomSessionBootstrapService {
     }, room.settings.actionTimeoutSeconds * 1_000);
     timer.unref?.();
     this.#actionTimers.set(roomId, timer);
+  }
+
+  private rememberReconnectToken(
+    roomId: string,
+    playerId: string,
+    token: string,
+  ): void {
+    const tokens = this.#reconnectTokens.get(roomId) ?? new Map();
+    tokens.set(playerId, token);
+    this.#reconnectTokens.set(roomId, tokens);
   }
 
   private commandResultKey(input: unknown): string | null {

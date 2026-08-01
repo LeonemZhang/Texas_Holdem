@@ -95,6 +95,21 @@ export class RoomCommandHandler {
     );
   }
 
+  restoreState(input: {
+    readonly room: RoomState;
+    readonly hand: StartedHandState | null;
+    readonly handReady: HandReadyState | null;
+    readonly chipRequests: ChipRequestBook | null;
+  }): void {
+    this.rooms.save(input.room);
+    if (input.hand) this.#hands.set(input.room.roomId, input.hand);
+    if (input.handReady)
+      this.#handReady.set(input.room.roomId, input.handReady);
+    if (input.chipRequests) {
+      this.#chipRequests.set(input.room.roomId, input.chipRequests);
+    }
+  }
+
   startNextHandIfReady(
     roomId: string,
     input: {
