@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest';
+
+import { joinRoom } from './join-room.js';
+import { canHostStartFirstHand, setLobbyReady } from './lobby-ready.js';
+import { createRoom } from './room.js';
+
+function twoPlayerRoom() {
+  const room = createRoom({
+    roomId: 'room',
+    hostPlayerId: 'host',
+    hostNickname: 'Alice',
+    settings: {
+      roomName: 'Friends',
+      maxPlayers: 10,
+      initialChips: 2_000,
+      blind: { kind: 'preset', smallBlind: 1 },
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    },
+  });
+  return joinRoom(room, { playerId: 'bob', nickname: 'Bob' });
+}
+
+describe('lobby readiness', () => {
+  it('requires at least two seated players and every player ready', () => {
+    let room = twoPlayerRoom();
+    expect(canHostStartFirstHand(room, 'host')).toBe(false);
+    room = setLobbyReady(room, 'host', true);
+    room = setLobbyReady(room, 'bob', true);
+    expect(canHostStartFirstHand(room, 'host')).toBe(true);
+  });
+
+  it('never starts automatically when everyone becomes ready', () => {
+    let room = setLobbyReady(twoPlayerRoom(), 'host', true);
+    room = setLobbyReady(room, 'bob', true);
+    expect(room.phase).toBe('lobby');
+    expect(room.firstHandStarted).toBe(false);
+  });
+
+  it('disables starting immediately when a player cancels readiness', () => {
+    let room = setLobbyReady(twoPlayerRoom(), 'host', true);
+    room = setLobbyReady(room, 'bob', true);
+    room = setLobbyReady(room, 'bob', false);
+    expect(canHostStartFirstHand(room, 'host')).toBe(false);
+  });
+
+  it('does not grant the manual start gate to an ordinary player', () => {
+    let room = setLobbyReady(twoPlayerRoom(), 'host', true);
+    room = setLobbyReady(room, 'bob', true);
+    expect(canHostStartFirstHand(room, 'bob')).toBe(false);
+  });
+});
