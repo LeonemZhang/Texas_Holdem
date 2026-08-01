@@ -30,7 +30,7 @@ export function createChipRequestBook(
   });
 }
 
-function freezeBook(book: ChipRequestBook): ChipRequestBook {
+export function freezeChipRequestBook(book: ChipRequestBook): ChipRequestBook {
   return Object.freeze({
     ...book,
     requests: Object.freeze(
@@ -107,7 +107,7 @@ export function createChipRequest(
     );
   }
   const note = input.note?.trim() || null;
-  return freezeBook({
+  return freezeChipRequestBook({
     ...book,
     requests: [
       ...book.requests,
@@ -133,7 +133,7 @@ export function revokeChipRequest(
   if (request.requesterId !== actorPlayerId) {
     throw new RangeError('Only the requester can revoke a chip request');
   }
-  return freezeBook({
+  return freezeChipRequestBook({
     ...book,
     requests: book.requests.map((candidate) =>
       candidate.requestId === requestId
@@ -170,7 +170,7 @@ export function rejectChipRequest(
   const fullyRejected =
     request.targetPlayerId !== null ||
     possibleDonors.every(({ playerId }) => rejectedBy.includes(playerId));
-  return freezeBook({
+  return freezeChipRequestBook({
     ...book,
     requests: book.requests.map((candidate) =>
       candidate.requestId === requestId
