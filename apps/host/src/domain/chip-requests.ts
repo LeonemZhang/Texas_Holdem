@@ -44,6 +44,19 @@ export function freezeChipRequestBook(book: ChipRequestBook): ChipRequestBook {
   });
 }
 
+export function revokePendingChipRequests(
+  book: ChipRequestBook,
+): ChipRequestBook {
+  return freezeChipRequestBook({
+    ...book,
+    requests: book.requests.map((request) =>
+      request.status === 'pending'
+        ? { ...request, status: 'revoked' }
+        : request,
+    ),
+  });
+}
+
 function requirePending(book: ChipRequestBook, requestId: string): ChipRequest {
   const request = book.requests.find(
     (candidate) => candidate.requestId === requestId,
