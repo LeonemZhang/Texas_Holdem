@@ -12,6 +12,21 @@ const session = {
 };
 
 describe('RoomSessionClient', () => {
+  it('invokes an injected fetch port without binding it as a client method', async () => {
+    function strictFetch(this: unknown) {
+      expect(this).toBeUndefined();
+      return Promise.resolve(
+        new Response(JSON.stringify({ roomId: 'room-1' }), { status: 200 }),
+      );
+    }
+    const client = new RoomSessionClient(
+      'http://10.126.126.1:32100',
+      strictFetch,
+    );
+
+    await client.currentRoomId();
+  });
+
   it('resolves the current room and creates or joins through the selected host', async () => {
     const fetcher = vi
       .fn()

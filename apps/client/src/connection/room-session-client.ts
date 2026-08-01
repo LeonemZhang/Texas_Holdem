@@ -12,6 +12,8 @@ export type FetchPort = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+const defaultFetch: FetchPort = (input, init) => fetch(input, init);
+
 export class RoomSessionRequestError extends Error {
   constructor(
     message: string,
@@ -27,7 +29,7 @@ export class RoomSessionClient {
 
   constructor(
     baseUrl: string | URL,
-    private readonly fetcher: FetchPort = fetch,
+    private readonly fetcher: FetchPort = defaultFetch,
   ) {
     this.#baseUrl = new URL(baseUrl);
   }
@@ -74,7 +76,8 @@ export class RoomSessionClient {
   }
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
-    const response = await this.fetcher(new URL(path, this.#baseUrl), init);
+    const fetcher = this.fetcher;
+    const response = await fetcher(new URL(path, this.#baseUrl), init);
     if (response.ok) return response;
     let message = `房主服务请求失败（${response.status}）`;
     try {
