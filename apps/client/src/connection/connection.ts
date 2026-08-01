@@ -1,5 +1,7 @@
 import type {
   CommandResponse,
+  DomainEvent,
+  PlayerSnapshot,
   ResyncRequest,
   ResyncResponse,
   SocketAuthentication,
@@ -28,6 +30,8 @@ export interface ConnectionAdapter {
   sendCommand(command: unknown, timeoutMs?: number): Promise<CommandResponse>;
   requestResync(request: ResyncRequest): Promise<ResyncResponse>;
   onConnectionLost(listener: (reason: string) => void): () => void;
+  onDomainEvent(listener: (event: DomainEvent) => void): () => void;
+  onSnapshot(listener: (snapshot: PlayerSnapshot) => void): () => void;
 }
 
 export function reduceConnectionState(

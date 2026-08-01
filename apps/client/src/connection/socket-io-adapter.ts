@@ -2,8 +2,12 @@ import { io, type Socket } from 'socket.io-client';
 
 import {
   CommandResponseSchema,
+  DomainEventSchema,
+  PlayerSnapshotSchema,
   ResyncResponseSchema,
   type CommandResponse,
+  type DomainEvent,
+  type PlayerSnapshot,
   type ResyncRequest,
   type ResyncResponse,
   type SocketAuthentication,
@@ -20,6 +24,8 @@ export interface ClientSocketPort {
   on(event: 'connect', listener: () => void): void;
   on(event: 'connect_error', listener: (error: Error) => void): void;
   on(event: 'disconnect', listener: (reason: string) => void): void;
+  on(event: 'event:domain', listener: (payload: unknown) => void): void;
+  on(event: 'state:snapshot', listener: (payload: unknown) => void): void;
   off(event: string, listener: (...arguments_: never[]) => void): void;
   timeout(milliseconds: number): {
     emit(event: string, payload: unknown, acknowledge: Acknowledge): void;
@@ -57,6 +63,8 @@ const defaultSocketFactory: ClientSocketFactory = (
 
 export class SocketIoConnectionAdapter implements ConnectionAdapter {
   readonly #lostListeners = new Set<(reason: string) => void>();
+  readonly #eventListeners = new Set<(event: DomainEvent) => void>();
+  readonly #snapshotListeners = new Set<(snapshot: PlayerSnapshot) => void>();
   #socket: ClientSocketPort | null = null;
 
   constructor(
@@ -87,6 +95,20 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
       socket.on('connect_error', failed);
       socket.on('disconnect', (reason) => {
         this.#lostListeners.forEach((listener) => listener(reason));
+      });
+      socket.on('event:domain', (payload) => {
+        const event = DomainEventSchema.safeParse(payload);
+        if (event.success) {
+          this.#eventListeners.forEach((listener) => listener(event.data));
+        }
+      });
+      socket.on('state:snapshot', (payload) => {
+        const snapshot = PlayerSnapshotSchema.safeParse(payload);
+        if (snapshot.success) {
+          this.#snapshotListeners.forEach((listener) =>
+            listener(snapshot.data),
+          );
+        }
       });
       socket.connect();
     });
@@ -123,6 +145,16 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
   onConnectionLost(listener: (reason: string) => void): () => void {
     this.#lostListeners.add(listener);
     return () => this.#lostListeners.delete(listener);
+  }
+
+  onDomainEvent(listener: (event: DomainEvent) => void): () => void {
+    this.#eventListeners.add(listener);
+    return () => this.#eventListeners.delete(listener);
+  }
+
+  onSnapshot(listener: (snapshot: PlayerSnapshot) => void): () => void {
+    this.#snapshotListeners.add(listener);
+    return () => this.#snapshotListeners.delete(listener);
   }
 
   private ensureCommandId(command: unknown): unknown {
