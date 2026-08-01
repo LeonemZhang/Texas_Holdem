@@ -6,6 +6,8 @@ import { io as createSocketClient } from 'socket.io-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InMemorySessionAuthenticator } from './application/session-authenticator.js';
 import { projectPlayerSnapshot } from './application/snapshot-projector.js';
+import { InMemoryEventBuffer } from './application/event-buffer.js';
+import { ReconnectSynchronizer } from './application/reconnect-synchronizer.js';
 import { createRoom } from './domain/room.js';
 import { joinRoom } from './domain/join-room.js';
 import { setLobbyReady } from './domain/lobby-ready.js';
@@ -342,6 +344,62 @@ describe('host framework server', () => {
     } finally {
       hostClient.disconnect();
       bobClient.disconnect();
+    }
+  });
+
+  it('serves continuous reconnect events through the authenticated socket', async () => {
+    const sessions = new InMemorySessionAuthenticator();
+    sessions.register(
+      { roomId: 'room-1', playerId: 'host' },
+      'host-secret-token',
+    );
+    const events = new InMemoryEventBuffer();
+    events.append([
+      {
+        protocolVersion: PROTOCOL_VERSION,
+        eventId: 'event-1',
+        roomId: 'room-1',
+        stateVersion: 1,
+        type: 'room.control-changed',
+        phase: 'playing',
+      },
+    ]);
+    activeHost = await createHostServer({
+      sessionAuthenticator: sessions,
+      reconnectSynchronizer: new ReconnectSynchronizer(events, () => null),
+    });
+    const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const client = createSocketClient(address, {
+      transports: ['websocket'],
+      auth: {
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: 'room-1',
+        playerId: 'host',
+        token: 'host-secret-token',
+      },
+    });
+
+    try {
+      const response = await new Promise<unknown>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.emit(
+          'state:resync',
+          {
+            protocolVersion: PROTOCOL_VERSION,
+            roomId: 'room-1',
+            playerId: 'host',
+            offset: 0,
+          },
+          resolve,
+        );
+      });
+      expect(response).toMatchObject({
+        status: 'events',
+        latestSequence: 1,
+        events: [{ eventId: 'event-1', sequence: 1 }],
+      });
+    } finally {
+      client.disconnect();
     }
   });
 });

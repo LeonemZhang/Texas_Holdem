@@ -2,6 +2,7 @@ import {
   HealthResponseSchema,
   JoinBootstrapResponseSchema,
   PROTOCOL_VERSION,
+  ResyncRequestSchema,
   SocketAuthenticationSchema,
   SystemHelloRequestSchema,
   SystemHelloResponseSchema,
@@ -18,6 +19,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import type { CommandResponse } from '@texas-holdem/protocol';
 
 import type { CommandDispatcher } from './application/command-dispatcher.js';
+import type { ReconnectSynchronizer } from './application/reconnect-synchronizer.js';
 import type {
   SessionAuthenticator,
   SessionIdentity,
@@ -36,6 +38,7 @@ export interface CreateHostServerOptions {
   port?: number;
   commandDispatcher?: Pick<CommandDispatcher, 'dispatch'>;
   sessionAuthenticator?: SessionAuthenticator;
+  reconnectSynchronizer?: ReconnectSynchronizer;
 }
 
 export interface HostServer {
@@ -177,6 +180,28 @@ export async function createHostServer(
           },
         } satisfies CommandResponse);
       }
+    });
+
+    socket.on('state:resync', (rawRequest: unknown, acknowledge: unknown) => {
+      if (typeof acknowledge !== 'function') return;
+      const request = ResyncRequestSchema.safeParse(rawRequest);
+      if (!request.success || !identity || !options.reconnectSynchronizer) {
+        acknowledge({
+          protocolVersion: PROTOCOL_VERSION,
+          status: 'failed',
+          latestSequence: 0,
+          error: {
+            code: request.success ? 'UNAUTHORIZED' : 'INVALID_MESSAGE',
+            message: request.success
+              ? 'Socket session cannot resynchronize this identity'
+              : 'Resynchronization request is invalid',
+          },
+        });
+        return;
+      }
+      acknowledge(
+        options.reconnectSynchronizer.synchronize(identity, request.data),
+      );
     });
   });
 
