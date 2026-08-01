@@ -12,6 +12,10 @@ import {
 
 import { GameCommandHandler } from './game-command-handler.js';
 import {
+  rebuildStatistics,
+  type StoredStatisticsFact,
+} from './statistics-store.js';
+import {
   CommandDispatcher,
   type ClientCommand,
   type CommandHandlerResult,
@@ -22,6 +26,7 @@ import { RoomCommandHandler } from './room-command-handler.js';
 import { InMemoryRoomRegistry } from './room-registry.js';
 import { InMemorySessionAuthenticator } from './session-authenticator.js';
 import { projectPlayerSnapshot } from './snapshot-projector.js';
+import type { HandSummaryEvent } from '@texas-holdem/poker-core';
 
 export interface RoomSessionBootstrapService {
   currentRoomId(): string | null;
@@ -48,7 +53,21 @@ export class GameRuntime implements RoomSessionBootstrapService {
   readonly #roomHandler = new RoomCommandHandler(this.rooms, {
     next: () => Math.random(),
   });
-  readonly #gameHandler = new GameCommandHandler(this.rooms, this.#roomHandler);
+  readonly #summaries = new Map<string, HandSummaryEvent[]>();
+  readonly #facts = new Map<string, StoredStatisticsFact[]>();
+  readonly #gameHandler = new GameCommandHandler(
+    this.rooms,
+    this.#roomHandler,
+    Date.now,
+    {
+      onPlayerAction: (event) => {
+        const facts = this.#facts.get(event.handId) ?? [];
+        facts.push({ factId: randomUUID(), event });
+        this.#facts.set(event.handId, facts);
+      },
+      onHandSettled: (summary) => this.recordSummary(summary),
+    },
+  );
   readonly #sequences = new Map<string, number>();
   readonly #completedHands = new Map<string, number>();
   readonly #results = new Map<string, CommandResponse>();
@@ -180,6 +199,26 @@ export class GameRuntime implements RoomSessionBootstrapService {
     if (!room || !room.players.some((player) => player.playerId === playerId)) {
       return null;
     }
+    const initialChips = Object.fromEntries(
+      room.players.map((player) => [
+        player.playerId,
+        room.settings.initialChips,
+      ]),
+    );
+    const summaries = this.#summaries.get(roomId) ?? [];
+    const facts = summaries.flatMap(
+      (summary) => this.#facts.get(summary.handId) ?? [],
+    );
+    const rebuilt = rebuildStatistics(
+      {
+        saveSummary: () => undefined,
+        saveFacts: () => undefined,
+        loadSummaries: () => summaries,
+        loadFacts: () => facts.map(({ event }) => event),
+      },
+      roomId,
+      initialChips,
+    );
     return projectPlayerSnapshot({
       room,
       viewerPlayerId: playerId,
@@ -188,6 +227,17 @@ export class GameRuntime implements RoomSessionBootstrapService {
       handReady: this.#roomHandler.getHandReady(roomId),
       chipRequests: this.#roomHandler.getChipRequests(roomId),
       completedHands: this.#completedHands.get(roomId) ?? 0,
+      statistics: room.players.map((player) => ({
+        playerId: player.playerId,
+        currentChips:
+          rebuilt.basic[player.playerId]?.currentChips ?? player.chips,
+        participatedHands:
+          rebuilt.basic[player.playerId]?.participatedHands ?? 0,
+        wonHands: rebuilt.basic[player.playerId]?.wonHands ?? 0,
+        showdownWinRate:
+          rebuilt.outcomes[player.playerId]?.showdownWinRate ?? null,
+      })),
+      titles: rebuilt.titles,
     });
   }
 
@@ -210,6 +260,39 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return betting.success
       ? this.#gameHandler.handle(betting.data, room)
       : this.#roomHandler.handle(command, room);
+  }
+
+  private recordSummary(summary: HandSummaryEvent): void {
+    const room = this.rooms
+      .listRoomIds()
+      .find(
+        (roomId) =>
+          this.#roomHandler.getCurrentHand(roomId)?.handId === summary.handId,
+      );
+    if (!room) return;
+    const summaries = this.#summaries.get(room) ?? [];
+    summaries.push(summary);
+    this.#summaries.set(room, summaries);
+    if (summary.reason === 'showdown' && summary.participants.length === 2) {
+      const winner = summary.winnerIds[0];
+      const loser = summary.participants.find(
+        ({ playerId }) => !summary.winnerIds.includes(playerId),
+      )?.playerId;
+      if (winner && loser) {
+        const facts = this.#facts.get(summary.handId) ?? [];
+        facts.push({
+          factId: randomUUID(),
+          event: {
+            type: 'showdown.heads-up-loss',
+            handId: summary.handId,
+            loserPlayerId: loser,
+            winnerPlayerId: winner,
+            contenderCount: 2,
+          },
+        });
+        this.#facts.set(summary.handId, facts);
+      }
+    }
   }
 
   private startNextHandIfReady(

@@ -117,6 +117,15 @@ describe('GameRuntime', () => {
       room: { phase: 'playing', completedHands: 1 },
       game: { street: 'preflop' },
       handReady: null,
+      statistics: {
+        players: expect.arrayContaining([
+          expect.objectContaining({ participatedHands: 1 }),
+        ]),
+        titles: expect.arrayContaining([
+          expect.objectContaining({ title: 'pot-harvester' }),
+          expect.objectContaining({ title: 'bluff-king' }),
+        ]),
+      },
     });
     expect(snapshot?.game?.handId).not.toBe('hand-1');
     runtime.dispose();

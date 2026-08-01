@@ -1,11 +1,15 @@
 import {
   advanceAfterCompletedBetting,
   applyHandAction,
+  createHandSummary,
   isBettingRoundComplete,
   settleShowdown,
   settleUncontestedHand,
   type BettingAction,
+  type HandSummaryEvent,
+  type ShowdownSettledHand,
   type StartedHandState,
+  type UncontestedSettledHand,
 } from '@texas-holdem/poker-core';
 import type { BettingCommand } from '@texas-holdem/protocol';
 
@@ -14,6 +18,12 @@ import { beginHandReadyPhase } from '../domain/hand-ready.js';
 import type { CommandHandlerResult } from './command-dispatcher.js';
 import type { RoomCommandHandler } from './room-command-handler.js';
 import type { RoomRepository } from './room-registry.js';
+import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
+
+export interface GameCommandHandlerHooks {
+  readonly onPlayerAction?: (event: PlayerActionEvent) => void;
+  readonly onHandSettled?: (summary: HandSummaryEvent) => void;
+}
 
 function toBettingAction(command: BettingCommand): BettingAction {
   switch (command.type) {
@@ -35,6 +45,7 @@ export class GameCommandHandler {
     private readonly rooms: RoomRepository,
     private readonly runtime: RoomCommandHandler,
     private readonly nowMs: () => number = Date.now,
+    private readonly hooks: GameCommandHandlerHooks = {},
   ) {}
 
   handle(
@@ -53,6 +64,16 @@ export class GameCommandHandler {
       command.playerId,
       toBettingAction(command),
     );
+    this.hooks.onPlayerAction?.({
+      type: 'player.action',
+      handId: hand.handId,
+      playerId: command.playerId,
+      action:
+        command.type === 'game.raise-to'
+          ? 'raiseTo'
+          : command.type.slice('game.'.length),
+      street: hand.street,
+    } as PlayerActionEvent);
     if (isBettingRoundComplete(nextHand.betting)) {
       const contenders = nextHand.players.filter(
         ({ status }) => status !== 'folded',
@@ -80,8 +101,9 @@ export class GameCommandHandler {
   private settle(
     progressedHand: StartedHandState,
     room: RoomState,
-    settledHand: StartedHandState,
+    settledHand: UncontestedSettledHand | ShowdownSettledHand,
   ): CommandHandlerResult {
+    this.hooks.onHandSettled?.(createHandSummary(settledHand));
     this.runtime.replaceCurrentHand(room.roomId, settledHand);
     const stacks = new Map(
       settledHand.players.map(({ playerId, stack }) => [playerId, stack]),
