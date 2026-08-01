@@ -730,18 +730,13 @@ h1 {
 }
 
 .hand-ready-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: rgb(2 12 10 / 78%);
-  backdrop-filter: blur(8px);
+  position: static;
+  padding: 0;
 }
 
 .hand-ready-card {
-  width: min(100%, 34rem);
+  width: 100%;
+  margin-top: 1rem;
   padding: clamp(1rem, 4vw, 2rem);
   border: 1px solid rgb(167 243 208 / 25%);
   border-radius: 1.25rem;
