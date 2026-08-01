@@ -15,6 +15,7 @@ import {
   type SystemHelloResponse,
 } from '@texas-holdem/protocol';
 import fastifyStatic from '@fastify/static';
+import fastifyCors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -65,8 +66,10 @@ export async function createHostServer(
   const app = Fastify({ logger: false });
   const io = new SocketIOServer(app.server, {
     serveClient: false,
+    cors: { origin: true },
   });
   const publisher = new SocketPublisher(io);
+  await app.register(fastifyCors, { origin: true });
 
   const connection = () => {
     const address = app.server.address();

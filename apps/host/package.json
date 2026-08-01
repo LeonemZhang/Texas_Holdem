@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/cors": "11.3.0",
     "@fastify/static": "10.1.2",
     "@texas-holdem/poker-core": "workspace:*",
     "@texas-holdem/protocol": "workspace:*",
