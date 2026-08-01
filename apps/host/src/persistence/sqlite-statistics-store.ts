@@ -49,6 +49,24 @@ export class SqliteStatisticsStore implements StatisticsFactStorePort {
     this.database
       .prepare(
         `
+        INSERT OR IGNORE INTO events (
+          room_id, sequence, event_id, state_version, event_type,
+          payload_json, created_at_ms
+        )
+        SELECT room_id, ?, ?, state_version, 'hand.summary', ?, ?
+        FROM rooms WHERE room_id = ?
+      `,
+      )
+      .run(
+        sequence,
+        `statistics-summary-${summary.handId}`,
+        JSON.stringify(summary),
+        createdAtMs,
+        roomId,
+      );
+    this.database
+      .prepare(
+        `
         INSERT INTO hand_summaries (
           room_id, hand_id, sequence, summary_json, created_at_ms
         ) VALUES (?, ?, ?, ?, ?)

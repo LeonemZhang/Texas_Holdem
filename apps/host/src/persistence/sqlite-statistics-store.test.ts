@@ -5,12 +5,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { HandSummaryEvent } from '@texas-holdem/poker-core';
-import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
 
 import { rebuildStatistics } from '../application/statistics-store.js';
 import { HOST_MIGRATIONS } from './migrations.js';
 import { openSqliteDatabase, runSqliteMigrations } from './sqlite-database.js';
-import { SqliteEventStore } from './sqlite-event-command-store.js';
 import { SqliteStatisticsStore } from './sqlite-statistics-store.js';
 
 const temporaryDirectories: string[] = [];
@@ -57,30 +55,6 @@ describe('SQLite statistics fact store', () => {
       `,
       )
       .run();
-    const events = new SqliteEventStore(database, () => 2);
-    events.append([
-      {
-        protocolVersion: PROTOCOL_VERSION,
-        eventId: 'summary-1',
-        roomId: 'room-1',
-        sequence: 1,
-        stateVersion: 1,
-        type: 'hand.summary',
-        handId: 'hand-1',
-        reason: 'showdown',
-        communityCards: [...summary.communityCards],
-        investments: summary.investments,
-        winnerIds: [...summary.winnerIds],
-        payouts: summary.payouts,
-        netChanges: summary.netChanges,
-        revealedHoleCards: Object.fromEntries(
-          Object.entries(summary.revealedHoleCards).map(([playerId, cards]) => [
-            playerId,
-            [...cards],
-          ]),
-        ),
-      },
-    ]);
     const store = new SqliteStatisticsStore(database);
     try {
       store.saveSummary('room-1', 1, summary, 2);
