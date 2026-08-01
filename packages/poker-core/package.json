@@ -1,0 +1,24 @@
+{
+  "name": "@texas-holdem/poker-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "verify:five-card-distribution": "tsx scripts/verify-five-card-distribution.ts"
+  },
+  "devDependencies": {
+    "@pokertools/evaluator": "1.0.16",
+    "tsx": "4.20.6",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
