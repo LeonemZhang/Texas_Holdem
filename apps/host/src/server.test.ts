@@ -3,7 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { io as createSocketClient } from 'socket.io-client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { InMemorySessionAuthenticator } from './application/session-authenticator.js';
 import { createHostServer, type HostServer } from './server.js';
 
 let activeHost: HostServer | undefined;
@@ -104,6 +105,116 @@ describe('host framework server', () => {
       });
     } finally {
       client.disconnect();
+    }
+  });
+
+  it('binds business command acknowledgements to the authenticated identity', async () => {
+    const sessions = new InMemorySessionAuthenticator();
+    sessions.register(
+      { roomId: 'room-1', playerId: 'host' },
+      'host-secret-token',
+    );
+    const dispatch = vi.fn(() => ({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: 'command-1',
+      status: 'accepted' as const,
+      stateVersion: 1,
+      sequence: 1,
+    }));
+    activeHost = await createHostServer({
+      sessionAuthenticator: sessions,
+      commandDispatcher: { dispatch },
+    });
+    const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const client = createSocketClient(address, {
+      transports: ['websocket'],
+      auth: {
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: 'room-1',
+        playerId: 'host',
+        token: 'host-secret-token',
+      },
+    });
+
+    try {
+      const response = await new Promise<unknown>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.emit(
+          'command:submit',
+          {
+            protocolVersion: PROTOCOL_VERSION,
+            commandId: 'command-1',
+            roomId: 'room-1',
+            playerId: 'host',
+            expectedVersion: 0,
+            type: 'room.pause',
+          },
+          resolve,
+        );
+      });
+      expect(response).toMatchObject({
+        status: 'accepted',
+        commandId: 'command-1',
+      });
+      expect(dispatch).toHaveBeenCalledTimes(1);
+    } finally {
+      client.disconnect();
+    }
+  });
+
+  it('rejects unauthenticated and identity-mismatched business commands', async () => {
+    const sessions = new InMemorySessionAuthenticator();
+    sessions.register(
+      { roomId: 'room-1', playerId: 'host' },
+      'host-secret-token',
+    );
+    const dispatch = vi.fn();
+    activeHost = await createHostServer({
+      sessionAuthenticator: sessions,
+      commandDispatcher: { dispatch },
+    });
+    const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const clients = [
+      createSocketClient(address, { transports: ['websocket'] }),
+      createSocketClient(address, {
+        transports: ['websocket'],
+        auth: {
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'host',
+          token: 'host-secret-token',
+        },
+      }),
+    ];
+
+    try {
+      const responses = await Promise.all(
+        clients.map(
+          (client, index) =>
+            new Promise<unknown>((resolve, reject) => {
+              client.on('connect_error', reject);
+              client.emit(
+                'command:submit',
+                {
+                  protocolVersion: PROTOCOL_VERSION,
+                  commandId: `command-${index}`,
+                  roomId: 'room-1',
+                  playerId: index === 0 ? 'host' : 'bob',
+                  expectedVersion: 0,
+                  type: 'room.pause',
+                },
+                resolve,
+              );
+            }),
+        ),
+      );
+      expect(responses).toEqual([
+        expect.objectContaining({ status: 'unauthorized' }),
+        expect.objectContaining({ status: 'unauthorized' }),
+      ]);
+      expect(dispatch).not.toHaveBeenCalled();
+    } finally {
+      clients.forEach((client) => client.disconnect());
     }
   });
 });

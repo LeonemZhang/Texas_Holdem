@@ -2,6 +2,7 @@ import {
   HealthResponseSchema,
   JoinBootstrapResponseSchema,
   PROTOCOL_VERSION,
+  SocketAuthenticationSchema,
   SystemHelloRequestSchema,
   SystemHelloResponseSchema,
   type HealthResponse,
@@ -14,12 +15,22 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Server as SocketIOServer } from 'socket.io';
 
+import type { CommandResponse } from '@texas-holdem/protocol';
+
+import type { CommandDispatcher } from './application/command-dispatcher.js';
+import type {
+  SessionAuthenticator,
+  SessionIdentity,
+} from './application/session-authenticator.js';
+
 export const HOST_SERVER_VERSION = '0.0.0';
 
 export interface CreateHostServerOptions {
   staticDirectory?: string;
   advertisedHost?: string;
   port?: number;
+  commandDispatcher?: Pick<CommandDispatcher, 'dispatch'>;
+  sessionAuthenticator?: SessionAuthenticator;
 }
 
 export interface HostServer {
@@ -86,6 +97,14 @@ export async function createHostServer(
     }));
   }
   io.on('connection', (socket) => {
+    const parsedAuthentication = SocketAuthenticationSchema.safeParse(
+      socket.handshake.auth,
+    );
+    const identity: SessionIdentity | null =
+      parsedAuthentication.success && options.sessionAuthenticator
+        ? options.sessionAuthenticator.authenticate(parsedAuthentication.data)
+        : null;
+
     socket.on('system:hello', (rawRequest: unknown, acknowledge: unknown) => {
       const request = SystemHelloRequestSchema.safeParse(rawRequest);
       if (!request.success || typeof acknowledge !== 'function') {
@@ -98,6 +117,53 @@ export async function createHostServer(
         serverTime: new Date().toISOString(),
       });
       acknowledge(response);
+    });
+
+    socket.on('command:submit', (rawCommand: unknown, acknowledge: unknown) => {
+      if (typeof acknowledge !== 'function') return;
+      const commandId =
+        typeof rawCommand === 'object' &&
+        rawCommand !== null &&
+        'commandId' in rawCommand &&
+        typeof rawCommand.commandId === 'string' &&
+        rawCommand.commandId.trim()
+          ? rawCommand.commandId
+          : 'unknown-command';
+      const unauthorized = (): CommandResponse => ({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId,
+        status: 'unauthorized',
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Socket session is not authenticated for this identity',
+        },
+      });
+      if (
+        !identity ||
+        !options.commandDispatcher ||
+        typeof rawCommand !== 'object' ||
+        rawCommand === null ||
+        !('roomId' in rawCommand) ||
+        !('playerId' in rawCommand) ||
+        rawCommand.roomId !== identity.roomId ||
+        rawCommand.playerId !== identity.playerId
+      ) {
+        acknowledge(unauthorized());
+        return;
+      }
+      try {
+        acknowledge(options.commandDispatcher.dispatch(rawCommand));
+      } catch {
+        acknowledge({
+          protocolVersion: PROTOCOL_VERSION,
+          commandId,
+          status: 'rejected',
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'Command handling failed',
+          },
+        } satisfies CommandResponse);
+      }
     });
   });
 

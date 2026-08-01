@@ -6,6 +6,13 @@ export const SystemHelloRequestSchema = z.object({
   protocolVersion: z.string().min(1),
 });
 
+export const SocketAuthenticationSchema = z.object({
+  protocolVersion: z.literal(PROTOCOL_VERSION),
+  roomId: z.string().trim().min(1).max(128),
+  playerId: z.string().trim().min(1).max(128),
+  token: z.string().min(16).max(512),
+});
+
 export const SystemHelloResponseSchema = z.object({
   protocolVersion: z.literal(PROTOCOL_VERSION),
   serverVersion: z.string().min(1),
@@ -32,6 +39,7 @@ export const JoinBootstrapResponseSchema = z.object({
 });
 
 export type SystemHelloRequest = z.infer<typeof SystemHelloRequestSchema>;
+export type SocketAuthentication = z.infer<typeof SocketAuthenticationSchema>;
 export type SystemHelloResponse = z.infer<typeof SystemHelloResponseSchema>;
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 export type JoinBootstrapResponse = z.infer<typeof JoinBootstrapResponseSchema>;
