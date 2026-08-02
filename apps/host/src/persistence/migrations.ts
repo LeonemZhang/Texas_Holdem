@@ -207,4 +207,16 @@ export const HOST_MIGRATIONS: readonly SqliteMigration[] = Object.freeze([
       `);
     },
   },
+  {
+    version: 6,
+    name: 'add_room_record_archive_state',
+    up: (database) => {
+      database.exec(`
+        ALTER TABLE rooms ADD COLUMN archived INTEGER NOT NULL DEFAULT 0
+          CHECK (archived IN (0, 1));
+        CREATE INDEX idx_rooms_record_catalog
+          ON rooms (archived, updated_at_ms DESC, room_id);
+      `);
+    },
+  },
 ]);

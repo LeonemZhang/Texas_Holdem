@@ -45,9 +45,11 @@ function phase() {
 }
 
 describe('startNextRoomHand', () => {
-  it('starts immediately after every choice resolves and no request remains', () => {
+  it('starts with players who explicitly chose ready before the deadline', () => {
     const { room, handReady } = phase();
-    const ready = normalizeHandReadyAtDeadline(room, handReady, 30_000);
+    let ready = setHandReadyChoice(room, handReady, 'host', 'ready');
+    ready = setHandReadyChoice(room, ready, 'carol', 'ready');
+    ready = normalizeHandReadyAtDeadline(room, ready, 30_000);
     const result = startNextRoomHand(
       room,
       ready,

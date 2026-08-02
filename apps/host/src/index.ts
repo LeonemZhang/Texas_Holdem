@@ -10,8 +10,26 @@ import {
 } from './persistence/sqlite-database.js';
 import { SqliteGameRuntimeStore } from './persistence/sqlite-game-runtime-store.js';
 import { SqliteStatisticsStore } from './persistence/sqlite-statistics-store.js';
+import { SqliteRoomRecordCatalog } from './persistence/sqlite-room-record-catalog.js';
 import { UdpDiscoveryResponder } from '@texas-holdem/lan-discovery';
 import { currentDiscoverySummary } from './application/discovery-summary.js';
+import {
+  parentPidFromEnvironment,
+  startParentProcessMonitor,
+} from './parent-process-monitor.js';
+import {
+  RoomRecordManagementRequestSchema,
+  type RoomRecordManagementResponse,
+} from '@texas-holdem/protocol';
+import { RoomRecordManagementService } from './application/room-record-management.js';
+
+interface HostControlParentPort {
+  on(
+    event: 'message',
+    listener: (event: { readonly data: unknown }) => void,
+  ): void;
+  postMessage(message: unknown): void;
+}
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultStaticDirectory = resolve(currentDirectory, '../../client/dist');
@@ -24,6 +42,7 @@ const discoveryPort = Number.parseInt(
   process.env.HOST_DISCOVERY_PORT ?? '32101',
   10,
 );
+const hostInstanceId = process.env.HOST_INSTANCE_ID?.trim() || null;
 
 if (!Number.isSafeInteger(port) || port <= 0 || port > 65_535) {
   throw new Error(`Invalid HOST_PORT: ${process.env.HOST_PORT ?? ''}`);
@@ -48,6 +67,9 @@ const database = dataDirectory
   : null;
 const runtimeStore = database ? new SqliteGameRuntimeStore(database) : null;
 const statisticsStore = database ? new SqliteStatisticsStore(database) : null;
+const roomRecordCatalog = database
+  ? new SqliteRoomRecordCatalog(database)
+  : null;
 const runtime = new GameRuntime(
   runtimeStore
     ? {
@@ -57,8 +79,10 @@ const runtime = new GameRuntime(
       }
     : {},
 );
-const recovered = runtimeStore?.loadLatest();
-if (recovered) runtime.restore(recovered.state, recovered.sequence);
+const roomRecordManagement =
+  runtimeStore && roomRecordCatalog
+    ? new RoomRecordManagementService(runtime, roomRecordCatalog, runtimeStore)
+    : null;
 const stopPersistence = runtime.onStateCommitted((roomId) => {
   const state = runtime.exportState(roomId);
   if (state) runtimeStore?.save(state, Date.now());
@@ -85,6 +109,97 @@ const discovery = new UdpDiscoveryResponder({
   httpPort: port,
   roomSummary: () => currentDiscoverySummary(runtime),
 });
+let stopParentProcessMonitor: () => void = () => undefined;
+let shuttingDown = false;
+const parentPort = (
+  process as NodeJS.Process & {
+    readonly parentPort?: HostControlParentPort;
+  }
+).parentPort;
+
+function managementFailure(
+  requestId: string,
+  error: unknown,
+): RoomRecordManagementResponse {
+  const message = error instanceof Error ? error.message : 'Management failed';
+  return {
+    protocolVersion: '1',
+    requestId,
+    status: 'rejected',
+    error: {
+      code: message.includes('does not exist') ? 'NOT_FOUND' : 'CONFLICT',
+      message,
+    },
+  };
+}
+
+parentPort?.on('message', ({ data }) => {
+  const parsed = RoomRecordManagementRequestSchema.safeParse(data);
+  if (!parsed.success) return;
+  if (!roomRecordManagement) {
+    parentPort.postMessage({
+      protocolVersion: '1',
+      requestId: parsed.data.requestId,
+      status: 'rejected',
+      error: {
+        code: 'INVALID_REQUEST',
+        message: 'Room record management requires local persistence',
+      },
+    });
+    return;
+  }
+  try {
+    let result: unknown;
+    switch (parsed.data.type) {
+      case 'room-record.list':
+        result = {
+          records: roomRecordManagement.listRecords(
+            parsed.data.includeArchived,
+          ),
+        };
+        break;
+      case 'room-record.create':
+        result = {
+          session: roomRecordManagement.createRecord(
+            parsed.data,
+            `http://${advertisedHost}:${port}`,
+          ),
+        };
+        break;
+      case 'room-record.recover':
+        result = {
+          session: roomRecordManagement.recoverRecord(
+            parsed.data.roomId,
+            `http://${advertisedHost}:${port}`,
+          ),
+        };
+        break;
+      case 'room-record.archive':
+        roomRecordManagement.archiveRecord(parsed.data.roomId);
+        result = null;
+        break;
+      case 'room-record.restore':
+        roomRecordManagement.restoreArchivedRecord(parsed.data.roomId);
+        result = null;
+        break;
+      case 'room-record.delete':
+        roomRecordManagement.deleteArchivedRecord(parsed.data.roomId);
+        result = null;
+        break;
+      case 'room-record.get':
+        result = { record: roomRecordManagement.getRecord(parsed.data.roomId) };
+        break;
+    }
+    parentPort.postMessage({
+      protocolVersion: '1',
+      requestId: parsed.data.requestId,
+      status: 'accepted',
+      result,
+    });
+  } catch (error) {
+    parentPort.postMessage(managementFailure(parsed.data.requestId, error));
+  }
+});
 
 try {
   await host.app.listen({ host: address, port });
@@ -96,19 +211,29 @@ try {
     );
   }
   process.stdout.write(`Texas Hold’em host listening on ${address}:${port}\n`);
+  if (hostInstanceId) {
+    parentPort?.postMessage({ type: 'host.ready', instanceId: hostInstanceId });
+  }
+  stopParentProcessMonitor = startParentProcessMonitor({
+    parentPid: parentPidFromEnvironment(),
+    onParentExit: () => shutdown(),
+  });
 } catch (error) {
   await host.close();
   throw error;
 }
 
 async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  stopParentProcessMonitor();
   stopPersistence();
   stopAutomaticUpdates();
   runtime.dispose();
   await discovery.close();
   await host.close();
   database?.close();
-  process.exitCode = 0;
+  process.exit(0);
 }
 
 process.once('SIGINT', () => void shutdown());

@@ -58,6 +58,7 @@ describe('host SQLite schema', () => {
           'snapshots',
           'idx_events_room_sequence',
           'idx_snapshots_room_latest',
+          'idx_rooms_record_catalog',
         ]),
       );
       expect(database.prepare('PRAGMA foreign_keys').get()).toMatchObject({

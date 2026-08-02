@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { SocketAuthentication } from '@texas-holdem/protocol';
+import { IdSchema, type SocketAuthentication } from '@texas-holdem/protocol';
 
 import type { GameRuntimeStateExport } from '../application/game-runtime.js';
 import type { RoomRecoveryState } from '../application/persistence-ports.js';
@@ -10,8 +10,9 @@ import { SqliteReconnectIdentityStore } from './sqlite-reconnect-identity-store.
 import { SqliteRoomLifecycleStore } from './sqlite-room-lifecycle-store.js';
 import { SqliteSnapshotStore } from './sqlite-snapshot-store.js';
 
-interface ActiveRoomRow {
-  readonly room_id: string;
+interface RecoverableRoomRow {
+  readonly normal_closed: number;
+  readonly archived: number;
 }
 
 export interface LoadedGameRuntimeState {
@@ -30,19 +31,18 @@ export class SqliteGameRuntimeStore {
     this.#identities = new SqliteReconnectIdentityStore(database);
   }
 
-  loadLatest(): LoadedGameRuntimeState | null {
+  loadRecoverable(roomId: string): LoadedGameRuntimeState | null {
+    const parsedRoomId = IdSchema.parse(roomId);
     const row = this.database
       .prepare(
         `
-        SELECT room_id FROM rooms
-        WHERE normal_closed = 0
-        ORDER BY updated_at_ms DESC
-        LIMIT 1
+        SELECT normal_closed, archived FROM rooms
+        WHERE room_id = ?
       `,
       )
-      .get() as unknown as ActiveRoomRow | undefined;
-    if (!row) return null;
-    const snapshot = this.#snapshots.latest(row.room_id);
+      .get(parsedRoomId) as unknown as RecoverableRoomRow | undefined;
+    if (!row || row.normal_closed === 1 || row.archived === 1) return null;
+    const snapshot = this.#snapshots.latest(parsedRoomId);
     if (!snapshot) return null;
     return Object.freeze({
       state: snapshot.state,

@@ -64,7 +64,8 @@ describe('SqliteGameRuntimeStore', () => {
     try {
       runSqliteMigrations(reopened, HOST_MIGRATIONS);
       const reopenedStore = new SqliteGameRuntimeStore(reopened);
-      const loaded = reopenedStore.loadLatest();
+      expect(reopenedStore.loadRecoverable('missing-room')).toBeNull();
+      const loaded = reopenedStore.loadRecoverable(host.roomId);
       expect(loaded?.state.room.players).toHaveLength(2);
       const restored = new GameRuntime({
         sessionFallback: (credentials) =>
@@ -89,6 +90,18 @@ describe('SqliteGameRuntimeStore', () => {
         ]),
       );
       restored.dispose();
+
+      reopened
+        .prepare('UPDATE rooms SET archived = 1 WHERE room_id = ?')
+        .run(host.roomId);
+      expect(reopenedStore.loadRecoverable(host.roomId)).toBeNull();
+
+      reopened
+        .prepare(
+          "UPDATE rooms SET archived = 0, phase = 'closed', normal_closed = 1 WHERE room_id = ?",
+        )
+        .run(host.roomId);
+      expect(reopenedStore.loadRecoverable(host.roomId)).toBeNull();
     } finally {
       reopened.close();
     }
