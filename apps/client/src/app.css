@@ -893,11 +893,8 @@ body:has(.poker-table-page) .poker-table-controls {
 }
 
 .hole-cards {
-  position: absolute;
-  bottom: 7%;
-  left: 50%;
-  z-index: 3;
-  transform: translateX(-50%);
+  position: relative;
+  z-index: 1;
 }
 
 .betting-controls,
