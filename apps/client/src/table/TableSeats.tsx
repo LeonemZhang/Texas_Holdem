@@ -18,6 +18,9 @@ export interface TableSeatPlayer {
   readonly status: TableSeatStatus;
   readonly isCurrentActor?: boolean;
   readonly isDealer?: boolean;
+  readonly isSmallBlind?: boolean;
+  readonly isBigBlind?: boolean;
+  readonly revealedHoleCards?: readonly string[];
 }
 
 export interface TableSeatsProps {
@@ -35,6 +38,19 @@ const statusLabels: Record<TableSeatStatus, string> = {
   left: '已离开',
   disconnected: '已掉线',
 };
+
+const suitSymbols: Record<string, string> = {
+  c: '♣',
+  d: '♦',
+  h: '♥',
+  s: '♠',
+};
+
+function displayCard(code: string): string {
+  const rank = code.slice(0, -1);
+  const suit = code.slice(-1);
+  return `${rank === 'T' ? '10' : rank}${suitSymbols[suit] ?? suit}`;
+}
 
 function positionFor(index: number, count: number): CSSProperties {
   const angle = (Math.PI / 2 + (index * Math.PI * 2) / count) % (Math.PI * 2);
@@ -67,6 +83,7 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
         const stateClasses = [
           'table-seat',
           `table-seat--${player.status}`,
+          `table-seat--color-${player.seatIndex % 6}`,
           player.isCurrentActor ? 'table-seat--acting' : '',
           player.playerId === ownPlayerId ? 'table-seat--own' : '',
         ]
@@ -79,12 +96,29 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
             style={positionFor(index, sorted.length)}
             aria-current={player.isCurrentActor ? 'true' : undefined}
           >
-            <span className="table-seat__name">
-              {player.nickname}
-              {player.isDealer ? <i title="庄家">D</i> : null}
-            </span>
+            <span className="table-seat__name">{player.nickname}</span>
+            {player.isDealer || player.isSmallBlind || player.isBigBlind ? (
+              <span className="table-seat__position-labels">
+                {player.isDealer ? <i>庄家</i> : null}
+                {player.isSmallBlind ? <i>小盲</i> : null}
+                {player.isBigBlind ? <i>大盲</i> : null}
+              </span>
+            ) : null}
+            {player.isCurrentActor ? (
+              <span className="table-seat__acting-indicator">行动中</span>
+            ) : null}
             <strong>{player.chips.toLocaleString('zh-CN')}</strong>
             <small>{statusLabels[player.status]}</small>
+            {player.revealedHoleCards?.length === 2 ? (
+              <span
+                className="table-seat__showdown-cards"
+                aria-label={`${player.nickname} 摊牌底牌 ${player.revealedHoleCards.map(displayCard).join(' ')}`}
+              >
+                {player.revealedHoleCards.map((card) => (
+                  <i key={card}>{displayCard(card)}</i>
+                ))}
+              </span>
+            ) : null}
           </li>
         );
       })}

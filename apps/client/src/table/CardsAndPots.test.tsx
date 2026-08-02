@@ -14,6 +14,7 @@ describe('CardsAndPots', () => {
     );
     expect(screen.getByLabelText('第一张底牌 A♥')).toBeInTheDocument();
     expect(screen.getByLabelText('第二张底牌 K♠')).toBeInTheDocument();
+    expect(screen.getByLabelText('第 2 张公共牌 10♦')).toBeInTheDocument();
     expect(screen.getByLabelText('第 4 张公共牌，未公开')).toBeInTheDocument();
     expect(screen.getByLabelText('第 5 张公共牌，未公开')).toBeInTheDocument();
   });

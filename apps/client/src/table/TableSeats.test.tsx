@@ -19,6 +19,8 @@ function makePlayers(count: number): TableSeatPlayer[] {
             : 'active',
     isCurrentActor: index === 0,
     isDealer: index === count - 1,
+    isSmallBlind: index === 0,
+    isBigBlind: index === 1,
   }));
 }
 
@@ -41,6 +43,11 @@ describe('TableSeats', () => {
     expect(container.querySelector('.table-seat--acting')).toHaveTextContent(
       '玩家 1',
     );
+    expect(container.querySelector('.table-seat--acting')).toHaveTextContent(
+      '行动中',
+    );
+    expect(screen.getByText('小盲')).toBeInTheDocument();
+    expect(screen.getByText('大盲')).toBeInTheDocument();
     expect(
       container.querySelector('.table-seat--disconnected'),
     ).toHaveTextContent('已掉线');
@@ -50,5 +57,18 @@ describe('TableSeats', () => {
     expect(container.querySelector('.table-seat--folded')).toHaveTextContent(
       '已弃牌',
     );
+  });
+
+  it('shows public showdown cards only on the matching contender seat', () => {
+    render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[
+          { ...makePlayers(2)[0]!, revealedHoleCards: ['Th', 'As'] },
+          makePlayers(2)[1]!,
+        ]}
+      />,
+    );
+    expect(screen.getByLabelText('玩家 1 摊牌底牌 10♥ A♠')).toBeInTheDocument();
   });
 });

@@ -35,6 +35,30 @@ describe('BettingControls', () => {
     });
   });
 
+  it('adds quick chips to the pending raise total and shows contribution details', () => {
+    const onAction = vi.fn();
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        roundContribution={20}
+        handContribution={80}
+        currentRoundBet={60}
+        onAction={onAction}
+      />,
+    );
+
+    expect(screen.getByText('本轮已投 20')).toBeInTheDocument();
+    expect(screen.getByText('本手累计 80')).toBeInTheDocument();
+    expect(screen.getByText('本轮最高 60')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '增加 20 筹码' }));
+    fireEvent.click(screen.getByRole('button', { name: '增加 5 筹码' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
+    expect(onAction).toHaveBeenCalledWith({
+      type: 'game.raise-to',
+      amount: 85,
+    });
+  });
+
   it('locks every action while recovering or when it is not this player turn', () => {
     const { rerender } = render(
       <BettingControls

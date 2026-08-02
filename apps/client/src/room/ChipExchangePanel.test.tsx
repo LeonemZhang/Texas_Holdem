@@ -9,7 +9,7 @@ const players = [
 ];
 
 describe('ChipExchangePanel', () => {
-  it('blocks transfer forms while a hand is being played', () => {
+  it('keeps the exchange interactions collapsed until requested', () => {
     render(
       <ChipExchangePanel
         phase="playing"
@@ -19,6 +19,13 @@ describe('ChipExchangePanel', () => {
         onAction={vi.fn()}
       />,
     );
+    expect(
+      screen.queryByText('对局进行中不能请求或给予筹码，请等待本手结束。'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '准备给予' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开筹码交换' }));
     expect(
       screen.getByText('对局进行中不能请求或给予筹码，请等待本手结束。'),
     ).toBeInTheDocument();
@@ -38,6 +45,7 @@ describe('ChipExchangePanel', () => {
         onAction={onAction}
       />,
     );
+    fireEvent.click(screen.getByRole('button', { name: '展开筹码交换' }));
     fireEvent.change(screen.getByLabelText('给予玩家'), {
       target: { value: 'bob' },
     });
@@ -72,6 +80,7 @@ describe('ChipExchangePanel', () => {
         onAction={onAction}
       />,
     );
+    fireEvent.click(screen.getByRole('button', { name: '展开筹码交换' }));
     expect(
       screen.getByText(/Bob 向 Alice 请求 200 · 待处理/),
     ).toBeInTheDocument();

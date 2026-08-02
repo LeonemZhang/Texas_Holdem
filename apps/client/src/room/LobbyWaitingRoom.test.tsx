@@ -66,6 +66,28 @@ describe('LobbyWaitingRoom', () => {
     expect(onStartFirstHand).toHaveBeenCalledOnce();
   });
 
+  it('does not start while any seated player is still unready', () => {
+    const onStartFirstHand = vi.fn();
+    const mixedReadiness = players(true);
+    mixedReadiness[1] = { ...mixedReadiness[1]!, ready: false };
+
+    render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={mixedReadiness}
+        onSetReady={vi.fn()}
+        onStartFirstHand={onStartFirstHand}
+      />,
+    );
+
+    const startButton = screen.getByRole('button', { name: '开始游戏' });
+    expect(startButton).toBeDisabled();
+    expect(screen.getByText('还有 1 位玩家未准备')).toBeInTheDocument();
+    fireEvent.click(startButton);
+    expect(onStartFirstHand).not.toHaveBeenCalled();
+  });
+
   it('lets a non-host prepare but does not expose the start action', () => {
     const onSetReady = vi.fn();
     render(

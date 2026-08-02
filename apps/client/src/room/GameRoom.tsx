@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
 import {
@@ -14,6 +14,7 @@ import {
   BettingControls,
   type BettingActionIntent,
 } from '../table/BettingControls.js';
+import { ActionCountdown } from '../table/ActionCountdown.js';
 import { CardsAndPots } from '../table/CardsAndPots.js';
 import { PokerTableLayout } from '../table/PokerTableLayout.js';
 import { TableSeats } from '../table/TableSeats.js';
@@ -24,6 +25,19 @@ import {
 import { HandReadyOverlay } from './HandReadyOverlay.js';
 import { HostControls, type HostControlIntent } from './HostControls.js';
 import { LobbyWaitingRoom } from './LobbyWaitingRoom.js';
+import { createRandomId } from '../random-id.js';
+import {
+  PokerSoundEffects,
+  pokerSoundCues,
+} from '../sound/poker-sound-effects.js';
+
+const streetLabels = {
+  preflop: '翻牌前',
+  flop: '翻牌',
+  turn: '转牌',
+  river: '河牌',
+  settled: '结算',
+} as const;
 
 export interface GameRoomProps {
   readonly session: RoomSessionResponse;
@@ -54,10 +68,26 @@ export function GameRoom({
   const [snapshot, setSnapshot] = useState<PlayerSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
+  const [hostShareOpen, setHostShareOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const latestSnapshot = useRef<PlayerSnapshot | null>(null);
+  const soundEffects = useMemo(() => new PokerSoundEffects(), []);
+
+  useEffect(() => {
+    soundEffects.enableOnFirstInteraction();
+    return () => soundEffects.dispose();
+  }, [soundEffects]);
 
   useEffect(() => {
     const stopSnapshot = connection.onSnapshot((next) => {
+      if (
+        latestSnapshot.current &&
+        next.sequence < latestSnapshot.current.sequence
+      ) {
+        return;
+      }
+      soundEffects.play(pokerSoundCues(latestSnapshot.current, next));
+      latestSnapshot.current = next;
       setSnapshot(next);
       setError(null);
     });
@@ -81,23 +111,38 @@ export function GameRoom({
       stopEvent();
       connection.disconnect();
     };
-  }, [connection, session]);
+  }, [connection, session, soundEffects]);
 
   const send = useCallback(
     async (command: Record<string, unknown>): Promise<boolean> => {
-      if (!snapshot || sending) return false;
+      const submittedSnapshot = latestSnapshot.current;
+      if (!submittedSnapshot || sending) return false;
       setSending(true);
       setError(null);
       try {
-        const response = await connection.sendCommand({
-          protocolVersion: PROTOCOL_VERSION,
-          roomId: session.roomId,
-          playerId: session.playerId,
-          expectedVersion: snapshot.stateVersion,
-          ...command,
-        });
+        const submit = (expectedVersion: number) =>
+          connection.sendCommand({
+            ...command,
+            protocolVersion: PROTOCOL_VERSION,
+            roomId: session.roomId,
+            playerId: session.playerId,
+            expectedVersion,
+          });
+        let response = await submit(submittedSnapshot.stateVersion);
+        const refreshedSnapshot = latestSnapshot.current;
+        if (
+          response.status === 'conflict' &&
+          refreshedSnapshot &&
+          refreshedSnapshot.stateVersion > submittedSnapshot.stateVersion
+        ) {
+          response = await submit(refreshedSnapshot.stateVersion);
+        }
         if (response.status !== 'accepted') {
-          setError(response.error.message);
+          setError(
+            response.status === 'conflict'
+              ? '对局状态刚刚更新，已同步最新状态，请再次操作。'
+              : response.error.message,
+          );
           return false;
         }
         return true;
@@ -108,8 +153,14 @@ export function GameRoom({
         setSending(false);
       }
     },
-    [connection, sending, session, snapshot],
+    [connection, sending, session],
   );
+
+  useEffect(() => {
+    return () => {
+      latestSnapshot.current = null;
+    };
+  }, [connection]);
 
   useEffect(() => {
     onCommandPortChange?.(send);
@@ -125,7 +176,7 @@ export function GameRoom({
       case 'request':
         void send({
           type: 'chips.request',
-          requestId: crypto.randomUUID(),
+          requestId: createRandomId(),
           audience: intent.targetPlayerId ? 'targeted' : 'table',
           ...(intent.targetPlayerId
             ? { targetPlayerId: intent.targetPlayerId }
@@ -136,7 +187,7 @@ export function GameRoom({
       case 'give':
         void send({
           type: 'chips.give',
-          transferId: crypto.randomUUID(),
+          transferId: createRandomId(),
           receiverPlayerId: intent.receiverPlayerId,
           amount: intent.amount,
         });
@@ -145,7 +196,7 @@ export function GameRoom({
         void send({
           type: 'chips.approve',
           requestId: intent.requestId,
-          transferId: crypto.randomUUID(),
+          transferId: createRandomId(),
         });
         break;
       case 'reject':
@@ -203,7 +254,7 @@ export function GameRoom({
           onStartFirstHand={() =>
             void send({
               type: 'room.start-first-hand',
-              handId: crypto.randomUUID(),
+              handId: createRandomId(),
             })
           }
         />
@@ -220,16 +271,31 @@ export function GameRoom({
         ) : null}
         {own?.isHost ? (
           <section className="host-share" aria-labelledby="game-invite-title">
-            <div>
-              <p className="connection-home__kicker">邀请朋友加入</p>
-              <h2 id="game-invite-title">房间连接地址</h2>
-              <a href={session.joinUrl}>{session.joinUrl}</a>
-            </div>
-            <QRCodeSVG
-              value={session.joinUrl}
-              size={144}
-              title="加入房间二维码"
-            />
+            <header className="host-share__header">
+              <div>
+                <p className="connection-home__kicker">邀请朋友加入</p>
+                <h2 id="game-invite-title">房间邀请</h2>
+              </div>
+              <button
+                className="button button--secondary"
+                type="button"
+                aria-expanded={hostShareOpen}
+                aria-controls="host-share-content"
+                onClick={() => setHostShareOpen((current) => !current)}
+              >
+                {hostShareOpen ? '收起邀请信息' : '展开邀请信息'}
+              </button>
+            </header>
+            {hostShareOpen ? (
+              <div id="host-share-content" className="host-share__content">
+                <a href={session.joinUrl}>{session.joinUrl}</a>
+                <QRCodeSVG
+                  value={session.joinUrl}
+                  size={144}
+                  title="加入房间二维码"
+                />
+              </div>
+            ) : null}
           </section>
         ) : null}
         <button
@@ -274,6 +340,15 @@ export function GameRoom({
   }
 
   const game = snapshot.game;
+  const actionActor = game?.currentActorId
+    ? snapshot.room.players.find(
+        ({ playerId }) => playerId === game.currentActorId,
+      )
+    : null;
+  const currentRoundBet = Math.max(
+    0,
+    ...snapshot.room.players.map(({ streetCommitted }) => streetCommitted ?? 0),
+  );
   return (
     <div className="game-room-shell" aria-busy={sending}>
       {error ? (
@@ -285,13 +360,38 @@ export function GameRoom({
         roomName={snapshot.room.roomName}
         handLabel={
           game
-            ? `第 ${snapshot.room.completedHands + 1} 手 · ${game.street}`
-            : '牌局状态'
+            ? `第 ${snapshot.room.completedHands + 1} 手 · ${streetLabels[game.street]}${actionActor ? ` · 当前行动：${actionActor.nickname}` : ''}`
+            : '等待牌局开始'
         }
         status={
-          <button type="button" onClick={() => setStatisticsOpen(true)}>
-            查看统计
-          </button>
+          <div className="poker-table-page__utility-actions">
+            <ChipExchangePanel
+              presentation="drawer"
+              phase={snapshot.room.phase}
+              currentPlayerId={session.playerId}
+              players={snapshot.room.players}
+              records={snapshot.handReady?.pendingRequests ?? []}
+              onAction={sendChipIntent}
+            />
+            <HostControls
+              presentation="drawer"
+              isHost={own?.isHost ?? false}
+              hostPlayerId={
+                snapshot.room.players.find(({ isHost }) => isHost)?.playerId ??
+                ''
+              }
+              phase={snapshot.room.phase}
+              players={snapshot.room.players}
+              onCommand={sendHostControl}
+            />
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => setStatisticsOpen(true)}
+            >
+              查看统计
+            </button>
+          </div>
         }
         seats={
           <TableSeats
@@ -300,6 +400,13 @@ export function GameRoom({
               ...player,
               isCurrentActor: game?.currentActorId === player.playerId,
               isDealer: game?.buttonPlayerId === player.playerId,
+              isSmallBlind: game?.smallBlindPlayerId === player.playerId,
+              isBigBlind: game?.bigBlindPlayerId === player.playerId,
+              ...(game?.showdownHoleCards[player.playerId]
+                ? {
+                    revealedHoleCards: game.showdownHoleCards[player.playerId],
+                  }
+                : {}),
             }))}
           />
         }
@@ -311,47 +418,48 @@ export function GameRoom({
           />
         }
         pots={null}
+        actionTimer={
+          game?.actionDeadlineMs !== null &&
+          game?.actionDeadlineMs !== undefined &&
+          actionActor ? (
+            <ActionCountdown
+              deadlineMs={game.actionDeadlineMs}
+              actorName={actionActor.nickname}
+            />
+          ) : null
+        }
+        tableOverlay={
+          snapshot.handReady ? (
+            <HandReadyOverlay
+              deadlineMs={snapshot.handReady.deadlineMs}
+              ownChoice={snapshot.handReady.ownChoice}
+              pendingRequests={snapshot.handReady.pendingRequests.map(
+                (request) => ({
+                  requestId: request.requestId,
+                  requesterName:
+                    names.get(request.requesterId) ?? request.requesterId,
+                  amount: request.amount,
+                }),
+              )}
+              complete={false}
+              onChoose={(choice) =>
+                void send({ type: 'hand-ready.set-choice', choice })
+              }
+            />
+          ) : null
+        }
         controls={
-          <BettingControls
-            legalActions={game?.legalActions ?? null}
-            disabled={sending || snapshot.room.phase !== 'playing'}
-            onAction={sendBetting}
-          />
+          snapshot.handReady ? null : (
+            <BettingControls
+              legalActions={game?.legalActions ?? null}
+              roundContribution={own?.streetCommitted ?? 0}
+              handContribution={own?.totalCommitted ?? 0}
+              currentRoundBet={currentRoundBet}
+              disabled={sending || snapshot.room.phase !== 'playing'}
+              onAction={sendBetting}
+            />
+          )
         }
-      />
-      <ChipExchangePanel
-        phase={snapshot.room.phase}
-        currentPlayerId={session.playerId}
-        players={snapshot.room.players}
-        records={snapshot.handReady?.pendingRequests ?? []}
-        onAction={sendChipIntent}
-      />
-      {snapshot.handReady ? (
-        <HandReadyOverlay
-          deadlineMs={snapshot.handReady.deadlineMs}
-          ownChoice={snapshot.handReady.ownChoice}
-          pendingRequests={snapshot.handReady.pendingRequests.map(
-            (request) => ({
-              requestId: request.requestId,
-              requesterName:
-                names.get(request.requesterId) ?? request.requesterId,
-              amount: request.amount,
-            }),
-          )}
-          complete={false}
-          onChoose={(choice) =>
-            void send({ type: 'hand-ready.set-choice', choice })
-          }
-        />
-      ) : null}
-      <HostControls
-        isHost={own?.isHost ?? false}
-        hostPlayerId={
-          snapshot.room.players.find(({ isHost }) => isHost)?.playerId ?? ''
-        }
-        phase={snapshot.room.phase}
-        players={snapshot.room.players}
-        onCommand={sendHostControl}
       />
       <StatisticsPanel
         open={statisticsOpen}

@@ -121,7 +121,7 @@ export function StatisticsPanel({
       </ol>
 
       <section className="fun-titles" aria-labelledby="fun-titles-title">
-        <h3 id="fun-titles-title">趣味称号</h3>
+        <h3 id="fun-titles-title">局内称号</h3>
         <ul>
           {titles.map((award) => (
             <li key={award.title}>

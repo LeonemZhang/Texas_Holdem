@@ -33,6 +33,10 @@ describe('HostControls', () => {
         onCommand={onCommand}
       />,
     );
+    expect(
+      screen.queryByRole('button', { name: '暂停游戏' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
     fireEvent.click(screen.getByRole('button', { name: '暂停游戏' }));
     expect(onCommand).toHaveBeenCalledWith({ type: 'room.pause' });
     rerender(
@@ -59,6 +63,7 @@ describe('HostControls', () => {
         onCommand={onCommand}
       />,
     );
+    fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
     fireEvent.change(screen.getByLabelText('移除玩家'), {
       target: { value: 'bob' },
     });
@@ -85,6 +90,7 @@ describe('HostControls', () => {
         onCommand={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
     expect(screen.getByRole('combobox', { name: /移除玩家/ })).toBeDisabled();
     expect(screen.getByText('每手结束后可移除')).toBeInTheDocument();
   });

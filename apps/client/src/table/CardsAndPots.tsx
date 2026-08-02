@@ -32,14 +32,15 @@ function PlayingCard({
     );
   }
   const rank = code.slice(0, -1);
+  const displayedRank = rank === 'T' ? '10' : rank;
   const suit = code.slice(-1);
   const red = suit === 'd' || suit === 'h';
   return (
     <span
       className={`playing-card${red ? ' playing-card--red' : ''}`}
-      aria-label={`${label} ${rank}${suitSymbols[suit] ?? suit}`}
+      aria-label={`${label} ${displayedRank}${suitSymbols[suit] ?? suit}`}
     >
-      <strong>{rank}</strong>
+      <strong>{displayedRank}</strong>
       <span>{suitSymbols[suit] ?? suit}</span>
     </span>
   );

@@ -1,4 +1,5 @@
 import { BettingControls } from '../table/BettingControls';
+import { ActionCountdown } from '../table/ActionCountdown';
 import { CardsAndPots } from '../table/CardsAndPots';
 import { PokerTableLayout } from '../table/PokerTableLayout';
 import { TableSeats } from '../table/TableSeats';
@@ -38,7 +39,8 @@ const players = [
 ];
 
 export function UiSmokePreview({ page }: { readonly page: string }) {
-  if (page === 'table') {
+  if (page === 'table' || page === 'ready') {
+    const handReady = page === 'ready';
     return (
       <ConnectionGuard
         state={{ status: 'connected' }}
@@ -49,7 +51,29 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
         <PokerTableLayout
           roomName="朋友局"
           handLabel="第 8 手 · 翻牌"
-          status="轮到 Alice · 18s"
+          status={
+            <div className="poker-table-page__utility-actions">
+              <ChipExchangePanel
+                presentation="drawer"
+                phase="hand-ready"
+                currentPlayerId="alice"
+                players={players}
+                records={[]}
+                onAction={noop}
+              />
+              <HostControls
+                presentation="drawer"
+                isHost
+                hostPlayerId="alice"
+                phase="hand-ready"
+                players={players}
+                onCommand={noop}
+              />
+              <button className="button button--secondary" type="button">
+                查看统计
+              </button>
+            </div>
+          }
           seats={<TableSeats players={players} ownPlayerId="alice" />}
           communityCards={
             <CardsAndPots
@@ -62,35 +86,47 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
             />
           }
           pots={null}
+          actionTimer={
+            handReady ? null : (
+              <ActionCountdown
+                deadlineMs={Date.now() + 18_000}
+                actorName="Alice"
+              />
+            )
+          }
+          tableOverlay={
+            handReady ? (
+              <HandReadyOverlay
+                deadlineMs={Date.now() + 30_000}
+                ownChoice="pending"
+                pendingRequests={[
+                  { requestId: 'r1', requesterName: 'Bob', amount: 200 },
+                ]}
+                complete={false}
+                onChoose={noop}
+              />
+            ) : null
+          }
           controls={
-            <BettingControls
-              legalActions={{
-                canFold: true,
-                canCheck: false,
-                callAmount: 40,
-                minimumRaiseTo: 120,
-                maximumRaiseTo: 720,
-                canAllIn: true,
-              }}
-              onAction={noop}
-            />
+            handReady ? null : (
+              <BettingControls
+                legalActions={{
+                  canFold: true,
+                  canCheck: false,
+                  callAmount: 40,
+                  minimumRaiseTo: 120,
+                  maximumRaiseTo: 720,
+                  canAllIn: true,
+                }}
+                roundContribution={80}
+                handContribution={220}
+                currentRoundBet={120}
+                onAction={noop}
+              />
+            )
           }
         />
       </ConnectionGuard>
-    );
-  }
-
-  if (page === 'ready') {
-    return (
-      <HandReadyOverlay
-        deadlineMs={Date.now() + 30_000}
-        ownChoice="pending"
-        pendingRequests={[
-          { requestId: 'r1', requesterName: 'Bob', amount: 200 },
-        ]}
-        complete={false}
-        onChoose={noop}
-      />
     );
   }
 

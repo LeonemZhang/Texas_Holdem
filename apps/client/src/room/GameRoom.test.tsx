@@ -25,6 +25,8 @@ const snapshot: PlayerSnapshot = {
         nickname: 'Alice',
         seatIndex: 0,
         chips: 100,
+        streetCommitted: 0,
+        totalCommitted: 0,
         status: 'waiting',
         isHost: true,
         lobbyReady: true,
@@ -34,6 +36,8 @@ const snapshot: PlayerSnapshot = {
         nickname: 'Bob',
         seatIndex: 1,
         chips: 100,
+        streetCommitted: 0,
+        totalCommitted: 0,
         status: 'waiting',
         isHost: false,
         lobbyReady: false,
@@ -95,6 +99,111 @@ describe('GameRoom', () => {
     );
   });
 
+  it('retries a betting action once when a conflict arrives with a newer snapshot', async () => {
+    const staleSnapshot: PlayerSnapshot = {
+      ...snapshot,
+      playerId: 'host',
+      sequence: 5,
+      stateVersion: 5,
+      room: {
+        ...snapshot.room,
+        phase: 'playing',
+        players: snapshot.room.players.map((player) => ({
+          ...player,
+          status: 'active' as const,
+        })),
+      },
+      game: {
+        handId: 'hand-1',
+        street: 'preflop',
+        buttonPlayerId: 'host',
+        smallBlindPlayerId: 'host',
+        bigBlindPlayerId: 'bob',
+        currentActorId: 'host',
+        actionDeadlineMs: Date.now() + 30_000,
+        communityCards: [],
+        pots: [],
+        ownHoleCards: ['As', 'Kd'],
+        showdownHoleCards: {},
+        legalActions: {
+          canFold: true,
+          canCheck: false,
+          callAmount: 98,
+          minimumRaiseTo: 100,
+          maximumRaiseTo: 100,
+          canAllIn: true,
+        },
+      },
+    };
+    const currentSnapshot: PlayerSnapshot = {
+      ...staleSnapshot,
+      sequence: 6,
+      stateVersion: 6,
+    };
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const sendCommand = vi.fn(async () => {
+      if (sendCommand.mock.calls.length === 1) {
+        consumeSnapshot(currentSnapshot);
+        return {
+          protocolVersion: PROTOCOL_VERSION,
+          commandId: 'conflict-1',
+          status: 'conflict' as const,
+          expectedVersion: 5,
+          currentVersion: 6,
+          error: { code: 'CONFLICT' as const, message: 'Room state changed' },
+        };
+      }
+      return {
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: 'accepted-1',
+        status: 'accepted' as const,
+        stateVersion: 7,
+        sequence: 7,
+      };
+    });
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => consumeSnapshot(staleSnapshot)),
+      disconnect: vi.fn(),
+      sendCommand,
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    let commandPort:
+      ((command: Record<string, unknown>) => Promise<boolean>) | null = null;
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'host',
+          token: 'host-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+        onCommandPortChange={(port) => {
+          commandPort = port;
+        }}
+      />,
+    );
+
+    await screen.findByRole('heading', { name: 'Friends' });
+    await expect(commandPort!({ type: 'game.call' })).resolves.toBe(true);
+    expect(sendCommand).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ type: 'game.call', expectedVersion: 5 }),
+    );
+    expect(sendCommand).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ type: 'game.call', expectedVersion: 6 }),
+    );
+  });
+
   it('exposes the same authoritative command port to desktop close handling', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
     const sendCommand = vi.fn().mockResolvedValue({
@@ -143,7 +252,7 @@ describe('GameRoom', () => {
     );
   });
 
-  it('keeps the real room link and QR code visible to the seated host', async () => {
+  it('keeps the host invitation available on demand and management actions operable', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
     const sendCommand = vi.fn().mockResolvedValue({
       protocolVersion: PROTOCOL_VERSION,
@@ -180,12 +289,16 @@ describe('GameRoom', () => {
       />,
     );
 
-    expect(await screen.findByTitle('加入房间二维码')).toBeInTheDocument();
+    await screen.findByRole('button', { name: '展开邀请信息' });
+    expect(screen.queryByTitle('加入房间二维码')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开邀请信息' }));
+    expect(screen.getByTitle('加入房间二维码')).toBeInTheDocument();
     expect(
       screen.getByRole('link', {
         name: 'http://10.126.126.1:32100/?room=room-1',
       }),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
     fireEvent.change(screen.getByLabelText('移除玩家'), {
       target: { value: 'bob' },
     });
@@ -285,6 +398,7 @@ describe('GameRoom', () => {
       />,
     );
 
+    fireEvent.click(await screen.findByRole('button', { name: '筹码交换' }));
     fireEvent.click(await screen.findByRole('button', { name: '发起请求' }));
     fireEvent.click(screen.getByRole('button', { name: /^确认$/ }));
     await waitFor(() =>
@@ -298,15 +412,82 @@ describe('GameRoom', () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '查看统计' }));
+    const statisticsButton = screen.getByRole('button', { name: '查看统计' });
+    expect(statisticsButton).toHaveClass('button', 'button--secondary');
+    fireEvent.click(statisticsButton);
     expect(
       screen.getByRole('heading', { name: '牌局战报' }),
     ).toBeInTheDocument();
     expect(screen.getByText('#1 Bob')).toBeInTheDocument();
-    expect(screen.getByText('+1')).toBeInTheDocument();
+    expect(
+      screen.getByText('+1', { selector: '.statistics-positive' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('1 / 0 / 0 / 0 / 0')).toBeInTheDocument();
     expect(window.innerWidth).toBe(360);
+  });
+
+  it('shows the server action countdown on the table felt', async () => {
+    const playingSnapshot: PlayerSnapshot = {
+      ...snapshot,
+      room: {
+        ...snapshot.room,
+        phase: 'playing',
+        players: snapshot.room.players.map((player) => ({
+          ...player,
+          status: 'active' as const,
+        })),
+      },
+      game: {
+        handId: 'hand-1',
+        street: 'preflop',
+        buttonPlayerId: 'host',
+        smallBlindPlayerId: 'host',
+        bigBlindPlayerId: 'bob',
+        currentActorId: 'host',
+        actionDeadlineMs: Date.now() + 30_000,
+        communityCards: [],
+        pots: [],
+        ownHoleCards: null,
+        showdownHoleCards: {},
+        legalActions: null,
+      },
+    };
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => consumeSnapshot(playingSnapshot)),
+      disconnect: vi.fn(),
+      sendCommand: vi.fn(),
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+      />,
+    );
+
+    expect(
+      await screen.findByLabelText(/Alice 行动剩余 \d+ 秒/),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('牌局进度')).toHaveTextContent(
+      '第 1 手 · 翻牌前 · 当前行动：Alice',
+    );
+    expect(screen.getByText('行动中')).toBeInTheDocument();
   });
 
   it('shows a terminal closed-room state and returns without another command', async () => {

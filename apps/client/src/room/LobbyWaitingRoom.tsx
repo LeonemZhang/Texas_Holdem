@@ -26,9 +26,13 @@ export function LobbyWaitingRoom({
     ({ playerId }) => playerId === currentPlayerId,
   );
   const seatedPlayers = players.filter(({ seatIndex }) => seatIndex >= 0);
-  const allReady =
+  const readyPlayerCount = seatedPlayers.filter(
+    ({ ready, connected }) => ready && connected,
+  ).length;
+  const canStartFirstHand =
     seatedPlayers.length >= 2 &&
     seatedPlayers.every(({ ready, connected }) => ready && connected);
+  const waitingPlayerCount = seatedPlayers.length - readyPlayerCount;
 
   return (
     <section className="lobby" aria-labelledby="lobby-title">
@@ -39,8 +43,7 @@ export function LobbyWaitingRoom({
           <p>所有玩家准备后，由房主手动开始游戏。</p>
         </div>
         <strong className="lobby__count">
-          {seatedPlayers.filter(({ ready }) => ready).length}/
-          {seatedPlayers.length} 已准备
+          {readyPlayerCount}/{seatedPlayers.length} 已准备
         </strong>
       </header>
 
@@ -78,14 +81,24 @@ export function LobbyWaitingRoom({
           {currentPlayer?.ready ? '取消准备' : '准备'}
         </button>
         {currentPlayer?.isHost ? (
-          <button
-            className="button button--primary"
-            type="button"
-            disabled={!allReady}
-            onClick={onStartFirstHand}
-          >
-            开始游戏
-          </button>
+          <div className="lobby__start-control">
+            <button
+              className="button button--primary"
+              type="button"
+              disabled={!canStartFirstHand}
+              aria-describedby="lobby-start-status"
+              onClick={() => {
+                if (canStartFirstHand) onStartFirstHand();
+              }}
+            >
+              开始游戏
+            </button>
+            <small id="lobby-start-status">
+              {canStartFirstHand
+                ? '全员已准备，可以开始游戏'
+                : `还有 ${waitingPlayerCount} 位玩家未准备`}
+            </small>
+          </div>
         ) : (
           <p>等待房主开始游戏</p>
         )}
