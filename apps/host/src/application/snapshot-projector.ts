@@ -1,4 +1,5 @@
 import {
+  actionOrderForStreet,
   buildPots,
   formatCard,
   legalBettingActions,
@@ -84,6 +85,23 @@ function showdownHoleCards(
   );
 }
 
+function actionOrderByPlayerId(
+  hand: StartedHandState | null,
+): ReadonlyMap<string, number> {
+  if (!hand) return new Map();
+  return new Map(
+    actionOrderForStreet(
+      hand.players.map(({ playerId, seatIndex }) => ({
+        playerId,
+        index: seatIndex,
+        status: 'active' as const,
+      })),
+      hand.positions,
+      hand.street,
+    ).map(({ playerId }, index) => [playerId, index + 1]),
+  );
+}
+
 export function projectPlayerSnapshot(
   input: SnapshotProjectionInput,
 ): PlayerSnapshot {
@@ -99,6 +117,7 @@ export function projectPlayerSnapshot(
   const ready = input.handReady ?? null;
   const requests = input.chipRequests ?? null;
   const currentViewer = handPlayer(hand, input.viewerPlayerId);
+  const actionOrder = actionOrderByPlayerId(hand);
   const currentChips = (player: RoomPlayer) =>
     handPlayer(hand, player.playerId)?.stack ?? player.chips;
   const statistics =
@@ -136,6 +155,7 @@ export function projectPlayerSnapshot(
         streetCommitted:
           handPlayer(hand, player.playerId)?.streetCommitted ?? 0,
         totalCommitted: handPlayer(hand, player.playerId)?.totalCommitted ?? 0,
+        actionOrder: actionOrder.get(player.playerId) ?? null,
         lastAction: handPlayer(hand, player.playerId)?.lastAction ?? null,
         status: publicStatus(player, hand),
         isHost: player.playerId === input.room.hostPlayerId,

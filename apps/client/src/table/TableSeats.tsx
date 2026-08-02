@@ -16,6 +16,7 @@ export interface TableSeatPlayer {
   readonly seatIndex: number;
   readonly chips: number;
   readonly streetCommitted?: number;
+  readonly actionOrder?: number | null | undefined;
   readonly status: TableSeatStatus;
   readonly isCurrentActor?: boolean;
   readonly isDealer?: boolean;
@@ -100,6 +101,11 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
             aria-current={player.isCurrentActor ? 'true' : undefined}
           >
             <span className="table-seat__name">{player.nickname}</span>
+            {player.actionOrder ? (
+              <span className="table-seat__action-order">
+                行动顺位 {player.actionOrder}
+              </span>
+            ) : null}
             {player.isDealer || player.isSmallBlind || player.isBigBlind ? (
               <span className="table-seat__position-labels">
                 {player.isDealer ? <i>庄家</i> : null}

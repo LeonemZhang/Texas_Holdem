@@ -62,6 +62,7 @@ describe('projectPlayerSnapshot', () => {
         expect.objectContaining({
           streetCommitted: expect.any(Number),
           totalCommitted: expect.any(Number),
+          actionOrder: expect.any(Number),
         }),
       ]),
     );

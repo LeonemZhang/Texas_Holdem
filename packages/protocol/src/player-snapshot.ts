@@ -26,6 +26,7 @@ export const PublicPlayerSchema = z.object({
   chips: AmountSchema,
   streetCommitted: AmountSchema.optional().default(0),
   totalCommitted: AmountSchema.optional().default(0),
+  actionOrder: z.number().int().positive().nullable().optional(),
   lastAction: z
     .enum(['fold', 'check', 'call', 'raiseTo', 'allIn'])
     .nullable()

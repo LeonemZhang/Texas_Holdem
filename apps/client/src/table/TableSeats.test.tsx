@@ -82,4 +82,18 @@ describe('TableSeats', () => {
     expect(screen.getByText('本轮下注 20')).toBeInTheDocument();
     expect(screen.getByText('本轮下注 60')).toBeInTheDocument();
   });
+
+  it('labels each seat with its server-provided action order', () => {
+    render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[
+          { ...makePlayers(2)[0]!, actionOrder: 2 },
+          { ...makePlayers(2)[1]!, actionOrder: 1 },
+        ]}
+      />,
+    );
+    expect(screen.getByText('行动顺位 1')).toBeInTheDocument();
+    expect(screen.getByText('行动顺位 2')).toBeInTheDocument();
+  });
 });

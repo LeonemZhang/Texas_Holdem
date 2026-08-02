@@ -737,6 +737,16 @@ body:has(.poker-table-page) .poker-table-controls {
   font-variant-numeric: tabular-nums;
 }
 
+.table-seat__action-order {
+  justify-self: center;
+  padding: 0.08rem 0.3rem;
+  border-radius: 999px;
+  color: #c4b5fd;
+  background: rgb(76 29 149 / 55%);
+  font-size: clamp(0.54rem, 1.15vw, 0.64rem);
+  font-weight: 800;
+}
+
 .table-seat small {
   color: #a7f3d0;
 }
