@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { legalBettingActions } from '@texas-holdem/poker-core';
+import { legalBettingActions, startHand } from '@texas-holdem/poker-core';
 
 import { GameCommandHandler } from './game-command-handler.js';
 import { RoomCommandHandler } from './room-command-handler.js';
@@ -71,6 +71,30 @@ function playingRoom() {
 }
 
 describe('GameCommandHandler', () => {
+  it('runs an all-in hand directly to the river when nobody can act', () => {
+    const { rooms, runtime } = playingRoom();
+    const handler = new GameCommandHandler(rooms, runtime, () => 5_000);
+    runtime.replaceCurrentHand(
+      'room-1',
+      startHand({
+        handId: 'hand-1',
+        participants: [
+          { playerId: 'host', seatIndex: 0, stack: 1 },
+          { playerId: 'bob', seatIndex: 1, stack: 1 },
+        ],
+        previousButtonIndex: null,
+        smallBlind: 1,
+        randomSource: { next: () => 0.5 },
+      }),
+    );
+
+    handler.resolveAutomatic(rooms.get('room-1')!);
+
+    expect(runtime.getCurrentHand('room-1')?.street).toBe('river');
+    expect(runtime.getCurrentHand('room-1')?.communityCards).toHaveLength(5);
+    expect(rooms.get('room-1')?.phase).toBe('hand-ready');
+  });
+
   it('delegates a legal current-player action to poker-core', () => {
     const { rooms, runtime } = playingRoom();
     const handler = new GameCommandHandler(rooms, runtime);

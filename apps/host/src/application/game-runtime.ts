@@ -144,6 +144,8 @@ export class GameRuntime implements RoomSessionBootstrapService {
       );
     }
     this.startNextHandIfReady(command.roomId, false);
+    const playingRoom = this.rooms.get(command.roomId);
+    if (playingRoom) this.#gameHandler.resolveAutomatic(playingRoom);
     this.scheduleHandReadyTimeout(command.roomId);
     this.scheduleActionTimeout(command.roomId);
     const sequence = (this.#sequences.get(command.roomId) ?? 0) + 1;

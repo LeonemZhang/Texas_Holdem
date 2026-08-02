@@ -98,6 +98,29 @@ export class GameCommandHandler {
     return { stateVersion: nextRoom.version, sequence: 0 };
   }
 
+  resolveAutomatic(
+    room: RoomState,
+  ): CommandHandlerResult | null {
+    if (room.phase !== 'playing') return null;
+    const hand = this.runtime.getCurrentHand(room.roomId);
+    if (
+      !hand ||
+      hand.betting.currentActorId !== null ||
+      !isBettingRoundComplete(hand.betting)
+    ) {
+      return null;
+    }
+    const contenders = hand.players.filter(({ status }) => status !== 'folded');
+    if (contenders.length === 1) {
+      return this.settle(hand, room, settleUncontestedHand(hand));
+    }
+    if (hand.street === 'river') {
+      return this.settle(hand, room, settleShowdown(hand));
+    }
+    const progressed = advanceAfterCompletedBetting(hand);
+    return this.settle(progressed, room, settleShowdown(progressed));
+  }
+
   private settle(
     progressedHand: StartedHandState,
     room: RoomState,
