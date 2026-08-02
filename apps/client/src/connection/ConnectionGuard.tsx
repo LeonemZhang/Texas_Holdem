@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 
 import type { ConnectionState } from './connection.js';
+import { networkErrorMessage } from './error-message.js';
 
 export interface ConnectionGuardProps {
   readonly state: ConnectionState;
@@ -22,7 +23,9 @@ export function ConnectionGuard({
   const [confirmingExit, setConfirmingExit] = useState(false);
   const recovering =
     state.status === 'recovering' || state.status === 'connecting';
-  const error = state.status === 'failed' ? state.error : synchronizationError;
+  const error = networkErrorMessage(
+    state.status === 'failed' ? state.error : synchronizationError,
+  );
   const exitRoom = () => {
     clearReconnectSession();
     onExitRoom();
@@ -42,7 +45,7 @@ export function ConnectionGuard({
           <span>恢复期间已暂时锁定游戏操作，座位和数据会保留。</span>
         </div>
       ) : null}
-      {error ? (
+      {error && (state.status === 'failed' || synchronizationError) ? (
         <div
           className="connection-banner connection-banner--error"
           role="alert"

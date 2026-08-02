@@ -11,6 +11,7 @@ import {
   RoomSessionClient,
   RoomSessionRequestError,
 } from './connection/room-session-client.js';
+import { networkErrorMessage } from './connection/error-message.js';
 import { ConnectionHome } from './home/ConnectionHome.js';
 import { NetworkDiagnostics } from './home/NetworkDiagnostics.js';
 import {
@@ -166,7 +167,7 @@ export function App() {
       }
       setJoinTarget({ baseUrl: url.origin, roomId });
     } catch (reason) {
-      setJoinError(reason instanceof Error ? reason.message : '无法连接房主');
+      setJoinError(networkErrorMessage(reason instanceof Error ? reason.message : null));
     }
   };
 
@@ -187,11 +188,11 @@ export function App() {
       );
       saveSession(joined, false);
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : '加入房间失败';
+      const message = reason instanceof Error ? reason.message : null;
       setJoinError(
         message === 'Room is not accepting new players'
           ? '对局已经开始：只有原玩家可使用本机保存的身份恢复，不能以新昵称加入。'
-          : message,
+          : networkErrorMessage(message),
       );
     }
   };

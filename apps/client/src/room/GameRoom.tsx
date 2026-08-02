@@ -9,6 +9,7 @@ import {
 
 import type { ConnectionAdapter } from '../connection/connection.js';
 import { SocketIoConnectionAdapter } from '../connection/socket-io-adapter.js';
+import { networkErrorMessage } from '../connection/error-message.js';
 import { StatisticsPanel } from '../statistics/StatisticsPanel.js';
 import {
   BettingControls,
@@ -91,9 +92,7 @@ export function GameRoom({
       setSnapshot(next);
       setError(null);
     });
-    const stopLost = connection.onConnectionLost(() =>
-      setError('连接已中断，正在等待重新连接'),
-    );
+    const stopLost = connection.onConnectionLost(() => setError('网络异常，请重试'));
     const stopEvent = connection.onDomainEvent(() => undefined);
     void connection
       .connect({
@@ -103,7 +102,7 @@ export function GameRoom({
         token: session.token,
       })
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : '连接房间失败'),
+        setError(networkErrorMessage(reason instanceof Error ? reason.message : null)),
       );
     return () => {
       stopSnapshot();
@@ -147,7 +146,7 @@ export function GameRoom({
         }
         return true;
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : '命令发送失败');
+        setError(networkErrorMessage(reason instanceof Error ? reason.message : null));
         return false;
       } finally {
         setSending(false);
