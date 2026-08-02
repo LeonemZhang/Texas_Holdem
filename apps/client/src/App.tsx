@@ -116,6 +116,16 @@ export function App() {
             setSession(roomSessionFromStored(stored, joinUrl.toString()));
           });
       } else setJoinTarget({ baseUrl: window.location.origin, roomId });
+    } else if (!window.texasHoldemDesktop) {
+      void new RoomSessionClient(window.location.origin)
+        .currentRoomId()
+        .then((activeRoomId) =>
+          setJoinTarget({
+            baseUrl: window.location.origin,
+            roomId: activeRoomId,
+          }),
+        )
+        .catch(() => undefined);
     }
     const stopPlayerExit = adapter.onPlayerExitRequested(async () => {
       await roomCommand.current?.({ type: 'room.exit' });

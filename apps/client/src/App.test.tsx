@@ -74,4 +74,22 @@ describe('application shell', () => {
     expect(screen.getByLabelText('房主 IP 或完整地址')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '创建房间' })).toBeNull();
   });
+
+  it('asks only for a nickname when a browser opens a host address directly', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ roomId: 'room-at-host' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: '加入房间' })).toBeInTheDocument();
+    expect(screen.getByLabelText('玩家昵称')).toBeInTheDocument();
+  });
 });
