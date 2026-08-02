@@ -71,4 +71,14 @@ describe('TableSeats', () => {
     );
     expect(screen.getByLabelText('玩家 1 摊牌底牌 10♥ A♠')).toBeInTheDocument();
   });
+
+  it('labels a completed action on the corresponding player seat', () => {
+    render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[{ ...makePlayers(2)[0]!, lastAction: 'check' }, makePlayers(2)[1]!]}
+      />,
+    );
+    expect(screen.getByText('过牌')).toBeInTheDocument();
+  });
 });

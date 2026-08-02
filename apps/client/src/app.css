@@ -795,6 +795,17 @@ body:has(.poker-table-page) .poker-table-controls {
   white-space: nowrap;
 }
 
+.table-seat__last-action {
+  justify-self: center;
+  padding: 0.08rem 0.35rem;
+  border-radius: 999px;
+  color: #dcfce7;
+  background: rgb(6 78 59 / 85%);
+  font-size: clamp(0.56rem, 1.2vw, 0.66rem);
+  font-weight: 800;
+  line-height: 1.25;
+}
+
 .table-seat--disconnected,
 .table-seat--folded,
 .table-seat--sitting-out,

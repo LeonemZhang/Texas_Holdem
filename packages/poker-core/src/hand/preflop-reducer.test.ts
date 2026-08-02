@@ -24,6 +24,7 @@ describe('applyPreflopAction', () => {
     const next = applyPreflopAction(initial, 'a', { type: 'call' });
     expect(initial.players[0]).toMatchObject({ stack: 99, streetCommitted: 1 });
     expect(next.players[0]).toMatchObject({ stack: 98, streetCommitted: 2 });
+    expect(next.players[0]).toMatchObject({ lastAction: 'call' });
     expect(next.betting.currentActorId).toBe('b');
   });
 

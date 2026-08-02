@@ -136,6 +136,7 @@ export function projectPlayerSnapshot(
         streetCommitted:
           handPlayer(hand, player.playerId)?.streetCommitted ?? 0,
         totalCommitted: handPlayer(hand, player.playerId)?.totalCommitted ?? 0,
+        lastAction: handPlayer(hand, player.playerId)?.lastAction ?? null,
         status: publicStatus(player, hand),
         isHost: player.playerId === input.room.hostPlayerId,
         lobbyReady: player.lobbyReady,

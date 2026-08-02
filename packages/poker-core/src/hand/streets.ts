@@ -17,7 +17,7 @@ function dealStreet(
     throw new RangeError(`Deck ended while dealing the ${street}`);
   }
   const players = state.players.map((player) =>
-    Object.freeze({ ...player, streetCommitted: 0 }),
+    Object.freeze({ ...player, streetCommitted: 0, lastAction: null }),
   );
   const seats: readonly Seat[] = players.map((player) => ({
     index: player.seatIndex,

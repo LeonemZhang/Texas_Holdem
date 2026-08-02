@@ -20,6 +20,14 @@ export interface TableSeatPlayer {
   readonly isDealer?: boolean;
   readonly isSmallBlind?: boolean;
   readonly isBigBlind?: boolean;
+  readonly lastAction?:
+    | 'fold'
+    | 'check'
+    | 'call'
+    | 'raiseTo'
+    | 'allIn'
+    | null
+    | undefined;
   readonly revealedHoleCards?: readonly string[];
 }
 
@@ -38,6 +46,14 @@ const statusLabels: Record<TableSeatStatus, string> = {
   left: '已离开',
   disconnected: '已掉线',
 };
+
+const actionLabels = {
+  fold: '弃牌',
+  check: '过牌',
+  call: '跟注',
+  raiseTo: '加注',
+  allIn: '全押',
+} as const;
 
 const suitSymbols: Record<string, string> = {
   c: '♣',
@@ -106,6 +122,11 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
             ) : null}
             {player.isCurrentActor ? (
               <span className="table-seat__acting-indicator">行动中</span>
+            ) : null}
+            {player.lastAction ? (
+              <span className="table-seat__last-action">
+                {actionLabels[player.lastAction]}
+              </span>
             ) : null}
             <strong>{player.chips.toLocaleString('zh-CN')}</strong>
             <small>{statusLabels[player.status]}</small>

@@ -25,6 +25,15 @@ export interface HandPlayerState {
   readonly streetCommitted: number;
   readonly totalCommitted: number;
   readonly status: 'active' | 'folded' | 'all-in';
+  /** The player's most recent completed action on the current street. */
+  readonly lastAction?:
+    | 'fold'
+    | 'check'
+    | 'call'
+    | 'raiseTo'
+    | 'allIn'
+    | null
+    | undefined;
   readonly holeCards: readonly [Card, Card];
 }
 
@@ -118,6 +127,7 @@ export function startHand(options: StartHandOptions): StartedHandState {
       totalCommitted: paid,
       status:
         paid === participant.stack ? ('all-in' as const) : ('active' as const),
+      lastAction: paid === participant.stack ? 'allIn' : null,
       holeCards: Object.freeze([cards[0], cards[1]]) as readonly [Card, Card],
     });
   });
