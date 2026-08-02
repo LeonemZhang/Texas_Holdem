@@ -11,17 +11,30 @@ import type {
 
 export interface DesktopRoomSetupProps {
   readonly runtime: RuntimeAdapter;
+  readonly mode: 'create' | 'records';
+  readonly existingService?: HostServiceInfo | null;
+  readonly onClose: () => void;
   readonly onHosted: (
     service: HostServiceInfo,
     room: CreateRoomFormValue,
   ) => Promise<HostServiceInfo>;
+  readonly onManageRecords: (service: HostServiceInfo) => Promise<void>;
 }
 
-export function DesktopRoomSetup({ runtime, onHosted }: DesktopRoomSetupProps) {
+export function DesktopRoomSetup({
+  runtime,
+  mode,
+  existingService = null,
+  onClose,
+  onHosted,
+  onManageRecords,
+}: DesktopRoomSetupProps) {
   const [interfaces, setInterfaces] = useState<
     readonly DesktopNetworkInterface[]
   >([]);
-  const [selectedAddress, setSelectedAddress] = useState('');
+  const [selectedAddress, setSelectedAddress] = useState(
+    existingService?.advertisedAddress ?? '',
+  );
   const [service, setService] = useState<HostServiceInfo | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,28 +44,46 @@ export function DesktopRoomSetup({ runtime, onHosted }: DesktopRoomSetupProps) {
       .listNetworkInterfaces()
       .then((result) => {
         setInterfaces(result);
-        setSelectedAddress((current) => current || result[0]?.address || '');
+        setSelectedAddress(
+          existingService?.advertisedAddress ?? result[0]?.address ?? '',
+        );
       })
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : '读取网卡失败'),
       );
-  }, [runtime]);
+  }, [existingService?.advertisedAddress, runtime]);
+
+  const startOrReuseHostService = async () => {
+    if (existingService) return existingService;
+    if (!selectedAddress) {
+      throw new Error('请选择用于朋友联机的 IPv4 网卡');
+    }
+    return runtime.startHostService({
+      port: 32_100,
+      advertisedAddress: selectedAddress,
+    });
+  };
 
   const create = async (room: CreateRoomFormValue) => {
-    if (!selectedAddress) {
-      setError('请选择用于朋友联机的 IPv4 网卡');
-      return;
-    }
     setCreating(true);
     setError(null);
     try {
-      const hosted = await runtime.startHostService({
-        port: 32_100,
-        advertisedAddress: selectedAddress,
-      });
+      const hosted = await startOrReuseHostService();
       setService(await onHosted(hosted, room));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '房主服务启动失败');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const manageRecords = async () => {
+    setCreating(true);
+    setError(null);
+    try {
+      await onManageRecords(await startOrReuseHostService());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '读取对局记录失败');
     } finally {
       setCreating(false);
     }
@@ -74,36 +105,77 @@ export function DesktopRoomSetup({ runtime, onHosted }: DesktopRoomSetupProps) {
 
   return (
     <section className="desktop-room-setup">
-      <label className="desktop-room-setup__adapter">
-        联机网卡
-        <select
-          value={selectedAddress}
-          onChange={(event) => setSelectedAddress(event.target.value)}
-        >
-          <option value="" disabled>
-            选择 IPv4 网卡
-          </option>
-          {interfaces.map((network) => (
-            <option
-              key={`${network.name}-${network.address}`}
-              value={network.address}
-            >
-              {network.name} · {network.address}
+      <div className="desktop-room-setup__network">
+        <header className="desktop-room-setup__header">
+          <div>
+            <p className="connection-home__kicker">
+              {mode === 'create' ? '创建牌桌' : '房主控制台'}
+            </p>
+            <h2>{mode === 'create' ? '选择房主网络' : '打开对局记录管理'}</h2>
+          </div>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={onClose}
+          >
+            返回首页
+          </button>
+        </header>
+        <label className="desktop-room-setup__adapter">
+          联机网卡
+          <select
+            value={selectedAddress}
+            disabled={existingService !== null}
+            onChange={(event) => setSelectedAddress(event.target.value)}
+          >
+            <option value="" disabled>
+              选择 IPv4 网卡
             </option>
-          ))}
-        </select>
-      </label>
-      <p className="form-help">
-        请选择朋友也能访问的网卡，例如虚拟局域网的 10.126.126.1。
-      </p>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
+            {interfaces.map((network) => (
+              <option
+                key={`${network.name}-${network.address}`}
+                value={network.address}
+              >
+                {network.name} · {network.address}
+              </option>
+            ))}
+            {existingService &&
+            !interfaces.some(
+              (network) =>
+                network.address === existingService.advertisedAddress,
+            ) ? (
+              <option value={existingService.advertisedAddress}>
+                当前房主服务 · {existingService.advertisedAddress}
+              </option>
+            ) : null}
+          </select>
+        </label>
+        <p className="form-help">
+          {existingService
+            ? `房主服务已在 ${existingService.advertisedAddress}:${existingService.port} 运行，将直接复用。`
+            : '请选择朋友也能访问的网卡，例如虚拟局域网的 10.126.126.1。'}
         </p>
-      ) : null}
-      <div aria-busy={creating}>
-        <CreateRoomForm onCreate={(room) => void create(room)} />
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {mode === 'records' ? (
+          <button
+            type="button"
+            className="button button--primary desktop-room-setup__open-records"
+            disabled={creating}
+            onClick={() => void manageRecords()}
+          >
+            {creating ? '正在打开…' : '打开对局记录'}
+          </button>
+        ) : null}
       </div>
+      {mode === 'create' ? (
+        <div aria-busy={creating}>
+          <CreateRoomForm onCreate={(room) => void create(room)} />
+        </div>
+      ) : null}
     </section>
   );
 }

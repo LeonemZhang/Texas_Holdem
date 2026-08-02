@@ -28,6 +28,7 @@ const room: RoomDiscoveryListItem = {
   compatibility: 'compatible',
   latencyMs: 12,
   expired: false,
+  reconnectable: false,
 };
 
 describe('RoomDiscoveryList', () => {
@@ -77,5 +78,35 @@ describe('RoomDiscoveryList', () => {
     expect(screen.getByRole('button', { name: '加入' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '刷新列表' }));
     expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('only enables an in-progress room for a player with a saved identity', () => {
+    const onJoin = vi.fn();
+    const playingRoom = {
+      ...room,
+      room: { ...room.room, phase: 'playing' as const },
+    };
+    const { rerender } = render(
+      <RoomDiscoveryList
+        rooms={[playingRoom]}
+        refreshing={false}
+        onRefresh={vi.fn()}
+        onJoin={onJoin}
+      />,
+    );
+
+    expect(screen.getByText('仅原玩家可恢复')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '加入' })).toBeDisabled();
+
+    rerender(
+      <RoomDiscoveryList
+        rooms={[{ ...playingRoom, reconnectable: true }]}
+        refreshing={false}
+        onRefresh={vi.fn()}
+        onJoin={onJoin}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '恢复对局' }));
+    expect(onJoin).toHaveBeenCalledWith(playingRoom.room);
   });
 });

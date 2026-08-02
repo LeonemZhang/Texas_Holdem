@@ -14,6 +14,7 @@ import {
 } from '@texas-holdem/protocol';
 
 import type { ConnectionAdapter } from './connection.js';
+import { createRandomId } from '../random-id.js';
 
 type Acknowledge = (error: Error | null, response?: unknown) => void;
 
@@ -71,7 +72,7 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
     private readonly url: string,
     private readonly socketPath = '/socket.io',
     private readonly socketFactory: ClientSocketFactory = defaultSocketFactory,
-    private readonly commandIdFactory: () => string = () => crypto.randomUUID(),
+    private readonly commandIdFactory: () => string = createRandomId,
   ) {}
 
   async connect(credentials: SocketAuthentication): Promise<void> {

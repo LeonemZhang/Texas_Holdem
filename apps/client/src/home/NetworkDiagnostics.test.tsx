@@ -26,7 +26,15 @@ function adapter(): RuntimeAdapter {
       joinUrl: 'http://10.126.126.1:32100',
       dataDirectory: 'rooms',
     }),
+    getActiveHostService: async () => null,
     stopHostService: async () => undefined,
+    listRoomRecords: async () => [],
+    recoverRoomRecord: async () => {
+      throw new Error('unavailable');
+    },
+    archiveRoomRecord: async () => undefined,
+    restoreRoomRecord: async () => undefined,
+    deleteRoomRecord: async () => undefined,
     onHostServiceExited: () => () => undefined,
     setWindowRoomContext: async () => undefined,
     onPlayerExitRequested: () => () => undefined,

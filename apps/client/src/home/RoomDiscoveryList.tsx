@@ -8,6 +8,7 @@ export interface RoomDiscoveryListItem {
   readonly compatibility: RoomCompatibility;
   readonly latencyMs: number | null;
   readonly expired: boolean;
+  readonly reconnectable: boolean;
 }
 
 export interface RoomDiscoveryListProps {
@@ -60,8 +61,18 @@ export function RoomDiscoveryList({
       ) : (
         <ul className="room-list">
           {rooms.map((item) => {
+            const acceptsNewPlayers =
+              item.room.phase === 'lobby' &&
+              item.room.playerCount < item.room.maxPlayers;
             const disabled =
-              item.expired || item.compatibility !== 'compatible';
+              item.expired ||
+              item.compatibility !== 'compatible' ||
+              (!acceptsNewPlayers && !item.reconnectable);
+            const entryLabel = acceptsNewPlayers
+              ? compatibilityLabel[item.compatibility]
+              : item.reconnectable
+                ? '可恢复身份'
+                : '仅原玩家可恢复';
             return (
               <li className="room-list__item" key={item.room.roomId}>
                 <div className="room-list__title">
@@ -96,7 +107,7 @@ export function RoomDiscoveryList({
                 </dl>
                 <div className="room-list__footer">
                   <span data-compatibility={item.compatibility}>
-                    {compatibilityLabel[item.compatibility]}
+                    {entryLabel}
                   </span>
                   <button
                     type="button"
@@ -104,7 +115,9 @@ export function RoomDiscoveryList({
                     disabled={disabled}
                     onClick={() => onJoin(item.room)}
                   >
-                    加入
+                    {item.reconnectable && !acceptsNewPlayers
+                      ? '恢复对局'
+                      : '加入'}
                   </button>
                 </div>
               </li>

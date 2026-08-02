@@ -7,6 +7,7 @@ import type { RuntimeKind } from '../runtime.js';
 export interface ConnectionHomeProps {
   readonly runtimeKind: RuntimeKind;
   readonly onCreateRoom: () => void;
+  readonly onManageRecords?: () => void;
   readonly onRefreshRooms: () => void;
   readonly onJoinAddress: (url: string) => void;
 }
@@ -14,6 +15,7 @@ export interface ConnectionHomeProps {
 export function ConnectionHome({
   runtimeKind,
   onCreateRoom,
+  onManageRecords,
   onRefreshRooms,
   onJoinAddress,
 }: ConnectionHomeProps) {
@@ -51,6 +53,13 @@ export function ConnectionHome({
               onClick={onCreateRoom}
             >
               创建房间
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={onManageRecords ?? onCreateRoom}
+            >
+              管理对局记录
             </button>
             <button
               type="button"
