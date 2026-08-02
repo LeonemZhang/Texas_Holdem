@@ -1175,6 +1175,26 @@ body:has(.poker-table-page) .poker-table-controls {
   background: rgb(120 53 15 / 18%);
 }
 
+.hand-ready-card__request-prompt {
+  margin-top: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid rgb(251 191 36 / 52%);
+  border-radius: 0.85rem;
+  color: #fef3c7;
+  background: rgb(69 26 3 / 92%);
+}
+
+.hand-ready-card__request-prompt p {
+  margin: 0.35rem 0 0;
+}
+
+.hand-ready-card__request-prompt div {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.6rem;
+  gap: 0.45rem;
+}
+
 .hand-ready-card__requests ul {
   margin: 0.45rem 0 0;
   padding-left: 1.2rem;

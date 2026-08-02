@@ -32,7 +32,13 @@ describe('HandReadyOverlay', () => {
         nowMs={5_000}
         ownChoice="ready"
         pendingRequests={[
-          { requestId: 'r1', requesterName: 'Bob', amount: 200 },
+          {
+            requestId: 'r1',
+            requesterId: 'bob',
+            requesterName: 'Bob',
+            targetPlayerId: null,
+            amount: 200,
+          },
         ]}
         complete={false}
         onChoose={vi.fn()}
@@ -56,5 +62,36 @@ describe('HandReadyOverlay', () => {
       />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('presents an incoming chip request for approval or rejection', () => {
+    const onApproveRequest = vi.fn();
+    const onRejectRequest = vi.fn();
+    render(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        complete={false}
+        onChoose={vi.fn()}
+        requestToReview={{
+          requestId: 'request-1',
+          requesterId: 'bob',
+          requesterName: 'Bob',
+          targetPlayerId: 'alice',
+          amount: 200,
+        }}
+        onApproveRequest={onApproveRequest}
+        onRejectRequest={onRejectRequest}
+      />,
+    );
+    expect(screen.getByRole('alertdialog', { name: '筹码请求' })).toHaveTextContent(
+      'Bob 请求 200 筹码',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '同意' }));
+    fireEvent.click(screen.getByRole('button', { name: '拒绝' }));
+    expect(onApproveRequest).toHaveBeenCalledWith('request-1');
+    expect(onRejectRequest).toHaveBeenCalledWith('request-1');
   });
 });

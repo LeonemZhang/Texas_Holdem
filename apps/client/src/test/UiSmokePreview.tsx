@@ -100,7 +100,13 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
                 deadlineMs={Date.now() + 30_000}
                 ownChoice="pending"
                 pendingRequests={[
-                  { requestId: 'r1', requesterName: 'Bob', amount: 200 },
+                  {
+                    requestId: 'r1',
+                    requesterId: 'bob',
+                    requesterName: 'Bob',
+                    targetPlayerId: null,
+                    amount: 200,
+                  },
                 ]}
                 complete={false}
                 onChoose={noop}

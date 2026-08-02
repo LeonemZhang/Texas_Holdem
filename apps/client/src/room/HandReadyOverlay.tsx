@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 
 export interface HandReadyRequestView {
   readonly requestId: string;
+  readonly requesterId: string;
   readonly requesterName: string;
+  readonly targetPlayerId: string | null;
   readonly amount: number;
 }
 
@@ -13,6 +15,9 @@ export interface HandReadyOverlayProps {
   readonly complete: boolean;
   readonly nowMs?: number;
   readonly onChoose: (choice: 'ready' | 'sitting-out') => void;
+  readonly requestToReview?: HandReadyRequestView | null;
+  readonly onApproveRequest?: (requestId: string) => void;
+  readonly onRejectRequest?: (requestId: string) => void;
 }
 
 function useCurrentTime(fixedNowMs?: number) {
@@ -32,6 +37,9 @@ export function HandReadyOverlay({
   complete,
   nowMs,
   onChoose,
+  requestToReview = null,
+  onApproveRequest,
+  onRejectRequest,
 }: HandReadyOverlayProps) {
   const [expanded, setExpanded] = useState(false);
   const currentTime = useCurrentTime(nowMs);
@@ -75,6 +83,36 @@ export function HandReadyOverlay({
             {expanded ? '收起详情' : '准备详情'}
           </button>
         </header>
+
+        {requestToReview ? (
+          <section
+            className="hand-ready-card__request-prompt"
+            role="alertdialog"
+            aria-label="筹码请求"
+          >
+            <strong>收到筹码请求</strong>
+            <p>
+              {requestToReview.requesterName} 请求{' '}
+              {requestToReview.amount.toLocaleString('zh-CN')} 筹码
+            </p>
+            <div>
+              <button
+                className="button button--primary"
+                type="button"
+                onClick={() => onApproveRequest?.(requestToReview.requestId)}
+              >
+                同意
+              </button>
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={() => onRejectRequest?.(requestToReview.requestId)}
+              >
+                拒绝
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {expanded && pendingRequests.length > 0 ? (
           <div className="hand-ready-card__requests" role="status">

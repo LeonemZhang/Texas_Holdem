@@ -223,6 +223,22 @@ export function GameRoom({
   const names = new Map(
     snapshot.room.players.map(({ playerId, nickname }) => [playerId, nickname]),
   );
+  const incomingChipRequest = snapshot.handReady?.pendingRequests.find(
+    (request) =>
+      request.requesterId !== session.playerId &&
+      (request.targetPlayerId === null ||
+        request.targetPlayerId === session.playerId),
+  );
+  const incomingChipRequestView = incomingChipRequest
+    ? {
+        requestId: incomingChipRequest.requestId,
+        requesterId: incomingChipRequest.requesterId,
+        requesterName:
+          names.get(incomingChipRequest.requesterId) ?? '玩家',
+        targetPlayerId: incomingChipRequest.targetPlayerId,
+        amount: incomingChipRequest.amount,
+      }
+    : null;
   const statistics = snapshot.statistics.players.map((player) => ({
     ...player,
     nickname: names.get(player.playerId) ?? player.playerId,
@@ -438,14 +454,23 @@ export function GameRoom({
               pendingRequests={snapshot.handReady.pendingRequests.map(
                 (request) => ({
                   requestId: request.requestId,
+                  requesterId: request.requesterId,
                   requesterName:
                     names.get(request.requesterId) ?? request.requesterId,
+                  targetPlayerId: request.targetPlayerId,
                   amount: request.amount,
                 }),
               )}
               complete={false}
               onChoose={(choice) =>
                 void send({ type: 'hand-ready.set-choice', choice })
+              }
+              requestToReview={incomingChipRequestView}
+              onApproveRequest={(requestId) =>
+                sendChipIntent({ type: 'approve', requestId })
+              }
+              onRejectRequest={(requestId) =>
+                sendChipIntent({ type: 'reject', requestId })
               }
             />
           ) : null
