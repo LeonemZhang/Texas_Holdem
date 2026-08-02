@@ -37,4 +37,21 @@ describe('CardsAndPots', () => {
     expect(screen.queryByText(/赢家/)).not.toBeInTheDocument();
     expect(screen.getAllByLabelText(/未公开/)).toHaveLength(7);
   });
+
+  it('puts server-authorized showdown cards on the table instead of player seats', () => {
+    render(
+      <CardsAndPots
+        ownHoleCards={['Ah', 'Ks']}
+        communityCards={['2c', 'Td', 'Jh', 'Qs', 'Ac']}
+        pots={[{ amount: 120, eligiblePlayerIds: ['a', 'b'] }]}
+        showdownHands={[
+          { playerId: 'a', nickname: 'Alice', cards: ['Ah', 'Ks'] },
+          { playerId: 'b', nickname: 'Bob', cards: ['Qc', 'Qd'] },
+        ]}
+      />,
+    );
+    expect(screen.getByLabelText('摊牌底牌')).toBeInTheDocument();
+    expect(screen.getByLabelText('Alice 的摊牌底牌')).toBeInTheDocument();
+    expect(screen.queryByLabelText('我的底牌')).not.toBeInTheDocument();
+  });
 });

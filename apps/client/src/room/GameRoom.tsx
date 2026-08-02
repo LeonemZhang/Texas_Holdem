@@ -402,11 +402,6 @@ export function GameRoom({
               isDealer: game?.buttonPlayerId === player.playerId,
               isSmallBlind: game?.smallBlindPlayerId === player.playerId,
               isBigBlind: game?.bigBlindPlayerId === player.playerId,
-              ...(game?.showdownHoleCards[player.playerId]
-                ? {
-                    revealedHoleCards: game.showdownHoleCards[player.playerId],
-                  }
-                : {}),
             }))}
           />
         }
@@ -415,6 +410,13 @@ export function GameRoom({
             ownHoleCards={game?.ownHoleCards ?? null}
             communityCards={game?.communityCards ?? []}
             pots={game?.pots ?? []}
+            showdownHands={Object.entries(game?.showdownHoleCards ?? {}).map(
+              ([playerId, cards]) => ({
+                playerId,
+                nickname: names.get(playerId) ?? playerId,
+                cards,
+              }),
+            )}
           />
         }
         pots={null}

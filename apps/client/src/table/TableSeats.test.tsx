@@ -59,19 +59,6 @@ describe('TableSeats', () => {
     );
   });
 
-  it('shows public showdown cards only on the matching contender seat', () => {
-    render(
-      <TableSeats
-        ownPlayerId="p0"
-        players={[
-          { ...makePlayers(2)[0]!, revealedHoleCards: ['Th', 'As'] },
-          makePlayers(2)[1]!,
-        ]}
-      />,
-    );
-    expect(screen.getByLabelText('玩家 1 摊牌底牌 10♥ A♠')).toBeInTheDocument();
-  });
-
   it('labels a completed action on the corresponding player seat', () => {
     render(
       <TableSeats

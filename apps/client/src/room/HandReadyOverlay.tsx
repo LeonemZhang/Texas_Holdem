@@ -33,6 +33,7 @@ export function HandReadyOverlay({
   nowMs,
   onChoose,
 }: HandReadyOverlayProps) {
+  const [expanded, setExpanded] = useState(false);
   const currentTime = useCurrentTime(nowMs);
   const secondsLeft = Math.max(
     0,
@@ -46,8 +47,10 @@ export function HandReadyOverlay({
       <div className="hand-ready-card">
         <header>
           <div>
-            <p className="connection-home__kicker">发牌前准备</p>
-            <h2 id="hand-ready-title">下一手将在准备完成后开始</h2>
+            <h2 id="hand-ready-title" className={expanded ? undefined : 'sr-only'}>
+              下一手准备
+            </h2>
+            {expanded ? <p className="connection-home__kicker">发牌前准备</p> : null}
           </div>
           <strong
             className="hand-ready-card__timer"
@@ -55,9 +58,25 @@ export function HandReadyOverlay({
           >
             {secondsLeft}s
           </strong>
+          <button
+            className="button button--primary"
+            type="button"
+            disabled={pendingRequests.length > 0}
+            onClick={() => onChoose('ready')}
+          >
+            就绪
+          </button>
+          <button
+            className="hand-ready-card__details"
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? '收起详情' : '准备详情'}
+          </button>
         </header>
 
-        {pendingRequests.length > 0 ? (
+        {expanded && pendingRequests.length > 0 ? (
           <div className="hand-ready-card__requests" role="status">
             <strong>尚有筹码请求待处理</strong>
             <ul>
@@ -71,7 +90,7 @@ export function HandReadyOverlay({
           </div>
         ) : null}
 
-        <p className="hand-ready-card__choice">
+        {expanded ? <p className="hand-ready-card__choice">
           当前选择：
           <strong>
             {ownChoice === 'pending'
@@ -80,16 +99,8 @@ export function HandReadyOverlay({
                 ? '已就绪'
                 : '下一手暂不参与'}
           </strong>
-        </p>
-        <div className="hand-ready-card__actions">
-          <button
-            className="button button--primary"
-            type="button"
-            disabled={pendingRequests.length > 0}
-            onClick={() => onChoose('ready')}
-          >
-            就绪
-          </button>
+        </p> : null}
+        {expanded ? <div className="hand-ready-card__actions">
           <button
             className="button button--secondary"
             type="button"
@@ -97,7 +108,7 @@ export function HandReadyOverlay({
           >
             下一手暂不参与
           </button>
-        </div>
+        </div> : null}
       </div>
     </section>
   );

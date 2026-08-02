@@ -7,6 +7,11 @@ export interface CardsAndPotsProps {
   readonly ownHoleCards: readonly string[] | null;
   readonly communityCards: readonly string[];
   readonly pots: readonly PotView[];
+  readonly showdownHands?: readonly {
+    readonly playerId: string;
+    readonly nickname: string;
+    readonly cards: readonly string[];
+  }[];
 }
 
 const suitSymbols: Record<string, string> = {
@@ -50,6 +55,7 @@ export function CardsAndPots({
   ownHoleCards,
   communityCards,
   pots,
+  showdownHands = [],
 }: CardsAndPotsProps) {
   let sidePotIndex = 0;
   return (
@@ -81,10 +87,29 @@ export function CardsAndPots({
         })}
       </dl>
 
-      <div className="hole-cards" aria-label="我的底牌">
-        <PlayingCard code={ownHoleCards?.[0] ?? null} label="第一张底牌" />
-        <PlayingCard code={ownHoleCards?.[1] ?? null} label="第二张底牌" />
-      </div>
+      {showdownHands.length > 0 ? (
+        <ul className="showdown-hands" aria-label="摊牌底牌">
+          {showdownHands.map((hand) => (
+            <li key={hand.playerId}>
+              <strong>{hand.nickname}</strong>
+              <div aria-label={`${hand.nickname} 的摊牌底牌`}>
+                {hand.cards.map((card, index) => (
+                  <PlayingCard
+                    code={card}
+                    key={card}
+                    label={`${hand.nickname} 的第 ${index + 1} 张底牌`}
+                  />
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="hole-cards" aria-label="我的底牌">
+          <PlayingCard code={ownHoleCards?.[0] ?? null} label="第一张底牌" />
+          <PlayingCard code={ownHoleCards?.[1] ?? null} label="第二张底牌" />
+        </div>
+      )}
     </div>
   );
 }

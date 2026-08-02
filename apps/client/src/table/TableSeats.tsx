@@ -28,7 +28,6 @@ export interface TableSeatPlayer {
     | 'allIn'
     | null
     | undefined;
-  readonly revealedHoleCards?: readonly string[];
 }
 
 export interface TableSeatsProps {
@@ -54,19 +53,6 @@ const actionLabels = {
   raiseTo: '加注',
   allIn: '全押',
 } as const;
-
-const suitSymbols: Record<string, string> = {
-  c: '♣',
-  d: '♦',
-  h: '♥',
-  s: '♠',
-};
-
-function displayCard(code: string): string {
-  const rank = code.slice(0, -1);
-  const suit = code.slice(-1);
-  return `${rank === 'T' ? '10' : rank}${suitSymbols[suit] ?? suit}`;
-}
 
 function positionFor(index: number, count: number): CSSProperties {
   const angle = (Math.PI / 2 + (index * Math.PI * 2) / count) % (Math.PI * 2);
@@ -130,16 +116,6 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
             ) : null}
             <strong>{player.chips.toLocaleString('zh-CN')}</strong>
             <small>{statusLabels[player.status]}</small>
-            {player.revealedHoleCards?.length === 2 ? (
-              <span
-                className="table-seat__showdown-cards"
-                aria-label={`${player.nickname} 摊牌底牌 ${player.revealedHoleCards.map(displayCard).join(' ')}`}
-              >
-                {player.revealedHoleCards.map((card) => (
-                  <i key={card}>{displayCard(card)}</i>
-                ))}
-              </span>
-            ) : null}
           </li>
         );
       })}
