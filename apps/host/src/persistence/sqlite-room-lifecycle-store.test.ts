@@ -44,7 +44,7 @@ describe('SqliteRoomLifecycleStore', () => {
           seat_index: 0,
           chips: 100,
           is_host: 1,
-          lobby_ready: 0,
+          lobby_ready: 1,
         },
         {
           player_id: 'bob',

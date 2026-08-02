@@ -37,7 +37,7 @@ describe('createRoom', () => {
         chips: 2_000,
         roles: ['host', 'player'],
         status: 'waiting',
-        lobbyReady: false,
+        lobbyReady: true,
       },
     ]);
   });

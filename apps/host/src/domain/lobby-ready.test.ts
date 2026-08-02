@@ -24,31 +24,37 @@ function twoPlayerRoom() {
 }
 
 describe('lobby readiness', () => {
-  it('requires at least two seated players and every player ready', () => {
+  it('requires at least two seated players and every non-host player ready', () => {
     let room = twoPlayerRoom();
     expect(canHostStartFirstHand(room, 'host')).toBe(false);
-    room = setLobbyReady(room, 'host', true);
     room = setLobbyReady(room, 'bob', true);
     expect(canHostStartFirstHand(room, 'host')).toBe(true);
   });
 
   it('never starts automatically when everyone becomes ready', () => {
-    let room = setLobbyReady(twoPlayerRoom(), 'host', true);
-    room = setLobbyReady(room, 'bob', true);
+    const room = setLobbyReady(twoPlayerRoom(), 'bob', true);
     expect(room.phase).toBe('lobby');
     expect(room.firstHandStarted).toBe(false);
   });
 
   it('disables starting immediately when a player cancels readiness', () => {
-    let room = setLobbyReady(twoPlayerRoom(), 'host', true);
-    room = setLobbyReady(room, 'bob', true);
+    let room = setLobbyReady(twoPlayerRoom(), 'bob', true);
     room = setLobbyReady(room, 'bob', false);
     expect(canHostStartFirstHand(room, 'host')).toBe(false);
   });
 
   it('does not grant the manual start gate to an ordinary player', () => {
-    let room = setLobbyReady(twoPlayerRoom(), 'host', true);
-    room = setLobbyReady(room, 'bob', true);
+    const room = setLobbyReady(twoPlayerRoom(), 'bob', true);
     expect(canHostStartFirstHand(room, 'bob')).toBe(false);
+  });
+
+  it('keeps the host ready without a manual readiness action', () => {
+    const room = twoPlayerRoom();
+    expect(room.players.find(({ playerId }) => playerId === 'host')?.lobbyReady).toBe(
+      true,
+    );
+    expect(() => setLobbyReady(room, 'host', false)).toThrow(
+      'Host remains ready',
+    );
   });
 });

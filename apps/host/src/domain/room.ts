@@ -66,7 +66,7 @@ export function createRoom(input: {
     chips: settings.initialChips,
     roles: Object.freeze(['host', 'player'] as const),
     status: 'waiting' as const,
-    lobbyReady: false,
+    lobbyReady: true,
   });
   return freezeRoom({
     roomId,

@@ -283,7 +283,7 @@ PAUSED
 CLOSED
 ```
 
-`LOBBY` 中全员准备后只启用房主开始命令，不自动转换到 `PRE_HAND_READY` 或 `PREFLOP`。
+`LOBBY` 中房主默认已准备；所有非房主玩家准备后只启用房主开始命令，不自动转换到 `PRE_HAND_READY` 或 `PREFLOP`。
 
 第一手由房主开始命令直接创建手牌。后续每手必须先经过 `PRE_HAND_READY`。
 

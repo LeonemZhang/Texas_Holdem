@@ -40,7 +40,7 @@ export function LobbyWaitingRoom({
         <div>
           <p className="connection-home__kicker">第一局开始前</p>
           <h2 id="lobby-title">{roomName}</h2>
-          <p>所有玩家准备后，由房主手动开始游戏。</p>
+          <p>房主默认已准备；其他玩家准备后，由房主手动开始游戏。</p>
         </div>
         <strong className="lobby__count">
           {readyPlayerCount}/{seatedPlayers.length} 已准备
@@ -72,14 +72,16 @@ export function LobbyWaitingRoom({
       </ol>
 
       <footer className="lobby__actions">
-        <button
-          className="button button--secondary"
-          type="button"
-          disabled={!currentPlayer?.connected}
-          onClick={() => onSetReady(!currentPlayer?.ready)}
-        >
-          {currentPlayer?.ready ? '取消准备' : '准备'}
-        </button>
+        {!currentPlayer?.isHost ? (
+          <button
+            className="button button--secondary"
+            type="button"
+            disabled={!currentPlayer?.connected}
+            onClick={() => onSetReady(!currentPlayer?.ready)}
+          >
+            {currentPlayer?.ready ? '取消准备' : '准备'}
+          </button>
+        ) : null}
         {currentPlayer?.isHost ? (
           <div className="lobby__start-control">
             <button

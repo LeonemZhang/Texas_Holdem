@@ -37,16 +37,17 @@ describe('LobbyWaitingRoom', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('房主 · 玩家')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '开始游戏' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '取消准备' })).toBeNull();
     expect(onStartFirstHand).not.toHaveBeenCalled();
   });
 
-  it('enables start only for the host after every connected player is ready', () => {
+  it('enables start once every non-host connected player is ready', () => {
     const onStartFirstHand = vi.fn();
     const { rerender } = render(
       <LobbyWaitingRoom
         roomName="朋友局"
         currentPlayerId="host"
-        players={players(false)}
+        players={[{ ...players(false)[0]!, ready: true }, players(false)[1]! ]}
         onSetReady={vi.fn()}
         onStartFirstHand={onStartFirstHand}
       />,

@@ -16,6 +16,9 @@ export function setLobbyReady(
   if (!player || player.status === 'left') {
     throw new RangeError(`Player is not seated: ${playerId}`);
   }
+  if (player.playerId === room.hostPlayerId && !ready) {
+    throw new RangeError('Host remains ready before the first hand');
+  }
   if (player.lobbyReady === ready) return room;
   return freezeRoom({
     ...room,
