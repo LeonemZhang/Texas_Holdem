@@ -355,13 +355,14 @@ export function GameRoom({
   }
 
   const game = snapshot.game;
-  const settlementView = game?.settlement
+  const gameSettlement = game?.settlement;
+  const settlementView = gameSettlement
     ? {
         handId: game.handId,
-        reason: game.settlement.reason,
-        winners: game.settlement.winnerIds.map((playerId) => ({
+        reason: gameSettlement.reason,
+        winners: gameSettlement.winnerIds.map((playerId) => ({
           nickname: names.get(playerId) ?? playerId,
-          payout: game.settlement.payouts[playerId] ?? 0,
+          payout: gameSettlement.payouts[playerId] ?? 0,
         })),
       }
     : null;

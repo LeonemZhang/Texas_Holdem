@@ -5,6 +5,7 @@ import {
   legalBettingActions,
   type StartedHandState,
   type ShowdownSettledHand,
+  type UncontestedSettledHand,
 } from '@texas-holdem/poker-core';
 import {
   PlayerSnapshotSchema,
@@ -72,6 +73,12 @@ function isShowdownSettledHand(
   );
 }
 
+function isSettledHand(
+  hand: StartedHandState,
+): hand is ShowdownSettledHand | UncontestedSettledHand {
+  return 'settlement' in hand;
+}
+
 function showdownHoleCards(
   hand: StartedHandState | null,
 ): Readonly<Record<string, readonly string[]>> {
@@ -90,8 +97,12 @@ function settlementSummary(hand: StartedHandState | null): {
   readonly winnerIds: readonly string[];
   readonly payouts: Readonly<Record<string, number>>;
 } | null {
-  if (!hand || !('settlement' in hand)) return null;
-  return hand.settlement;
+  if (!hand || !isSettledHand(hand)) return null;
+  return {
+    reason: hand.settlement.reason,
+    winnerIds: hand.settlement.winnerIds,
+    payouts: hand.settlement.payouts,
+  };
 }
 
 function actionOrderByPlayerId(
