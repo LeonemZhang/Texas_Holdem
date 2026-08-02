@@ -20,7 +20,18 @@ const bridge: DesktopBridge = Object.freeze({
     ),
   startHostService: (input: HostStartInput) =>
     ipcRenderer.invoke('host:start', HostStartInputSchema.parse(input)),
+  getActiveHostService: () => ipcRenderer.invoke('host:get-current'),
   stopHostService: () => ipcRenderer.invoke('host:stop'),
+  listRoomRecords: (includeArchived: boolean) =>
+    ipcRenderer.invoke('room-records:list', includeArchived),
+  recoverRoomRecord: (roomId: string) =>
+    ipcRenderer.invoke('room-records:recover', roomId),
+  archiveRoomRecord: (roomId: string) =>
+    ipcRenderer.invoke('room-records:archive', roomId),
+  restoreRoomRecord: (roomId: string) =>
+    ipcRenderer.invoke('room-records:restore', roomId),
+  deleteRoomRecord: (roomId: string) =>
+    ipcRenderer.invoke('room-records:delete', roomId),
   onHostServiceExited: (listener: (event: HostServiceExitEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
       const parsed = zHostExitEvent(value);

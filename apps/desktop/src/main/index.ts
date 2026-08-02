@@ -1,5 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain, utilityProcess } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  shell,
+  utilityProcess,
+} from 'electron';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { DesktopRuntimeInfo } from '../shared/runtime';
 import {
   DiscoveryScanInputSchema,
@@ -11,6 +20,11 @@ import { isTrustedRendererUrl } from './trusted-renderer';
 import { createWindowOptions } from './window-options';
 import { HostProcessController } from './host-process-controller';
 import { WindowCloseCoordinator } from './window-close-coordinator';
+import {
+  guardMainWindowNavigation,
+  guardNewWindowOpen,
+} from './external-navigation';
+import { hideApplicationMenu } from './application-menu';
 
 const developmentUrl = process.env.CLIENT_DEV_URL;
 let mainWindow: BrowserWindow | null = null;
@@ -44,10 +58,63 @@ function registerRuntimeHandler(hostController: HostProcessController) {
     assertTrusted(event.senderFrame?.url);
     return hostController.start(HostStartInputSchema.parse(rawInput));
   });
+  ipcMain.handle('host:get-current', (event) => {
+    assertTrusted(event.senderFrame?.url);
+    return hostController.current();
+  });
   ipcMain.handle('host:stop', (event) => {
     assertTrusted(event.senderFrame?.url);
     hostController.stop();
   });
+  ipcMain.handle(
+    'room-records:list',
+    async (event, includeArchived: unknown) => {
+      assertTrusted(event.senderFrame?.url);
+      if (typeof includeArchived !== 'boolean')
+        throw new Error('Invalid archive filter');
+      const result = await hostController.manage({
+        protocolVersion: '1',
+        requestId: randomUUID(),
+        type: 'room-record.list',
+        includeArchived,
+      });
+      if (!result || typeof result !== 'object' || !('records' in result)) {
+        throw new Error('Invalid room record list response');
+      }
+      return result.records;
+    },
+  );
+  ipcMain.handle('room-records:recover', async (event, roomId: unknown) => {
+    assertTrusted(event.senderFrame?.url);
+    if (typeof roomId !== 'string' || !roomId.trim())
+      throw new Error('Invalid room ID');
+    const result = await hostController.manage({
+      protocolVersion: '1',
+      requestId: randomUUID(),
+      type: 'room-record.recover',
+      roomId,
+    });
+    if (!result || typeof result !== 'object' || !('session' in result))
+      throw new Error('Invalid room recovery response');
+    return result.session;
+  });
+  for (const [channel, type] of [
+    ['room-records:archive', 'room-record.archive'],
+    ['room-records:restore', 'room-record.restore'],
+    ['room-records:delete', 'room-record.delete'],
+  ] as const) {
+    ipcMain.handle(channel, async (event, roomId: unknown) => {
+      assertTrusted(event.senderFrame?.url);
+      if (typeof roomId !== 'string' || !roomId.trim())
+        throw new Error('Invalid room ID');
+      await hostController.manage({
+        protocolVersion: '1',
+        requestId: randomUUID(),
+        type,
+        roomId,
+      });
+    });
+  }
   ipcMain.handle('window:set-room-context', (event, rawContext: unknown) => {
     assertTrusted(event.senderFrame?.url);
     windowCloseCoordinator?.setContext(
@@ -109,6 +176,18 @@ async function createMainWindow() {
       windowCloseCoordinator = null;
     }
   });
+  window.webContents.on('will-navigate', (event, url) => {
+    guardMainWindowNavigation({
+      url,
+      isTrustedRendererUrl: (candidate) =>
+        isTrustedRendererUrl(candidate, developmentUrl),
+      preventDefault: () => event.preventDefault(),
+      openExternal: (candidate) => shell.openExternal(candidate),
+    });
+  });
+  window.webContents.setWindowOpenHandler(({ url }) =>
+    guardNewWindowOpen(url, (candidate) => shell.openExternal(candidate)),
+  );
   window.once('ready-to-show', () => window.show());
 
   if (developmentUrl) {
@@ -123,6 +202,7 @@ async function createMainWindow() {
 }
 
 void app.whenReady().then(async () => {
+  hideApplicationMenu(Menu);
   const hostEntryPath = app.isPackaged
     ? join(process.resourcesPath, 'host/index.mjs')
     : join(__dirname, '../host/index.mjs');
@@ -133,7 +213,7 @@ void app.whenReady().then(async () => {
       : join(__dirname, '../../../client/dist'),
     spawn: ({ env }) =>
       utilityProcess.fork(hostEntryPath, [], {
-        env: { ...process.env, ...env },
+        env: { ...process.env, ...env, HOST_PARENT_PID: String(process.pid) },
         serviceName: 'Texas Holdem Host',
         stdio: 'pipe',
       }),

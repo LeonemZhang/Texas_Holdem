@@ -13,13 +13,41 @@ export interface DesktopBridge {
     input: DiscoveryScanInput,
   ): Promise<readonly DesktopDiscoveredRoom[]>;
   startHostService(input: HostStartInput): Promise<HostServiceInfo>;
+  getActiveHostService(): Promise<HostServiceInfo | null>;
   stopHostService(): Promise<void>;
+  listRoomRecords(
+    includeArchived: boolean,
+  ): Promise<readonly RoomRecordSummary[]>;
+  recoverRoomRecord(roomId: string): Promise<RecoveredHostSession>;
+  archiveRoomRecord(roomId: string): Promise<void>;
+  restoreRoomRecord(roomId: string): Promise<void>;
+  deleteRoomRecord(roomId: string): Promise<void>;
   onHostServiceExited(
     listener: (event: HostServiceExitEvent) => void,
   ): () => void;
   setWindowRoomContext(context: WindowRoomContext): Promise<void>;
   onPlayerExitRequested(listener: () => void | Promise<void>): () => void;
   onHostCloseRequested(listener: () => void | Promise<void>): () => void;
+}
+
+export interface RoomRecordSummary {
+  readonly roomId: string;
+  readonly roomName: string;
+  readonly hostNickname: string;
+  readonly status: 'running' | 'recoverable' | 'closed' | 'archived';
+  readonly createdAt: string;
+  readonly lastActiveAt: string;
+  readonly completedHands: number;
+  readonly playerCount: number;
+}
+
+export interface RecoveredHostSession {
+  readonly protocolVersion: '1';
+  readonly roomId: string;
+  readonly playerId: string;
+  readonly token: string;
+  readonly joinUrl: string;
+  readonly socketPath: '/socket.io';
 }
 
 export const DiscoveryScanInputSchema = z.object({

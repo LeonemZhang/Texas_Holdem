@@ -8,7 +8,7 @@
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "pnpm build && wait-on tcp:5173 && cross-env CLIENT_DEV_URL=http://localhost:5173 electron .",
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && esbuild src/preload/index.ts --bundle --platform=node --format=cjs --target=node24 --external:electron --outfile=dist/preload/index.js && esbuild ../host/src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/host/index.mjs",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && esbuild src/preload/index.ts --bundle --platform=node --format=cjs --target=node24 --external:electron --outfile=dist/preload/index.js && esbuild ../host/src/index.ts --bundle --platform=node --format=esm --target=node24 --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=dist/host/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "package:win": "electron-builder --win --x64"
