@@ -67,6 +67,8 @@ describe('BettingControls', () => {
     expect(slider).toHaveValue('0');
     fireEvent.click(screen.getByRole('button', { name: '增加 20 筹码' }));
     expect(slider).toHaveValue('20');
+    fireEvent.click(screen.getByRole('button', { name: '减少 5 筹码' }));
+    expect(slider).toHaveValue('15');
     fireEvent.click(screen.getByRole('button', { name: '清零' }));
     expect(slider).toHaveValue('0');
     expect(screen.getByText('加注至 60')).toBeInTheDocument();
