@@ -28,15 +28,16 @@ export function BettingControls({
 }: BettingControlsProps) {
   const minimum = legalActions?.minimumRaiseTo ?? 0;
   const maximum = legalActions?.maximumRaiseTo ?? minimum;
-  const [raiseTo, setRaiseTo] = useState(minimum);
-  const effectiveRaiseTo = Math.min(maximum, Math.max(minimum, raiseTo));
+  const maximumIncrement = Math.max(0, maximum - minimum);
+  const [raiseIncrement, setRaiseIncrement] = useState(0);
+  const effectiveRaiseTo = minimum + Math.min(maximumIncrement, raiseIncrement);
   const locked = disabled || legalActions === null;
   const canRaise = !locked && minimum > 0 && maximum >= minimum;
   const quickChipValues = [1, 2, 5, 10, 20, 50, 100] as const;
 
   useEffect(() => {
-    setRaiseTo((current) => Math.min(maximum, Math.max(minimum, current)));
-  }, [maximum, minimum]);
+    setRaiseIncrement((current) => Math.min(maximumIncrement, Math.max(0, current)));
+  }, [maximumIncrement]);
 
   return (
     <div className="betting-controls" aria-busy={disabled}>
@@ -75,17 +76,17 @@ export function BettingControls({
       </div>
 
       <div className="raise-control">
-        <label htmlFor="raise-to">加注到</label>
+        <label htmlFor="raise-increment">加注增量</label>
         <input
-          id="raise-to"
+          id="raise-increment"
           type="range"
-          min={minimum}
-          max={maximum}
-          value={effectiveRaiseTo}
+          min="0"
+          max={maximumIncrement}
+          value={raiseIncrement}
           disabled={!canRaise}
-          onChange={(event) => setRaiseTo(Number(event.target.value))}
+          onChange={(event) => setRaiseIncrement(Number(event.target.value))}
         />
-        <output htmlFor="raise-to">{effectiveRaiseTo}</output>
+        <output htmlFor="raise-increment">加注至 {effectiveRaiseTo}</output>
         <span className="raise-control__range">
           最小 {minimum} · 最大 {maximum}
         </span>
@@ -103,8 +104,8 @@ export function BettingControls({
               aria-label={`增加 ${value} 筹码`}
               disabled={!canRaise || effectiveRaiseTo >= maximum}
               onClick={() =>
-                setRaiseTo((current) =>
-                  Math.min(maximum, Math.max(minimum, current) + value),
+                setRaiseIncrement((current) =>
+                  Math.min(maximumIncrement, Math.max(0, current) + value),
                 )
               }
             >
@@ -114,6 +115,14 @@ export function BettingControls({
             </button>
           ))}
         </div>
+        <button
+          className="raise-control__clear"
+          type="button"
+          disabled={!canRaise || raiseIncrement === 0}
+          onClick={() => setRaiseIncrement(0)}
+        >
+          清零
+        </button>
         <button
           className="raise-control__confirm"
           type="button"

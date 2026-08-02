@@ -25,8 +25,8 @@ describe('BettingControls', () => {
   it('emits raise-to with an explicit amount inside the server range', () => {
     const onAction = vi.fn();
     render(<BettingControls legalActions={legalActions} onAction={onAction} />);
-    fireEvent.change(screen.getByLabelText('加注到'), {
-      target: { value: '180' },
+    fireEvent.change(screen.getByLabelText('加注增量'), {
+      target: { value: '120' },
     });
     fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
     expect(onAction).toHaveBeenCalledWith({
@@ -57,6 +57,19 @@ describe('BettingControls', () => {
       type: 'game.raise-to',
       amount: 85,
     });
+  });
+
+  it('starts the raise slider at zero increment and can clear the selected chips', () => {
+    const onAction = vi.fn();
+    render(<BettingControls legalActions={legalActions} onAction={onAction} />);
+    const slider = screen.getByLabelText('加注增量');
+    expect(slider).toHaveAttribute('min', '0');
+    expect(slider).toHaveValue('0');
+    fireEvent.click(screen.getByRole('button', { name: '增加 20 筹码' }));
+    expect(slider).toHaveValue('20');
+    fireEvent.click(screen.getByRole('button', { name: '清零' }));
+    expect(slider).toHaveValue('0');
+    expect(screen.getByText('加注至 60')).toBeInTheDocument();
   });
 
   it('locks every action while recovering or when it is not this player turn', () => {
