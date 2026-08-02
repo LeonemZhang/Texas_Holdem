@@ -22,6 +22,8 @@ const snapshot = {
         nickname: 'Alice',
         seatIndex: 0,
         chips: 99,
+        streetCommitted: 1,
+        totalCommitted: 1,
         status: 'active',
         isHost: true,
         lobbyReady: true,
@@ -31,6 +33,8 @@ const snapshot = {
         nickname: 'Bob',
         seatIndex: 1,
         chips: 98,
+        streetCommitted: 2,
+        totalCommitted: 2,
         status: 'active',
         isHost: false,
         lobbyReady: true,
@@ -44,6 +48,7 @@ const snapshot = {
     smallBlindPlayerId: 'p1',
     bigBlindPlayerId: 'p2',
     currentActorId: 'p1',
+    actionDeadlineMs: 30_000,
     communityCards: [],
     pots: [{ amount: 3, eligiblePlayerIds: ['p1', 'p2'] }],
     ownHoleCards: ['As', 'Kd'],
@@ -80,7 +85,11 @@ describe('PlayerSnapshotSchema', () => {
     expect(PlayerSnapshotSchema.parse(snapshot)).toMatchObject({
       playerId: 'p1',
       room: { initialChips: 100 },
-      game: { ownHoleCards: ['As', 'Kd'], legalActions: { callAmount: 1 } },
+      game: {
+        ownHoleCards: ['As', 'Kd'],
+        showdownHoleCards: {},
+        legalActions: { callAmount: 1 },
+      },
     });
   });
 
@@ -94,6 +103,51 @@ describe('PlayerSnapshotSchema', () => {
     expect(serialized).not.toContain('deck');
     expect(serialized).not.toContain('opponentHoleCards');
     expect(serialized).not.toContain('Qc');
+  });
+
+  it('defaults an older snapshot without an action deadline to no countdown', () => {
+    const legacyGame = { ...snapshot.game };
+    delete (legacyGame as { actionDeadlineMs?: number | null })
+      .actionDeadlineMs;
+
+    expect(
+      PlayerSnapshotSchema.parse({ ...snapshot, game: legacyGame }).game
+        ?.actionDeadlineMs,
+    ).toBeNull();
+  });
+
+  it('accepts public contender cards only for a completed showdown', () => {
+    expect(
+      PlayerSnapshotSchema.parse({
+        ...snapshot,
+        room: { ...snapshot.room, phase: 'hand-ready' },
+        game: {
+          ...snapshot.game,
+          street: 'river',
+          showdownHoleCards: { p1: ['As', 'Kd'], p2: ['Qc', 'Qd'] },
+        },
+      }).game?.showdownHoleCards,
+    ).toEqual({ p1: ['As', 'Kd'], p2: ['Qc', 'Qd'] });
+  });
+
+  it('defaults missing public contribution values for an older snapshot', () => {
+    const legacyPlayers = snapshot.room.players.map((player) => {
+      const legacyPlayer = { ...player };
+      delete (legacyPlayer as { streetCommitted?: number }).streetCommitted;
+      delete (legacyPlayer as { totalCommitted?: number }).totalCommitted;
+      return legacyPlayer;
+    });
+
+    expect(
+      PlayerSnapshotSchema.parse({
+        ...snapshot,
+        room: { ...snapshot.room, players: legacyPlayers },
+      }).room.players,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ streetCommitted: 0, totalCommitted: 0 }),
+      ]),
+    );
   });
 
   it('rejects an invalid legal-action amount', () => {

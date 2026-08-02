@@ -13,7 +13,7 @@ import { InMemoryRoomRegistry } from './application/room-registry.js';
 import { projectPlayerSnapshot } from './application/snapshot-projector.js';
 import { InMemoryEventBuffer } from './application/event-buffer.js';
 import { ReconnectSynchronizer } from './application/reconnect-synchronizer.js';
-import { createRoom } from './domain/room.js';
+import { createRoom, freezeRoom } from './domain/room.js';
 import { joinRoom } from './domain/join-room.js';
 import { setLobbyReady } from './domain/lobby-ready.js';
 import { startFirstHand } from './domain/start-first-hand.js';
@@ -249,6 +249,92 @@ describe('host framework server', () => {
         commandId: 'command-1',
       });
       expect(dispatch).toHaveBeenCalledTimes(1);
+    } finally {
+      client.disconnect();
+    }
+  });
+
+  it('pushes the caller a fresh snapshot before acknowledging a version conflict', async () => {
+    const sessions = new InMemorySessionAuthenticator();
+    sessions.register(
+      { roomId: 'room-1', playerId: 'host' },
+      'host-secret-token',
+    );
+    const room = freezeRoom({
+      ...createRoom({
+        roomId: 'room-1',
+        hostPlayerId: 'host',
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 100,
+          blind: { kind: 'preset', smallBlind: 1 },
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      }),
+      version: 1,
+    });
+    activeHost = await createHostServer({
+      sessionAuthenticator: sessions,
+      commandDispatcher: {
+        dispatch: vi.fn(() => ({
+          protocolVersion: PROTOCOL_VERSION,
+          commandId: 'conflict-1',
+          status: 'conflict' as const,
+          expectedVersion: 0,
+          currentVersion: 1,
+          error: { code: 'CONFLICT' as const, message: 'Room state changed' },
+        })),
+      },
+      snapshotProvider: (_roomId, playerId) =>
+        projectPlayerSnapshot({ room, viewerPlayerId: playerId, sequence: 1 }),
+    });
+    const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const client = createSocketClient(address, {
+      autoConnect: false,
+      transports: ['websocket'],
+      auth: {
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: 'room-1',
+        playerId: 'host',
+        token: 'host-secret-token',
+      },
+    });
+
+    try {
+      const initialSnapshot = new Promise<unknown>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.once('state:snapshot', resolve);
+      });
+      client.connect();
+      await initialSnapshot;
+      const refreshedSnapshot = new Promise<unknown>((resolve) =>
+        client.once('state:snapshot', resolve),
+      );
+      const response = await new Promise<unknown>((resolve) => {
+        client.emit(
+          'command:submit',
+          {
+            protocolVersion: PROTOCOL_VERSION,
+            commandId: 'conflict-1',
+            roomId: 'room-1',
+            playerId: 'host',
+            expectedVersion: 0,
+            type: 'room.pause',
+          },
+          resolve,
+        );
+      });
+
+      expect(response).toMatchObject({ status: 'conflict' });
+      await expect(refreshedSnapshot).resolves.toMatchObject({
+        playerId: 'host',
+        stateVersion: 1,
+      });
     } finally {
       client.disconnect();
     }

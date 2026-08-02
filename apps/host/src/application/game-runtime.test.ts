@@ -137,7 +137,7 @@ describe('GameRuntime', () => {
     runtime.dispose();
   });
 
-  it('normalizes readiness and starts automatically when the deadline elapses', async () => {
+  it('marks unanswered players sitting-out when the readiness deadline elapses', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
     const runtime = new GameRuntime();
@@ -150,8 +150,15 @@ describe('GameRuntime', () => {
     expect(
       runtime.snapshot(context.host.roomId, context.host.playerId),
     ).toMatchObject({
-      room: { phase: 'playing', completedHands: 1 },
-      handReady: null,
+      room: { phase: 'hand-ready', completedHands: 1 },
+      handReady: {
+        ownChoice: 'sitting-out',
+      },
+    });
+    expect(
+      runtime.snapshot(context.host.roomId, context.guest.playerId),
+    ).toMatchObject({
+      handReady: { ownChoice: 'sitting-out' },
     });
     expect(automatic).toHaveBeenCalledWith(context.host.roomId);
     runtime.dispose();
@@ -188,6 +195,9 @@ describe('GameRuntime', () => {
       type: 'room.start-first-hand',
       handId: 'timed-hand',
     });
+    expect(runtime.snapshot(host.roomId, host.playerId)?.game).toMatchObject({
+      actionDeadlineMs: 2_000,
+    });
     const automatic = vi.fn();
     runtime.onAutomaticStateChange(automatic);
 
@@ -197,6 +207,57 @@ describe('GameRuntime', () => {
       room: { phase: 'hand-ready', completedHands: 1 },
     });
     expect(automatic).toHaveBeenCalledWith(host.roomId);
+    runtime.dispose();
+  });
+
+  it('checks instead of folding when the timed-out player can check', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const runtime = new GameRuntime();
+    const host = runtime.create(
+      {
+        hostNickname: 'Alice',
+        settings: { ...settings, actionTimeoutSeconds: 1 },
+      },
+      'http://10.126.126.1:32100',
+    );
+    const guest = runtime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      'http://10.126.126.1:32100',
+    );
+    let commandNumber = 0;
+    const send = (playerId: string, command: Record<string, unknown>) =>
+      runtime.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: `check-timeout-${++commandNumber}`,
+        roomId: host.roomId,
+        playerId,
+        expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+        ...command,
+      });
+    send(host.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(guest.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(host.playerId, {
+      type: 'room.start-first-hand',
+      handId: 'check-timeout-hand',
+    });
+    const firstActor = runtime.snapshot(host.roomId, host.playerId)!.game!
+      .currentActorId!;
+    send(firstActor, { type: 'game.call' });
+    const beforeTimeout = runtime.snapshot(host.roomId, host.playerId)!;
+    expect(beforeTimeout.game?.street).toBe('preflop');
+    const timedOutActorId = beforeTimeout.game!.currentActorId!;
+    expect(
+      runtime.snapshot(host.roomId, timedOutActorId)?.game?.legalActions,
+    ).toMatchObject({ canCheck: true });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(runtime.snapshot(host.roomId, host.playerId)?.game).toMatchObject({
+      street: 'flop',
+      actionDeadlineMs: 3_000,
+    });
     runtime.dispose();
   });
 
@@ -225,10 +286,25 @@ describe('GameRuntime', () => {
 
     const recovered = new GameRuntime({ statisticsStore: store });
     recovered.restore(exported, exported.sequence);
-    const after = recovered.snapshot(
-      context.host.roomId,
-      context.host.playerId,
+    const recoveredHost = recovered.createRecoveredHostSession(
+      'http://10.126.126.1:32100',
     );
+    const after = recovered.snapshot(
+      recoveredHost.roomId,
+      recoveredHost.playerId,
+    );
+    expect(recoveredHost.playerId).toBe(context.host.playerId);
+    expect(
+      recovered.sessions.authenticate({
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: recoveredHost.roomId,
+        playerId: recoveredHost.playerId,
+        token: recoveredHost.token,
+      }),
+    ).toEqual({
+      roomId: recoveredHost.roomId,
+      playerId: recoveredHost.playerId,
+    });
     expect(after?.room.completedHands).toBe(1);
     expect(after?.statistics).toEqual(before.statistics);
     recovered.dispose();

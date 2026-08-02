@@ -137,6 +137,20 @@ export class RoomCommandHandler {
       ({ status }) => status === 'pending',
     ).length;
     if (!canBeginNextHand(ready, pendingRequests)) return null;
+    const readyPlayerCount = room.players.filter(
+      ({ playerId, chips, status }) =>
+        ready.players.some(
+          (player) => player.playerId === playerId && player.choice === 'ready',
+        ) &&
+        chips > 0 &&
+        !['left', 'eliminated'].includes(status),
+    ).length;
+    if (readyPlayerCount < 2) {
+      if (!input.deadlineElapsed) return null;
+      const normalizedRoom = incrementVersion(room);
+      this.rooms.save(normalizedRoom);
+      return normalizedRoom;
+    }
     const started = startNextRoomHand(room, ready, requests, {
       handId: input.handId,
       previousButtonIndex: previousHand.positions.button.index,

@@ -260,6 +260,13 @@ export async function createHostServer(
       }
       try {
         const response = options.commandDispatcher.dispatch(rawCommand);
+        if (response.status === 'conflict') {
+          const snapshot = options.snapshotProvider?.(
+            identity.roomId,
+            identity.playerId,
+          );
+          if (snapshot) socket.emit('state:snapshot', snapshot);
+        }
         acknowledge(response);
         if (response.status === 'accepted') {
           publishRoomSnapshots(identity.roomId);

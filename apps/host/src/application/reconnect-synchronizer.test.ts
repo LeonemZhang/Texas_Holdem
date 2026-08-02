@@ -46,6 +46,8 @@ function snapshot(sequence: number): PlayerSnapshot {
           nickname: 'Alice',
           seatIndex: 0,
           chips: 100,
+          streetCommitted: 0,
+          totalCommitted: 0,
           status: 'waiting',
           isHost: true,
           lobbyReady: false,

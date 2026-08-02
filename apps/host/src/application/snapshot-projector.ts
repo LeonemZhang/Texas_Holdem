@@ -3,6 +3,7 @@ import {
   formatCard,
   legalBettingActions,
   type StartedHandState,
+  type ShowdownSettledHand,
 } from '@texas-holdem/poker-core';
 import {
   PlayerSnapshotSchema,
@@ -39,6 +40,7 @@ export interface SnapshotProjectionInput {
   readonly sequence: number;
   readonly completedHands?: number;
   readonly hand?: StartedHandState | null;
+  readonly actionDeadlineMs?: number | null;
   readonly handReady?: HandReadyState | null;
   readonly chipRequests?: ChipRequestBook | null;
   readonly statistics?: readonly SnapshotPlayerStatistics[];
@@ -58,6 +60,28 @@ function publicStatus(
 ): PlayerSnapshot['room']['players'][number]['status'] {
   if (roomPlayer.status !== 'active') return roomPlayer.status;
   return handPlayer(hand, roomPlayer.playerId)?.status ?? roomPlayer.status;
+}
+
+function isShowdownSettledHand(
+  hand: StartedHandState,
+): hand is ShowdownSettledHand {
+  return (
+    'settlement' in hand &&
+    (hand as ShowdownSettledHand).settlement.reason === 'showdown'
+  );
+}
+
+function showdownHoleCards(
+  hand: StartedHandState | null,
+): Readonly<Record<string, readonly string[]>> {
+  if (!hand || !isShowdownSettledHand(hand)) return Object.freeze({});
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(hand.settlement.revealedHoleCards).map(
+        ([playerId, cards]) => [playerId, Object.freeze(cards.map(formatCard))],
+      ),
+    ),
+  );
 }
 
 export function projectPlayerSnapshot(
@@ -109,6 +133,9 @@ export function projectPlayerSnapshot(
         nickname: player.nickname,
         seatIndex: player.seatIndex,
         chips: currentChips(player),
+        streetCommitted:
+          handPlayer(hand, player.playerId)?.streetCommitted ?? 0,
+        totalCommitted: handPlayer(hand, player.playerId)?.totalCommitted ?? 0,
         status: publicStatus(player, hand),
         isHost: player.playerId === input.room.hostPlayerId,
         lobbyReady: player.lobbyReady,
@@ -122,6 +149,7 @@ export function projectPlayerSnapshot(
           smallBlindPlayerId: hand.positions.smallBlind.playerId,
           bigBlindPlayerId: hand.positions.bigBlind.playerId,
           currentActorId: hand.betting.currentActorId,
+          actionDeadlineMs: input.actionDeadlineMs ?? null,
           communityCards: hand.communityCards.map(formatCard),
           pots: buildPots(
             hand.players.map((player) => ({
@@ -136,6 +164,7 @@ export function projectPlayerSnapshot(
           ownHoleCards: currentViewer
             ? currentViewer.holeCards.map(formatCard)
             : null,
+          showdownHoleCards: showdownHoleCards(hand),
           legalActions:
             hand.betting.currentActorId === input.viewerPlayerId
               ? legalBettingActions(hand.betting, input.viewerPlayerId)

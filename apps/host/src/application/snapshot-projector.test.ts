@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCard } from '@texas-holdem/poker-core';
+import { formatCard, type ShowdownSettledHand } from '@texas-holdem/poker-core';
 
 import { createRoom } from '../domain/room.js';
 import { joinRoom } from '../domain/join-room.js';
@@ -38,12 +38,14 @@ describe('projectPlayerSnapshot', () => {
       viewerPlayerId: 'host',
       sequence: 1,
       hand: started.hand,
+      actionDeadlineMs: 30_000,
     });
     const bobSnapshot = projectPlayerSnapshot({
       room: started.room,
       viewerPlayerId: 'bob',
       sequence: 1,
       hand: started.hand,
+      actionDeadlineMs: 30_000,
     });
     const hostCards = started.hand.players
       .find(({ playerId }) => playerId === 'host')!
@@ -54,6 +56,15 @@ describe('projectPlayerSnapshot', () => {
 
     expect(hostSnapshot.game?.ownHoleCards).toEqual(hostCards);
     expect(bobSnapshot.game?.ownHoleCards).toEqual(bobCards);
+    expect(hostSnapshot.game?.actionDeadlineMs).toBe(30_000);
+    expect(hostSnapshot.room.players).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          streetCommitted: expect.any(Number),
+          totalCommitted: expect.any(Number),
+        }),
+      ]),
+    );
     expect(JSON.stringify(hostSnapshot)).not.toContain(bobCards[0]);
     expect(JSON.stringify(hostSnapshot)).not.toContain(bobCards[1]);
     expect(JSON.stringify(bobSnapshot)).not.toContain(hostCards[0]);
@@ -70,15 +81,50 @@ describe('projectPlayerSnapshot', () => {
       viewerPlayerId: actorId,
       sequence: 1,
       hand: started.hand,
+      actionDeadlineMs: 30_000,
     });
     const other = projectPlayerSnapshot({
       room: started.room,
       viewerPlayerId: otherId,
       sequence: 1,
       hand: started.hand,
+      actionDeadlineMs: 30_000,
     });
 
     expect(actor.game?.legalActions).not.toBeNull();
     expect(other.game?.legalActions).toBeNull();
+  });
+
+  it('publishes only settled showdown contender cards to every viewer', () => {
+    const started = startedRoom();
+    const revealedHoleCards = Object.fromEntries(
+      started.hand.players.map((player) => [player.playerId, player.holeCards]),
+    );
+    const settled = {
+      ...started.hand,
+      settlement: { reason: 'showdown', revealedHoleCards },
+    } as unknown as ShowdownSettledHand;
+
+    const hostSnapshot = projectPlayerSnapshot({
+      room: started.room,
+      viewerPlayerId: 'host',
+      sequence: 2,
+      hand: settled,
+    });
+    const bobSnapshot = projectPlayerSnapshot({
+      room: started.room,
+      viewerPlayerId: 'bob',
+      sequence: 2,
+      hand: settled,
+    });
+    const expected = Object.fromEntries(
+      Object.entries(revealedHoleCards).map(([playerId, cards]) => [
+        playerId,
+        cards.map(formatCard),
+      ]),
+    );
+
+    expect(hostSnapshot.game?.showdownHoleCards).toEqual(expected);
+    expect(bobSnapshot.game?.showdownHoleCards).toEqual(expected);
   });
 });

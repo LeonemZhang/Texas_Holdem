@@ -24,6 +24,8 @@ export const PublicPlayerSchema = z.object({
   nickname: z.string().trim().min(1),
   seatIndex: z.number().int().min(0).max(9),
   chips: AmountSchema,
+  streetCommitted: AmountSchema.optional().default(0),
+  totalCommitted: AmountSchema.optional().default(0),
   status: z.enum([
     'waiting',
     'active',
@@ -61,6 +63,14 @@ export const PlayerSnapshotSchema = z.object({
       smallBlindPlayerId: IdSchema,
       bigBlindPlayerId: IdSchema,
       currentActorId: IdSchema.nullable(),
+      actionDeadlineMs: z
+        .number()
+        .int()
+        .nonnegative()
+        .safe()
+        .nullable()
+        .optional()
+        .default(null),
       communityCards: z.array(CardCodeSchema).max(5),
       pots: z.array(
         z.object({
@@ -69,6 +79,10 @@ export const PlayerSnapshotSchema = z.object({
         }),
       ),
       ownHoleCards: z.array(CardCodeSchema).length(2).nullable(),
+      showdownHoleCards: z
+        .record(IdSchema, z.array(CardCodeSchema).length(2))
+        .optional()
+        .default({}),
       legalActions: LegalActionsSchema.nullable(),
     })
     .nullable(),

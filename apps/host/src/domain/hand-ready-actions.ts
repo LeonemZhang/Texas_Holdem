@@ -40,26 +40,19 @@ export function setHandReadyChoice(
 }
 
 export function normalizeHandReadyAtDeadline(
-  room: RoomState,
+  _room: RoomState,
   state: HandReadyState,
   nowMs: number,
 ): HandReadyState {
   if (!Number.isSafeInteger(nowMs) || nowMs < state.deadlineMs) {
     throw new RangeError('Hand-ready deadline has not elapsed');
   }
-  const chips = new Map(
-    room.players.map((player) => [player.playerId, player.chips]),
-  );
   return freezeHandReady({
     ...state,
     players: state.players.map((player) =>
       player.choice !== 'pending'
         ? player
-        : {
-            ...player,
-            choice:
-              (chips.get(player.playerId) ?? 0) > 0 ? 'ready' : 'sitting-out',
-          },
+        : { ...player, choice: 'sitting-out' },
     ),
   });
 }

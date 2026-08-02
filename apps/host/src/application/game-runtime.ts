@@ -79,6 +79,14 @@ export class GameRuntime implements RoomSessionBootstrapService {
   readonly #results = new Map<string, CommandResponse>();
   readonly #handReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #actionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #actionDeadlines = new Map<
+    string,
+    {
+      readonly handId: string;
+      readonly actorId: string;
+      readonly deadlineMs: number;
+    }
+  >();
   readonly #automaticListeners = new Set<(roomId: string) => void>();
   readonly #committedListeners = new Set<(roomId: string) => void>();
   readonly #reconnectTokens = new Map<string, Map<string, string>>();
@@ -181,6 +189,19 @@ export class GameRuntime implements RoomSessionBootstrapService {
     this.scheduleActionTimeout(state.room.roomId);
   }
 
+  createRecoveredHostSession(baseJoinUrl: string): RoomSessionResponse {
+    const roomId = this.currentRoomId();
+    if (!roomId) throw new RangeError('No recovered room is running');
+    const room = this.rooms.get(roomId);
+    if (!room) throw new RangeError('No recovered room is running');
+    const playerId = room.hostPlayerId;
+    const token = this.issueToken();
+    this.sessions.register({ roomId, playerId }, token);
+    this.rememberReconnectToken(roomId, playerId, token);
+    this.#committedListeners.forEach((listener) => listener(roomId));
+    return this.sessionResponse(roomId, playerId, token, baseJoinUrl);
+  }
+
   exportState(roomId: string): GameRuntimeStateExport | null {
     const room = this.rooms.get(roomId);
     if (!room) return null;
@@ -201,6 +222,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     for (const timer of this.#actionTimers.values()) clearTimeout(timer);
     this.#handReadyTimers.clear();
     this.#actionTimers.clear();
+    this.#actionDeadlines.clear();
     this.#automaticListeners.clear();
     this.#committedListeners.clear();
   }
@@ -300,11 +322,20 @@ export class GameRuntime implements RoomSessionBootstrapService {
       roomId,
       initialChips,
     );
+    const hand = this.#roomHandler.getCurrentHand(roomId);
+    const scheduledAction = this.#actionDeadlines.get(roomId);
+    const actionDeadlineMs =
+      hand &&
+      scheduledAction?.handId === hand.handId &&
+      scheduledAction.actorId === hand.betting.currentActorId
+        ? scheduledAction.deadlineMs
+        : null;
     return projectPlayerSnapshot({
       room,
       viewerPlayerId: playerId,
       sequence: this.#sequences.get(roomId) ?? 0,
-      hand: this.#roomHandler.getCurrentHand(roomId),
+      hand,
+      actionDeadlineMs,
       handReady: this.#roomHandler.getHandReady(roomId),
       chipRequests: this.#roomHandler.getChipRequests(roomId),
       completedHands: this.#completedHands.get(roomId) ?? 0,
@@ -459,6 +490,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     const existing = this.#actionTimers.get(roomId);
     if (existing) clearTimeout(existing);
     this.#actionTimers.delete(roomId);
+    this.#actionDeadlines.delete(roomId);
     const room = this.rooms.get(roomId);
     const hand = this.#roomHandler.getCurrentHand(roomId);
     const actorId = hand?.betting.currentActorId;
@@ -467,38 +499,48 @@ export class GameRuntime implements RoomSessionBootstrapService {
       ({ playerId }) => playerId === actorId,
     );
     if (!legal) return;
-    const timer = setTimeout(() => {
-      this.#actionTimers.delete(roomId);
-      const currentRoom = this.rooms.get(roomId);
-      const currentHand = this.#roomHandler.getCurrentHand(roomId);
-      if (
-        !currentRoom ||
-        currentRoom.phase !== 'playing' ||
-        currentHand?.handId !== hand.handId ||
-        currentHand.betting.currentActorId !== actorId
-      ) {
-        return;
-      }
-      const actor = currentHand.betting.players.find(
-        ({ playerId }) => playerId === actorId,
-      );
-      if (!actor) return;
-      const commandType =
-        actor.streetCommitted === currentHand.betting.currentBet
-          ? 'game.check'
-          : 'game.fold';
-      const response = this.dispatch({
-        protocolVersion: PROTOCOL_VERSION,
-        commandId: randomUUID(),
-        roomId,
-        playerId: actorId,
-        expectedVersion: currentRoom.version,
-        type: commandType,
-      });
-      if (response.status === 'accepted') {
-        this.#automaticListeners.forEach((listener) => listener(roomId));
-      }
-    }, room.settings.actionTimeoutSeconds * 1_000);
+    const deadlineMs = Date.now() + room.settings.actionTimeoutSeconds * 1_000;
+    this.#actionDeadlines.set(roomId, {
+      handId: hand.handId,
+      actorId,
+      deadlineMs,
+    });
+    const timer = setTimeout(
+      () => {
+        this.#actionTimers.delete(roomId);
+        this.#actionDeadlines.delete(roomId);
+        const currentRoom = this.rooms.get(roomId);
+        const currentHand = this.#roomHandler.getCurrentHand(roomId);
+        if (
+          !currentRoom ||
+          currentRoom.phase !== 'playing' ||
+          currentHand?.handId !== hand.handId ||
+          currentHand.betting.currentActorId !== actorId
+        ) {
+          return;
+        }
+        const actor = currentHand.betting.players.find(
+          ({ playerId }) => playerId === actorId,
+        );
+        if (!actor) return;
+        const commandType =
+          actor.streetCommitted === currentHand.betting.currentBet
+            ? 'game.check'
+            : 'game.fold';
+        const response = this.dispatch({
+          protocolVersion: PROTOCOL_VERSION,
+          commandId: randomUUID(),
+          roomId,
+          playerId: actorId,
+          expectedVersion: currentRoom.version,
+          type: commandType,
+        });
+        if (response.status === 'accepted') {
+          this.#automaticListeners.forEach((listener) => listener(roomId));
+        }
+      },
+      Math.max(0, deadlineMs - Date.now()),
+    );
     timer.unref?.();
     this.#actionTimers.set(roomId, timer);
   }

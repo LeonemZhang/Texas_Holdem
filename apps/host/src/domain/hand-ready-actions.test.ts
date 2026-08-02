@@ -58,11 +58,11 @@ describe('hand-ready actions', () => {
     );
   });
 
-  it('normalizes timeout to ready with chips and sitting-out without chips', () => {
+  it('normalizes every unanswered player to sitting-out at the deadline', () => {
     const { room, handReady } = phase();
     const normalized = normalizeHandReadyAtDeadline(room, handReady, 31_000);
     expect(normalized.players).toEqual([
-      { playerId: 'host', choice: 'ready' },
+      { playerId: 'host', choice: 'sitting-out' },
       { playerId: 'bob', choice: 'sitting-out' },
     ]);
   });

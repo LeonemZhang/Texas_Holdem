@@ -143,6 +143,8 @@ describe('DeadlineScheduler', () => {
     expect(scheduler.runDue()).toBe(1);
     expect(scheduler.runDue()).toBe(0);
     expect(callback).toHaveBeenCalledTimes(1);
-    expect(ready.players.every(({ choice }) => choice === 'ready')).toBe(true);
+    expect(ready.players.every(({ choice }) => choice === 'sitting-out')).toBe(
+      true,
+    );
   });
 });
