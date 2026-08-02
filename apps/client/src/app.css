@@ -731,6 +731,12 @@ body:has(.poker-table-page) .poker-table-controls {
   color: #fbbf24;
 }
 
+.table-seat__street-bet {
+  color: #fef3c7;
+  font-size: clamp(0.56rem, 1.2vw, 0.68rem);
+  font-variant-numeric: tabular-nums;
+}
+
 .table-seat small {
   color: #a7f3d0;
 }

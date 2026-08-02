@@ -68,4 +68,18 @@ describe('TableSeats', () => {
     );
     expect(screen.getByText('过牌')).toBeInTheDocument();
   });
+
+  it('shows every player’s current-street bet on the table', () => {
+    render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[
+          { ...makePlayers(2)[0]!, streetCommitted: 20 },
+          { ...makePlayers(2)[1]!, streetCommitted: 60 },
+        ]}
+      />,
+    );
+    expect(screen.getByText('本轮下注 20')).toBeInTheDocument();
+    expect(screen.getByText('本轮下注 60')).toBeInTheDocument();
+  });
 });

@@ -15,6 +15,7 @@ export interface TableSeatPlayer {
   readonly nickname: string;
   readonly seatIndex: number;
   readonly chips: number;
+  readonly streetCommitted?: number;
   readonly status: TableSeatStatus;
   readonly isCurrentActor?: boolean;
   readonly isDealer?: boolean;
@@ -115,6 +116,9 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
               </span>
             ) : null}
             <strong>{player.chips.toLocaleString('zh-CN')}</strong>
+            <span className="table-seat__street-bet">
+              本轮下注 {player.streetCommitted?.toLocaleString('zh-CN') ?? 0}
+            </span>
             <small>{statusLabels[player.status]}</small>
           </li>
         );
