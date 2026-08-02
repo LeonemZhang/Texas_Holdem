@@ -88,6 +88,14 @@ export const PlayerSnapshotSchema = z.object({
         .record(IdSchema, z.array(CardCodeSchema).length(2))
         .optional()
         .default({}),
+      settlement: z
+        .object({
+          reason: z.enum(['uncontested', 'showdown']),
+          winnerIds: z.array(IdSchema).min(1),
+          payouts: z.record(IdSchema, AmountSchema),
+        })
+        .nullable()
+        .optional(),
       legalActions: LegalActionsSchema.nullable(),
     })
     .nullable(),

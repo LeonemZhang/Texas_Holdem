@@ -18,6 +18,11 @@ export interface HandReadyOverlayProps {
   readonly requestToReview?: HandReadyRequestView | null;
   readonly onApproveRequest?: (requestId: string) => void;
   readonly onRejectRequest?: (requestId: string) => void;
+  readonly settlement?: {
+    readonly handId: string;
+    readonly reason: 'uncontested' | 'showdown';
+    readonly winners: readonly { readonly nickname: string; readonly payout: number }[];
+  } | null;
 }
 
 function useCurrentTime(fixedNowMs?: number) {
@@ -40,8 +45,12 @@ export function HandReadyOverlay({
   requestToReview = null,
   onApproveRequest,
   onRejectRequest,
+  settlement = null,
 }: HandReadyOverlayProps) {
   const [expanded, setExpanded] = useState(false);
+  const [dismissedSettlementHandId, setDismissedSettlementHandId] = useState<
+    string | null
+  >(null);
   const currentTime = useCurrentTime(nowMs);
   const secondsLeft = Math.max(
     0,
@@ -111,6 +120,30 @@ export function HandReadyOverlay({
                 拒绝
               </button>
             </div>
+          </section>
+        ) : null}
+
+        {settlement && dismissedSettlementHandId !== settlement.handId ? (
+          <section
+            className="hand-ready-card__settlement"
+            role="alertdialog"
+            aria-label="本手结算"
+          >
+            <strong>本手结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}</strong>
+            <ul>
+              {settlement.winners.map(({ nickname, payout }) => (
+                <li key={nickname}>
+                  {nickname} 赢得 {payout.toLocaleString('zh-CN')} 筹码
+                </li>
+              ))}
+            </ul>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => setDismissedSettlementHandId(settlement.handId)}
+            >
+              知道了
+            </button>
           </section>
         ) : null}
 

@@ -85,6 +85,15 @@ function showdownHoleCards(
   );
 }
 
+function settlementSummary(hand: StartedHandState | null): {
+  readonly reason: 'uncontested' | 'showdown';
+  readonly winnerIds: readonly string[];
+  readonly payouts: Readonly<Record<string, number>>;
+} | null {
+  if (!hand || !('settlement' in hand)) return null;
+  return hand.settlement;
+}
+
 function actionOrderByPlayerId(
   hand: StartedHandState | null,
 ): ReadonlyMap<string, number> {
@@ -186,6 +195,7 @@ export function projectPlayerSnapshot(
             ? currentViewer.holeCards.map(formatCard)
             : null,
           showdownHoleCards: showdownHoleCards(hand),
+          settlement: settlementSummary(hand),
           legalActions:
             hand.betting.currentActorId === input.viewerPlayerId
               ? legalBettingActions(hand.betting, input.viewerPlayerId)

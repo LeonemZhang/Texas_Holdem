@@ -94,4 +94,27 @@ describe('HandReadyOverlay', () => {
     expect(onApproveRequest).toHaveBeenCalledWith('request-1');
     expect(onRejectRequest).toHaveBeenCalledWith('request-1');
   });
+
+  it('shows a dismissible settlement summary during hand preparation', () => {
+    render(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        complete={false}
+        onChoose={vi.fn()}
+        settlement={{
+          handId: 'hand-1',
+          reason: 'showdown',
+          winners: [{ nickname: 'Alice', payout: 240 }],
+        }}
+      />,
+    );
+    expect(screen.getByRole('alertdialog', { name: '本手结算' })).toHaveTextContent(
+      'Alice 赢得 240 筹码',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '知道了' }));
+    expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
+  });
 });

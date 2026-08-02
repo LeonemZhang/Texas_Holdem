@@ -1200,6 +1200,20 @@ body:has(.poker-table-page) .poker-table-controls {
   background: rgb(69 26 3 / 92%);
 }
 
+.hand-ready-card__settlement {
+  margin-top: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid rgb(45 212 191 / 55%);
+  border-radius: 0.85rem;
+  color: #ccfbf1;
+  background: rgb(6 78 59 / 94%);
+}
+
+.hand-ready-card__settlement ul {
+  margin: 0.4rem 0;
+  padding-left: 1.1rem;
+}
+
 .hand-ready-card__request-prompt p {
   margin: 0.35rem 0 0;
 }

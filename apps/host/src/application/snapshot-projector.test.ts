@@ -103,7 +103,12 @@ describe('projectPlayerSnapshot', () => {
     );
     const settled = {
       ...started.hand,
-      settlement: { reason: 'showdown', revealedHoleCards },
+      settlement: {
+        reason: 'showdown',
+        winnerIds: ['host'],
+        payouts: { host: 100 },
+        revealedHoleCards,
+      },
     } as unknown as ShowdownSettledHand;
 
     const hostSnapshot = projectPlayerSnapshot({
@@ -127,5 +132,10 @@ describe('projectPlayerSnapshot', () => {
 
     expect(hostSnapshot.game?.showdownHoleCards).toEqual(expected);
     expect(bobSnapshot.game?.showdownHoleCards).toEqual(expected);
+    expect(hostSnapshot.game?.settlement).toEqual({
+      reason: 'showdown',
+      winnerIds: ['host'],
+      payouts: { host: 100 },
+    });
   });
 });

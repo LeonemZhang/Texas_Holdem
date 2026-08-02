@@ -355,6 +355,16 @@ export function GameRoom({
   }
 
   const game = snapshot.game;
+  const settlementView = game?.settlement
+    ? {
+        handId: game.handId,
+        reason: game.settlement.reason,
+        winners: game.settlement.winnerIds.map((playerId) => ({
+          nickname: names.get(playerId) ?? playerId,
+          payout: game.settlement.payouts[playerId] ?? 0,
+        })),
+      }
+    : null;
   const actionActor = game?.currentActorId
     ? snapshot.room.players.find(
         ({ playerId }) => playerId === game.currentActorId,
@@ -471,6 +481,7 @@ export function GameRoom({
               onRejectRequest={(requestId) =>
                 sendChipIntent({ type: 'reject', requestId })
               }
+              settlement={settlementView}
             />
           ) : null
         }
