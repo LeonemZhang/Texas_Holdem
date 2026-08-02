@@ -1,4 +1,6 @@
 import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
+
+import { APP_VERSION } from './app-version.js';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -119,7 +121,7 @@ describe('host framework server', () => {
     expect(response.json()).toEqual({
       status: 'ok',
       protocolVersion: PROTOCOL_VERSION,
-      serverVersion: '0.0.0',
+      serverVersion: APP_VERSION,
       connection: {
         host: '127.0.0.1',
         port: 32100,
@@ -191,7 +193,7 @@ describe('host framework server', () => {
 
       expect(response).toMatchObject({
         protocolVersion: PROTOCOL_VERSION,
-        serverVersion: '0.0.0',
+        serverVersion: APP_VERSION,
       });
     } finally {
       client.disconnect();

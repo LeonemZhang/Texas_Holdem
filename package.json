@@ -1,6 +1,6 @@
 {
   "name": "texas-holdem",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.0.0",
@@ -18,10 +18,13 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck",
+    "version:check": "node scripts/version.mjs --check",
+    "version:sync": "node scripts/version.mjs --sync",
+    "version:set": "node scripts/version.mjs --set",
     "pretest": "pnpm --filter \"./packages/*\" build",
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",
-    "package:win": "pnpm build && pnpm --filter @texas-holdem/desktop package:win",
+    "package:win": "pnpm version:check && pnpm build && pnpm --filter @texas-holdem/desktop package:win",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "devDependencies": {

@@ -1,6 +1,8 @@
 {
   "name": "@texas-holdem/desktop",
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "局域网德州扑克游戏",
+  "author": "LeonemZhang",
   "private": true,
   "type": "commonjs",
   "main": "dist/main/index.js",
@@ -9,7 +11,7 @@
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && esbuild src/preload/index.ts --bundle --platform=node --format=cjs --target=node24 --external:electron --outfile=dist/preload/index.js && esbuild ../host/src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/host/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "package:win": "electron-builder --win dir --x64"
+    "package:win": "electron-builder --win --x64"
   },
   "devDependencies": {
     "cross-env": "10.0.0",
@@ -29,8 +31,9 @@
     "productName": "Texas Holdem",
     "asar": true,
     "directories": {
-      "output": "../../release"
+      "output": "../../release/artifacts"
     },
+    "icon": "build/icon.ico",
     "files": [
       "dist/main/**/*",
       "dist/preload/**/*",
@@ -48,7 +51,26 @@
       }
     ],
     "win": {
-      "target": "dir"
+      "target": [
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "msi": {
+      "oneClick": false,
+      "perMachine": false,
+      "upgradeCode": "{B419EE84-D582-4FA3-9F65-60D45105F7B8}"
     }
   }
 }

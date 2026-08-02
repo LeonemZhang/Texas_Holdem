@@ -35,8 +35,9 @@ import {
   publicRoomChannel,
   SocketPublisher,
 } from './application/socket-publisher.js';
+import { APP_VERSION } from './app-version.js';
 
-export const HOST_SERVER_VERSION = '0.0.0';
+export const HOST_SERVER_VERSION = APP_VERSION;
 
 export interface CreateHostServerOptions {
   staticDirectory?: string;
