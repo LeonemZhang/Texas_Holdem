@@ -105,10 +105,17 @@ describe('E2E04 hand readiness and chip requests', () => {
 
   it('revokes unresolved requests at the deadline and seats the zero-chip player out', () => {
     const phase = createHandReadyTable();
-    let requests = createChipRequest(
+    let ready = setHandReadyChoice(
       phase.room,
       phase.handReady,
-      createChipRequestBook(phase.handReady),
+      'host',
+      'ready',
+    );
+    ready = setHandReadyChoice(phase.room, ready, 'carol', 'ready');
+    let requests = createChipRequest(
+      phase.room,
+      ready,
+      createChipRequestBook(ready),
       {
         requestId: 'request-1',
         requesterId: 'bob',
@@ -117,14 +124,14 @@ describe('E2E04 hand readiness and chip requests', () => {
       },
     );
 
-    const ready = normalizeHandReadyAtDeadline(
+    const deadlineReady = normalizeHandReadyAtDeadline(
       phase.room,
-      phase.handReady,
+      ready,
       30_000,
     );
-    expect(canBeginNextHand(ready, 1)).toBe(false);
+    expect(canBeginNextHand(deadlineReady, 1)).toBe(false);
     requests = revokePendingChipRequests(requests);
-    const started = startNextRoomHand(phase.room, ready, requests, {
+    const started = startNextRoomHand(phase.room, deadlineReady, requests, {
       handId: 'hand-2',
       previousButtonIndex: 0,
       smallBlind: 1,
