@@ -4,7 +4,9 @@ import { networkErrorMessage } from './error-message.js';
 
 describe('networkErrorMessage', () => {
   it('replaces raw transport errors with a retryable Chinese message', () => {
-    expect(networkErrorMessage('Socket is not connected')).toBe('网络异常，请重试');
+    expect(networkErrorMessage('Socket is not connected')).toBe(
+      '网络异常，请重试',
+    );
   });
 
   it('preserves a Chinese domain message', () => {

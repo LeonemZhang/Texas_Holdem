@@ -47,7 +47,7 @@ describe('LobbyWaitingRoom', () => {
       <LobbyWaitingRoom
         roomName="朋友局"
         currentPlayerId="host"
-        players={[{ ...players(false)[0]!, ready: true }, players(false)[1]! ]}
+        players={[{ ...players(false)[0]!, ready: true }, players(false)[1]!]}
         onSetReady={vi.fn()}
         onStartFirstHand={onStartFirstHand}
       />,

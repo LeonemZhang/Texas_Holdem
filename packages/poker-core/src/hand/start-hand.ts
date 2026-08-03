@@ -27,13 +27,7 @@ export interface HandPlayerState {
   readonly status: 'active' | 'folded' | 'all-in';
   /** The player's most recent completed action on the current street. */
   readonly lastAction?:
-    | 'fold'
-    | 'check'
-    | 'call'
-    | 'raiseTo'
-    | 'allIn'
-    | null
-    | undefined;
+    'fold' | 'check' | 'call' | 'raiseTo' | 'allIn' | null | undefined;
   readonly holeCards: readonly [Card, Card];
 }
 

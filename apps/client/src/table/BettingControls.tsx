@@ -36,7 +36,9 @@ export function BettingControls({
   const quickChipValues = [1, 2, 5, 10, 20, 50, 100] as const;
 
   useEffect(() => {
-    setRaiseIncrement((current) => Math.min(maximumIncrement, Math.max(0, current)));
+    setRaiseIncrement((current) =>
+      Math.min(maximumIncrement, Math.max(0, current)),
+    );
   }, [maximumIncrement]);
 
   return (

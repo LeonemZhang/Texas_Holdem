@@ -50,9 +50,9 @@ describe('lobby readiness', () => {
 
   it('keeps the host ready without a manual readiness action', () => {
     const room = twoPlayerRoom();
-    expect(room.players.find(({ playerId }) => playerId === 'host')?.lobbyReady).toBe(
-      true,
-    );
+    expect(
+      room.players.find(({ playerId }) => playerId === 'host')?.lobbyReady,
+    ).toBe(true);
     expect(() => setLobbyReady(room, 'host', false)).toThrow(
       'Host remains ready',
     );

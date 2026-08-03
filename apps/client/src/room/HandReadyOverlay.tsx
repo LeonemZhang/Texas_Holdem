@@ -21,7 +21,10 @@ export interface HandReadyOverlayProps {
   readonly settlement?: {
     readonly handId: string;
     readonly reason: 'uncontested' | 'showdown';
-    readonly winners: readonly { readonly nickname: string; readonly payout: number }[];
+    readonly winners: readonly {
+      readonly nickname: string;
+      readonly payout: number;
+    }[];
   } | null;
 }
 
@@ -64,10 +67,15 @@ export function HandReadyOverlay({
       <div className="hand-ready-card">
         <header>
           <div>
-            <h2 id="hand-ready-title" className={expanded ? undefined : 'sr-only'}>
+            <h2
+              id="hand-ready-title"
+              className={expanded ? undefined : 'sr-only'}
+            >
               下一手准备
             </h2>
-            {expanded ? <p className="connection-home__kicker">发牌前准备</p> : null}
+            {expanded ? (
+              <p className="connection-home__kicker">发牌前准备</p>
+            ) : null}
           </div>
           <strong
             className="hand-ready-card__timer"
@@ -129,7 +137,9 @@ export function HandReadyOverlay({
             role="alertdialog"
             aria-label="本手结算"
           >
-            <strong>本手结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}</strong>
+            <strong>
+              本手结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
+            </strong>
             <ul>
               {settlement.winners.map(({ nickname, payout }) => (
                 <li key={nickname}>
@@ -161,25 +171,29 @@ export function HandReadyOverlay({
           </div>
         ) : null}
 
-        {expanded ? <p className="hand-ready-card__choice">
-          当前选择：
-          <strong>
-            {ownChoice === 'pending'
-              ? '尚未选择'
-              : ownChoice === 'ready'
-                ? '已就绪'
-                : '下一手暂不参与'}
-          </strong>
-        </p> : null}
-        {expanded ? <div className="hand-ready-card__actions">
-          <button
-            className="button button--secondary"
-            type="button"
-            onClick={() => onChoose('sitting-out')}
-          >
-            下一手暂不参与
-          </button>
-        </div> : null}
+        {expanded ? (
+          <p className="hand-ready-card__choice">
+            当前选择：
+            <strong>
+              {ownChoice === 'pending'
+                ? '尚未选择'
+                : ownChoice === 'ready'
+                  ? '已就绪'
+                  : '下一手暂不参与'}
+            </strong>
+          </p>
+        ) : null}
+        {expanded ? (
+          <div className="hand-ready-card__actions">
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => onChoose('sitting-out')}
+            >
+              下一手暂不参与
+            </button>
+          </div>
+        ) : null}
       </div>
     </section>
   );

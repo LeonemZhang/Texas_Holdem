@@ -23,13 +23,7 @@ export interface TableSeatPlayer {
   readonly isSmallBlind?: boolean;
   readonly isBigBlind?: boolean;
   readonly lastAction?:
-    | 'fold'
-    | 'check'
-    | 'call'
-    | 'raiseTo'
-    | 'allIn'
-    | null
-    | undefined;
+    'fold' | 'check' | 'call' | 'raiseTo' | 'allIn' | null | undefined;
 }
 
 export interface TableSeatsProps {

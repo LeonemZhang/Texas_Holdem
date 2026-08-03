@@ -63,7 +63,10 @@ describe('TableSeats', () => {
     render(
       <TableSeats
         ownPlayerId="p0"
-        players={[{ ...makePlayers(2)[0]!, lastAction: 'check' }, makePlayers(2)[1]!]}
+        players={[
+          { ...makePlayers(2)[0]!, lastAction: 'check' },
+          makePlayers(2)[1]!,
+        ]}
       />,
     );
     expect(screen.getByText('过牌')).toBeInTheDocument();

@@ -92,7 +92,9 @@ export function GameRoom({
       setSnapshot(next);
       setError(null);
     });
-    const stopLost = connection.onConnectionLost(() => setError('网络异常，请重试'));
+    const stopLost = connection.onConnectionLost(() =>
+      setError('网络异常，请重试'),
+    );
     const stopEvent = connection.onDomainEvent(() => undefined);
     void connection
       .connect({
@@ -102,7 +104,9 @@ export function GameRoom({
         token: session.token,
       })
       .catch((reason: unknown) =>
-        setError(networkErrorMessage(reason instanceof Error ? reason.message : null)),
+        setError(
+          networkErrorMessage(reason instanceof Error ? reason.message : null),
+        ),
       );
     return () => {
       stopSnapshot();
@@ -146,7 +150,9 @@ export function GameRoom({
         }
         return true;
       } catch (reason) {
-        setError(networkErrorMessage(reason instanceof Error ? reason.message : null));
+        setError(
+          networkErrorMessage(reason instanceof Error ? reason.message : null),
+        );
         return false;
       } finally {
         setSending(false);
@@ -232,8 +238,7 @@ export function GameRoom({
     ? {
         requestId: incomingChipRequest.requestId,
         requesterId: incomingChipRequest.requesterId,
-        requesterName:
-          names.get(incomingChipRequest.requesterId) ?? '玩家',
+        requesterName: names.get(incomingChipRequest.requesterId) ?? '玩家',
         targetPlayerId: incomingChipRequest.targetPlayerId,
         amount: incomingChipRequest.amount,
       }

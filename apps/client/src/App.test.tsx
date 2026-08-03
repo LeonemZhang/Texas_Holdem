@@ -89,7 +89,9 @@ describe('application shell', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: '加入房间' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: '加入房间' }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('玩家昵称')).toBeInTheDocument();
   });
 });

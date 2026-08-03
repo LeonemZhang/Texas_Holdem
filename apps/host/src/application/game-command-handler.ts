@@ -98,9 +98,7 @@ export class GameCommandHandler {
     return { stateVersion: nextRoom.version, sequence: 0 };
   }
 
-  resolveAutomatic(
-    room: RoomState,
-  ): CommandHandlerResult | null {
+  resolveAutomatic(room: RoomState): CommandHandlerResult | null {
     if (room.phase !== 'playing') return null;
     const hand = this.runtime.getCurrentHand(room.roomId);
     if (

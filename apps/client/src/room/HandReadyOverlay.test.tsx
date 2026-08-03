@@ -86,9 +86,9 @@ describe('HandReadyOverlay', () => {
         onRejectRequest={onRejectRequest}
       />,
     );
-    expect(screen.getByRole('alertdialog', { name: '筹码请求' })).toHaveTextContent(
-      'Bob 请求 200 筹码',
-    );
+    expect(
+      screen.getByRole('alertdialog', { name: '筹码请求' }),
+    ).toHaveTextContent('Bob 请求 200 筹码');
     fireEvent.click(screen.getByRole('button', { name: '同意' }));
     fireEvent.click(screen.getByRole('button', { name: '拒绝' }));
     expect(onApproveRequest).toHaveBeenCalledWith('request-1');
@@ -111,9 +111,9 @@ describe('HandReadyOverlay', () => {
         }}
       />,
     );
-    expect(screen.getByRole('alertdialog', { name: '本手结算' })).toHaveTextContent(
-      'Alice 赢得 240 筹码',
-    );
+    expect(
+      screen.getByRole('alertdialog', { name: '本手结算' }),
+    ).toHaveTextContent('Alice 赢得 240 筹码');
     fireEvent.click(screen.getByRole('button', { name: '知道了' }));
     expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
   });

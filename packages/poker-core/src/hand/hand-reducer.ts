@@ -23,7 +23,8 @@ export function applyHandAction(
       streetCommitted: bettingPlayer.streetCommitted,
       totalCommitted: bettingPlayer.totalCommitted,
       status: bettingPlayer.status,
-      lastAction: player.playerId === playerId ? action.type : player.lastAction,
+      lastAction:
+        player.playerId === playerId ? action.type : player.lastAction,
     });
   });
   return Object.freeze({

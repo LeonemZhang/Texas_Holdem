@@ -177,7 +177,9 @@ export function App() {
       }
       setJoinTarget({ baseUrl: url.origin, roomId });
     } catch (reason) {
-      setJoinError(networkErrorMessage(reason instanceof Error ? reason.message : null));
+      setJoinError(
+        networkErrorMessage(reason instanceof Error ? reason.message : null),
+      );
     }
   };
 
