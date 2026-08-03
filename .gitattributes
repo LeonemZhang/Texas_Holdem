@@ -1,0 +1,2 @@
+# Keep text files identical across Windows development and Linux CI.
+* text=auto eol=lf
