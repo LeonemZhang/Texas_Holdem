@@ -5,9 +5,9 @@ export interface PokerTableLayoutProps {
   readonly handLabel: string;
   readonly seats: ReactNode;
   readonly communityCards: ReactNode;
-  readonly pots: ReactNode;
   readonly actionTimer?: ReactNode;
   readonly tableOverlay?: ReactNode;
+  readonly chipFlights?: ReactNode;
   readonly controls?: ReactNode;
   readonly status?: ReactNode;
 }
@@ -17,9 +17,9 @@ export function PokerTableLayout({
   handLabel,
   seats,
   communityCards,
-  pots,
   actionTimer,
   tableOverlay,
+  chipFlights,
   controls,
   status,
 }: PokerTableLayoutProps) {
@@ -44,13 +44,11 @@ export function PokerTableLayout({
           <div className="poker-table__cards" aria-label="公共牌">
             {communityCards}
           </div>
-          <div className="poker-table__pots" aria-label="底池">
-            {pots}
-          </div>
         </div>
         {tableOverlay ? (
           <div className="poker-table__overlay">{tableOverlay}</div>
         ) : null}
+        {chipFlights}
       </section>
 
       {controls ? (

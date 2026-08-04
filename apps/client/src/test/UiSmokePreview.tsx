@@ -79,9 +79,11 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
             <CardsAndPots
               ownHoleCards={['Ah', 'Ks']}
               communityCards={['2c', 'Td', 'Jh']}
-              pots={[
-                { amount: 420, eligiblePlayerIds: ['alice', 'bob', 'carol'] },
-                { amount: 160, eligiblePlayerIds: ['alice', 'bob'] },
+              totalPot={580}
+              currentStreet="flop"
+              streetPots={[
+                { street: 'preflop', amount: 420 },
+                { street: 'flop', amount: 160 },
               ]}
             />
           }

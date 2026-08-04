@@ -1,12 +1,14 @@
-export interface PotView {
+export interface StreetPotView {
+  readonly street: 'preflop' | 'flop' | 'turn' | 'river';
   readonly amount: number;
-  readonly eligiblePlayerIds: readonly string[];
 }
 
 export interface CardsAndPotsProps {
-  readonly ownHoleCards: readonly string[] | null;
   readonly communityCards: readonly string[];
-  readonly pots: readonly PotView[];
+  readonly totalPot: number;
+  readonly streetPots: readonly StreetPotView[];
+  readonly currentStreet?: StreetPotView['street'] | 'settled' | undefined;
+  readonly ownHoleCards?: readonly string[] | null;
   readonly showdownHands?: readonly {
     readonly playerId: string;
     readonly nickname: string;
@@ -21,7 +23,14 @@ const suitSymbols: Record<string, string> = {
   s: '♠',
 };
 
-function PlayingCard({
+const streetLabels: Record<StreetPotView['street'], string> = {
+  preflop: '翻牌前',
+  flop: '翻牌',
+  turn: '转牌',
+  river: '河牌',
+};
+
+export function PlayingCard({
   code,
   label,
 }: {
@@ -52,12 +61,13 @@ function PlayingCard({
 }
 
 export function CardsAndPots({
-  ownHoleCards,
   communityCards,
-  pots,
+  totalPot,
+  streetPots,
+  currentStreet,
+  ownHoleCards = null,
   showdownHands = [],
 }: CardsAndPotsProps) {
-  let sidePotIndex = 0;
   return (
     <div className="cards-and-pots">
       <div className="community-cards" aria-label="公共牌牌面">
@@ -70,33 +80,36 @@ export function CardsAndPots({
         ))}
       </div>
 
-      <dl className="pot-list" aria-label="底池列表">
-        {pots.map((pot, index) => {
-          const label =
-            index === 0
-              ? '主池'
-              : pot.eligiblePlayerIds.length < 2
-                ? '待匹配'
-                : `边池 ${++sidePotIndex}`;
-          return (
-            <div className="pot-chip" key={`${index}-${pot.amount}`}>
-              <dt>{label}</dt>
-              <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
-            </div>
-          );
-        })}
+      <dl className="street-pot-history" aria-label="本手底池">
+        <div className="street-pot-history__total" data-pot-target>
+          <dt>总池</dt>
+          <dd>{totalPot.toLocaleString('zh-CN')}</dd>
+        </div>
+        {streetPots.map((pot) => (
+          <div
+            className={
+              pot.street === currentStreet
+                ? 'street-pot-history__street street-pot-history__street--current'
+                : 'street-pot-history__street'
+            }
+            key={pot.street}
+          >
+            <dt>{streetLabels[pot.street]}</dt>
+            <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
+          </div>
+        ))}
       </dl>
 
       {showdownHands.length > 0 ? (
-        <ul className="showdown-hands" aria-label="摊牌底牌">
+        <ul className="showdown-hands" aria-label="摊牌玩家手牌">
           {showdownHands.map((hand) => (
             <li key={hand.playerId}>
               <strong>{hand.nickname}</strong>
-              <div aria-label={`${hand.nickname} 的摊牌底牌`}>
+              <div aria-label={`${hand.nickname} 的底牌`}>
                 {hand.cards.map((card, index) => (
                   <PlayingCard
                     code={card}
-                    key={card}
+                    key={`${card}-${index}`}
                     label={`${hand.nickname} 的第 ${index + 1} 张底牌`}
                   />
                 ))}
@@ -106,8 +119,14 @@ export function CardsAndPots({
         </ul>
       ) : (
         <div className="hole-cards" aria-label="我的底牌">
-          <PlayingCard code={ownHoleCards?.[0] ?? null} label="第一张底牌" />
-          <PlayingCard code={ownHoleCards?.[1] ?? null} label="第二张底牌" />
+          <PlayingCard
+            code={ownHoleCards?.[0] ?? null}
+            label="我的第一张底牌"
+          />
+          <PlayingCard
+            code={ownHoleCards?.[1] ?? null}
+            label="我的第二张底牌"
+          />
         </div>
       )}
     </div>

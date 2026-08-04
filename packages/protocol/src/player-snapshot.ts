@@ -9,6 +9,10 @@ import {
 } from './primitives.js';
 
 const CardCodeSchema = z.string().regex(/^[2-9TJQKA][cdhs]$/);
+const StreetPotSchema = z.object({
+  street: z.enum(['preflop', 'flop', 'turn', 'river']),
+  amount: AmountSchema,
+});
 
 export const LegalActionsSchema = z.object({
   canFold: z.boolean(),
@@ -77,12 +81,8 @@ export const PlayerSnapshotSchema = z.object({
         .optional()
         .default(null),
       communityCards: z.array(CardCodeSchema).max(5),
-      pots: z.array(
-        z.object({
-          amount: AmountSchema,
-          eligiblePlayerIds: z.array(IdSchema),
-        }),
-      ),
+      totalPot: AmountSchema.optional().default(0),
+      streetPots: z.array(StreetPotSchema).max(4).optional().default([]),
       ownHoleCards: z.array(CardCodeSchema).length(2).nullable(),
       showdownHoleCards: z
         .record(IdSchema, z.array(CardCodeSchema).length(2))

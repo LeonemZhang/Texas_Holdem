@@ -50,7 +50,8 @@ const snapshot = {
     currentActorId: 'p1',
     actionDeadlineMs: 30_000,
     communityCards: [],
-    pots: [{ amount: 3, eligiblePlayerIds: ['p1', 'p2'] }],
+    totalPot: 3,
+    streetPots: [{ street: 'preflop', amount: 3 }],
     ownHoleCards: ['As', 'Kd'],
     legalActions: {
       canFold: true,
@@ -62,6 +63,7 @@ const snapshot = {
     },
   },
   handReady: null,
+  chipRequests: [],
   statistics: {
     players: [
       {
@@ -87,6 +89,8 @@ describe('PlayerSnapshotSchema', () => {
       room: { initialChips: 100 },
       game: {
         ownHoleCards: ['As', 'Kd'],
+        totalPot: 3,
+        streetPots: [{ street: 'preflop', amount: 3 }],
         showdownHoleCards: {},
         legalActions: { callAmount: 1 },
       },

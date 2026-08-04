@@ -35,9 +35,18 @@ describe('turn and river progression', () => {
     expect(hand.street).toBe('turn');
     expect(hand.communityCards).toHaveLength(4);
     expect(hand.betting.currentActorId).toBe('b');
+    expect(hand.completedStreetPots).toEqual([
+      { street: 'preflop', amount: 4 },
+      { street: 'flop', amount: 0 },
+    ]);
     hand = advanceAfterCompletedBetting(checkedStreet(hand));
     expect(hand.street).toBe('river');
     expect(hand.communityCards).toHaveLength(5);
+    expect(hand.completedStreetPots).toEqual([
+      { street: 'preflop', amount: 4 },
+      { street: 'flop', amount: 0 },
+      { street: 'turn', amount: 0 },
+    ]);
   });
 
   it('automatically runs all community cards when nobody can act', () => {

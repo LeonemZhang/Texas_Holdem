@@ -10,7 +10,7 @@ import {
 import { PlayerSnapshotSchema } from '../packages/protocol/src/index.js';
 
 describe('LUNA-E2E03 all-ins, side pots, ties, and odd chips', () => {
-  it('keeps every pot conserved and sends the exact server pots through the UI snapshot contract', () => {
+  it('keeps every side pot conserved while sending only total and street history to the UI', () => {
     const pots = buildPots([
       { playerId: 'alice', amount: 5, folded: false },
       { playerId: 'bob', amount: 10, folded: false },
@@ -46,11 +46,6 @@ describe('LUNA-E2E03 all-ins, side pots, ties, and odd chips', () => {
         0,
       ),
     ).toBe(25);
-    const publicPots = pots.map(({ amount, eligiblePlayerIds }) => ({
-      amount,
-      eligiblePlayerIds,
-    }));
-
     const snapshot = PlayerSnapshotSchema.parse({
       protocolVersion: '1',
       roomId: 'room-1',
@@ -82,13 +77,17 @@ describe('LUNA-E2E03 all-ins, side pots, ties, and odd chips', () => {
         bigBlindPlayerId: 'bob',
         currentActorId: null,
         communityCards: ['2c', '3d', '4h', '5s', '6c'],
-        pots: publicPots,
+        totalPot: 25,
+        streetPots: [{ street: 'river', amount: 25 }],
         ownHoleCards: ['Ah', 'Ks'],
         legalActions: null,
       },
       handReady: null,
       statistics: { players: [], titles: [] },
     });
-    expect(snapshot.game?.pots).toEqual(publicPots);
+    expect(snapshot.game?.totalPot).toBe(25);
+    expect(snapshot.game?.streetPots).toEqual([
+      { street: 'river', amount: 25 },
+    ]);
   });
 });

@@ -4,54 +4,69 @@ import { describe, expect, it } from 'vitest';
 import { CardsAndPots } from './CardsAndPots.js';
 
 describe('CardsAndPots', () => {
-  it('shows own cards and fills unrevealed community cards with backs', () => {
+  it('fills unrevealed community cards with backs', () => {
     render(
       <CardsAndPots
-        ownHoleCards={['Ah', 'Ks']}
         communityCards={['2c', 'Td', 'Jh']}
-        pots={[{ amount: 120, eligiblePlayerIds: ['a', 'b'] }]}
+        totalPot={120}
+        streetPots={[{ street: 'flop', amount: 120 }]}
       />,
     );
-    expect(screen.getByLabelText('第一张底牌 A♥')).toBeInTheDocument();
-    expect(screen.getByLabelText('第二张底牌 K♠')).toBeInTheDocument();
     expect(screen.getByLabelText('第 2 张公共牌 10♦')).toBeInTheDocument();
     expect(screen.getByLabelText('第 4 张公共牌，未公开')).toBeInTheDocument();
     expect(screen.getByLabelText('第 5 张公共牌，未公开')).toBeInTheDocument();
   });
 
-  it('keeps each server-provided side pot identifiable without deriving a winner', () => {
+  it('shows total pot and started streets without exposing pot tiers', () => {
     render(
       <CardsAndPots
-        ownHoleCards={null}
         communityCards={[]}
-        pots={[
-          { amount: 300, eligiblePlayerIds: ['a', 'b', 'c'] },
-          { amount: 160, eligiblePlayerIds: ['a', 'b'] },
-          { amount: 40, eligiblePlayerIds: ['a'] },
+        totalPot={460}
+        currentStreet="flop"
+        streetPots={[
+          { street: 'preflop', amount: 300 },
+          { street: 'flop', amount: 160 },
         ]}
       />,
     );
-    expect(screen.getByText('主池')).toBeInTheDocument();
-    expect(screen.getByText('边池 1')).toBeInTheDocument();
-    expect(screen.getByText('待匹配')).toBeInTheDocument();
-    expect(screen.queryByText(/赢家/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('本手底池')).toHaveTextContent('总池460');
+    expect(screen.getByLabelText('本手底池')).toHaveTextContent('翻牌前300');
+    expect(screen.getByLabelText('本手底池')).toHaveTextContent('翻牌160');
+    expect(screen.queryByText('主池')).not.toBeInTheDocument();
+    expect(screen.queryByText('边池 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('待匹配')).not.toBeInTheDocument();
     expect(screen.getAllByLabelText(/未公开/)).toHaveLength(7);
   });
 
-  it('puts server-authorized showdown cards on the table instead of player seats', () => {
+  it('keeps own hole cards visible in the table center before showdown', () => {
     render(
       <CardsAndPots
-        ownHoleCards={['Ah', 'Ks']}
         communityCards={['2c', 'Td', 'Jh', 'Qs', 'Ac']}
-        pots={[{ amount: 120, eligiblePlayerIds: ['a', 'b'] }]}
+        totalPot={120}
+        streetPots={[{ street: 'river', amount: 120 }]}
+        ownHoleCards={['Ah', 'Ks']}
+      />,
+    );
+    expect(screen.getByLabelText('公共牌牌面')).toBeInTheDocument();
+    expect(screen.getByLabelText('本手底池')).toBeInTheDocument();
+    expect(screen.getByLabelText('我的底牌')).toBeInTheDocument();
+    expect(screen.getByLabelText('我的第一张底牌 A♥')).toBeInTheDocument();
+  });
+
+  it('replaces the central hand with service-authorized showdown hands', () => {
+    render(
+      <CardsAndPots
+        communityCards={[]}
+        totalPot={0}
+        streetPots={[]}
+        ownHoleCards={['Ah', 'Ks']}
         showdownHands={[
-          { playerId: 'a', nickname: 'Alice', cards: ['Ah', 'Ks'] },
-          { playerId: 'b', nickname: 'Bob', cards: ['Qc', 'Qd'] },
+          { playerId: 'alice', nickname: 'Alice', cards: ['Ah', 'Ks'] },
         ]}
       />,
     );
-    expect(screen.getByLabelText('摊牌底牌')).toBeInTheDocument();
-    expect(screen.getByLabelText('Alice 的摊牌底牌')).toBeInTheDocument();
+    expect(screen.getByLabelText('摊牌玩家手牌')).toBeInTheDocument();
+    expect(screen.getByLabelText('Alice 的第 1 张底牌 A♥')).toBeInTheDocument();
     expect(screen.queryByLabelText('我的底牌')).not.toBeInTheDocument();
   });
 });

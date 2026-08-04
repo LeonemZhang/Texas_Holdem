@@ -104,7 +104,16 @@ export class RoomCommandHandler {
     readonly chipRequests: ChipRequestBook | null;
   }): void {
     this.rooms.save(input.room);
-    if (input.hand) this.#hands.set(input.room.roomId, input.hand);
+    if (input.hand) {
+      // Runtime snapshots from before street-pot history are still valid hands.
+      const hand = input.hand.completedStreetPots
+        ? input.hand
+        : Object.freeze({
+            ...input.hand,
+            completedStreetPots: Object.freeze([]),
+          });
+      this.#hands.set(input.room.roomId, hand);
+    }
     if (input.handReady)
       this.#handReady.set(input.room.roomId, input.handReady);
     if (input.chipRequests) {

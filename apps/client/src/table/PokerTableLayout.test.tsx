@@ -11,7 +11,6 @@ describe('PokerTableLayout', () => {
         handLabel="第 8 手 · 翻牌前 · 当前行动：Alice"
         seats={<span>Alice 的座位</span>}
         communityCards={<span>翻牌</span>}
-        pots={<span>主池 120</span>}
         actionTimer={<span>轮到 Alice · 18s</span>}
         controls={<button>过牌</button>}
         status={<span>轮到 Alice</span>}
@@ -28,9 +27,6 @@ describe('PokerTableLayout', () => {
     expect(
       within(screen.getByLabelText('公共牌')).getByText('翻牌'),
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByLabelText('底池')).getByText('主池 120'),
-    ).toBeInTheDocument();
     expect(screen.getByText('轮到 Alice · 18s')).toBeInTheDocument();
     expect(
       within(screen.getByLabelText('行动操作区')).getByRole('button', {
@@ -46,7 +42,6 @@ describe('PokerTableLayout', () => {
         handLabel="等待中"
         seats={null}
         communityCards={null}
-        pots={null}
         controls={null}
       />,
     );

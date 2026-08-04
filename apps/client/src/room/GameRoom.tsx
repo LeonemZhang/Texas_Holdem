@@ -437,18 +437,15 @@ export function GameRoom({
           />
         }
         communityCards={
-          <CardsAndPots
-            ownHoleCards={game?.ownHoleCards ?? null}
-            communityCards={game?.communityCards ?? []}
-            pots={game?.pots ?? []}
-            showdownHands={Object.entries(game?.showdownHoleCards ?? {}).map(
-              ([playerId, cards]) => ({
-                playerId,
-                nickname: names.get(playerId) ?? playerId,
-                cards,
-              }),
-            )}
-          />
+          gameSettlement ? null : (
+            <CardsAndPots
+              communityCards={game?.communityCards ?? []}
+              totalPot={game?.totalPot ?? 0}
+              streetPots={game?.streetPots ?? []}
+              currentStreet={game?.street}
+              ownHoleCards={game?.ownHoleCards ?? null}
+            />
+          )
         }
         pots={null}
         actionTimer={

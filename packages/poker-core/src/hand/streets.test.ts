@@ -38,6 +38,9 @@ describe('advanceToFlop', () => {
     expect(flop.players.map(({ totalCommitted }) => totalCommitted)).toEqual([
       2, 2,
     ]);
+    expect(flop.completedStreetPots).toEqual([
+      { street: 'preflop', amount: 4 },
+    ]);
   });
 
   it('refuses to deal before the preflop betting round completes', () => {

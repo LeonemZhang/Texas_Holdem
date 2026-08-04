@@ -174,6 +174,25 @@ export function projectPlayerSnapshot(
         chips: currentChips(player),
         streetCommitted:
           handPlayer(hand, player.playerId)?.streetCommitted ?? 0,
+function streetPotHistory(hand: StartedHandState) {
+  const completed = hand.completedStreetPots ?? [];
+  const currentStreetAmount = hand.players.reduce(
+    (total, player) => total + player.streetCommitted,
+    0,
+  );
+  return [
+    ...completed.filter(({ street }) => street !== hand.street),
+    { street: hand.street, amount: currentStreetAmount },
+  ];
+}
+
+function totalPotAmount(hand: StartedHandState): number {
+  return hand.players.reduce(
+    (total, player) => total + player.totalCommitted,
+    0,
+  );
+}
+
         totalCommitted: handPlayer(hand, player.playerId)?.totalCommitted ?? 0,
         actionOrder: actionOrder.get(player.playerId) ?? null,
         lastAction: handPlayer(hand, player.playerId)?.lastAction ?? null,
@@ -192,16 +211,8 @@ export function projectPlayerSnapshot(
           currentActorId: hand.betting.currentActorId,
           actionDeadlineMs: input.actionDeadlineMs ?? null,
           communityCards: hand.communityCards.map(formatCard),
-          pots: buildPots(
-            hand.players.map((player) => ({
-              playerId: player.playerId,
-              amount: player.totalCommitted,
-              folded: player.status === 'folded',
-            })),
-          ).map(({ amount, eligiblePlayerIds }) => ({
-            amount,
-            eligiblePlayerIds,
-          })),
+          totalPot: totalPotAmount(hand),
+          streetPots: streetPotHistory(hand),
           ownHoleCards: currentViewer
             ? currentViewer.holeCards.map(formatCard)
             : null,

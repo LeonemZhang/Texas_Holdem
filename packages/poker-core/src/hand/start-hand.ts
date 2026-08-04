@@ -33,6 +33,12 @@ export interface HandPlayerState {
 
 export type HandStreet = 'preflop' | 'flop' | 'turn' | 'river';
 
+/** A completed street's aggregate investment, retained for table history. */
+export interface StreetPotAmount {
+  readonly street: HandStreet;
+  readonly amount: number;
+}
+
 export interface StartedHandState {
   readonly handId: string;
   readonly street: HandStreet;
@@ -43,6 +49,8 @@ export interface StartedHandState {
   readonly deckCursor: number;
   readonly smallBlind: number;
   readonly bigBlind: number;
+  /** Finalized investments from streets before the current street. */
+  readonly completedStreetPots: readonly StreetPotAmount[];
   readonly betting: BettingRoundState;
 }
 
@@ -148,6 +156,7 @@ export function startHand(options: StartHandOptions): StartedHandState {
     deckCursor: cursor,
     smallBlind: options.smallBlind,
     bigBlind,
+    completedStreetPots: Object.freeze([]),
     betting,
   });
 }

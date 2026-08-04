@@ -625,18 +625,12 @@ body:has(.poker-table-page) .poker-table {
   text-shadow: 0 0.15rem 0.5rem rgb(0 0 0 / 42%);
 }
 
-.poker-table__cards,
-.poker-table__pots {
+.poker-table__cards {
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 0;
   gap: clamp(0.2rem, 1vw, 0.65rem);
-}
-
-.poker-table__pots {
-  margin-top: 0.75rem;
-  flex-wrap: wrap;
 }
 
 .poker-table__action-timer {
@@ -888,22 +882,29 @@ body:has(.poker-table-page) .poker-table-controls {
   font-size: 0;
 }
 
-.pot-list {
-  flex-wrap: wrap;
+.street-pot-history {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+  margin: 0;
+  gap: 0.22rem;
 }
 
-.pot-chip {
+.street-pot-history > div {
   display: flex;
-  padding: 0.25rem 0.5rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.16rem 0.46rem;
   border: 1px solid rgb(251 191 36 / 30%);
   border-radius: 999px;
   color: #fde68a;
   background: rgb(4 17 14 / 70%);
   gap: 0.3rem;
-  font-size: clamp(0.65rem, 1.8vw, 0.85rem);
+  font-size: clamp(0.62rem, 1.55vw, 0.78rem);
 }
 
-.pot-chip dd {
+.street-pot-history dt,
+.street-pot-history dd {
   margin: 0;
   font-weight: 800;
 }
@@ -1181,9 +1182,26 @@ body:has(.poker-table-page) .poker-table-controls {
   color: #fde68a;
   font-size: 1.2rem;
 }
+}
+
+.street-pot-history dd {
 
 .hand-ready-card__requests {
   margin: 1rem 0;
+.street-pot-history__total {
+  border-color: rgb(251 191 36 / 65%) !important;
+  color: #fef3c7 !important;
+  background: rgb(69 26 3 / 88%) !important;
+  font-size: clamp(0.72rem, 1.8vw, 0.9rem) !important;
+}
+
+.street-pot-history__street--current {
+  border-color: rgb(45 212 191 / 72%) !important;
+  color: #ccfbf1 !important;
+  background: rgb(6 78 59 / 84%) !important;
+  box-shadow: 0 0 0.5rem rgb(45 212 191 / 18%);
+}
+
   padding: 0.8rem;
   border: 1px solid rgb(251 191 36 / 35%);
   border-radius: 0.8rem;

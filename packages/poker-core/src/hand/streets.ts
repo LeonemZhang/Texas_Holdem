@@ -2,7 +2,29 @@ import { isBettingRoundComplete } from '../betting/betting-round.js';
 import { createBettingRound } from '../betting/state.js';
 import { actionOrderForStreet } from '../seating/positions.js';
 import type { Seat } from '../seating/seats.js';
-import type { HandStreet, StartedHandState } from './start-hand.js';
+import type {
+  HandStreet,
+  StartedHandState,
+  StreetPotAmount,
+} from './start-hand.js';
+
+function streetPotAmount(state: StartedHandState): number {
+  return state.players.reduce(
+    (total, player) => total + player.streetCommitted,
+    0,
+  );
+}
+
+function completedStreetPots(
+  state: StartedHandState,
+): readonly StreetPotAmount[] {
+  // Saved games created before the history field existed remain playable.
+  const existing = state.completedStreetPots ?? [];
+  return Object.freeze([
+    ...existing,
+    Object.freeze({ street: state.street, amount: streetPotAmount(state) }),
+  ]);
+}
 
 function dealStreet(
   state: StartedHandState,
@@ -38,6 +60,7 @@ function dealStreet(
     players: Object.freeze(players),
     communityCards: Object.freeze([...state.communityCards, ...dealt]),
     deckCursor: state.deckCursor + cardCount,
+    completedStreetPots: completedStreetPots(state),
     betting,
   });
 }
