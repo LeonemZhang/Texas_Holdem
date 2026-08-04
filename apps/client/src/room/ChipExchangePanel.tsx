@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 export interface ChipExchangePlayer {
   readonly playerId: string;
@@ -57,23 +57,57 @@ export function ChipExchangePanel({
   const [confirmation, setConfirmation] = useState<ChipExchangeIntent | null>(
     null,
   );
+  const [requestTargetId, setRequestTargetId] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
   const currentPlayer = players.find(
     ({ playerId }) => playerId === currentPlayerId,
   );
   const available = phase === 'hand-ready';
   const drawer = presentation === 'drawer';
+  const requestTarget = players.find(
+    (player) => player.playerId === requestTargetId,
+  );
+  const requestLimit = requestTarget
+    ? requestTarget.chips
+    : Math.max(
+        0,
+        ...players
+          .filter((player) => player.playerId !== currentPlayerId)
+          .map((player) => player.chips),
+      );
   const nameOf = (playerId: string | null) =>
     playerId === null
       ? '任意玩家'
       : (players.find((player) => player.playerId === playerId)?.nickname ??
         playerId);
 
+  const incomingPendingRequest = records.some(
+    (record) =>
+      record.status === 'pending' &&
+      record.requesterId !== currentPlayerId &&
+      (record.targetPlayerId === null ||
+        record.targetPlayerId === currentPlayerId),
+  );
+  useEffect(() => {
+    if (incomingPendingRequest) setOpen(true);
+  }, [incomingPendingRequest]);
+
   const prepareRequest = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const amount = Number(form.get('amount'));
-    if (!Number.isSafeInteger(amount) || amount <= 0) return;
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      setFormError('请输入大于 0 的整数筹码。');
+      return;
+    }
     const targetPlayerId = String(form.get('targetPlayerId') ?? '') || null;
+    if (amount > requestLimit) {
+      setFormError(
+        `请求筹码不能超过${targetPlayerId ? '目标玩家' : '任意可响应玩家'}持有的 ${requestLimit.toLocaleString('zh-CN')}。`,
+      );
+      return;
+    }
+    setFormError(null);
     setConfirmation({ type: 'request', targetPlayerId, amount });
   };
 
@@ -106,7 +140,7 @@ export function ChipExchangePanel({
       <header>
         {!drawer || open ? (
           <div>
-            <p className="connection-home__kicker">仅限发牌前</p>
+            <p className="connection-home__kicker">牌桌筹码服务</p>
             <h2 id="chip-exchange-title">筹码交换</h2>
           </div>
         ) : null}
@@ -136,7 +170,7 @@ export function ChipExchangePanel({
 
       {open && !available ? (
         <p className="chip-exchange__locked" role="status">
-          对局进行中不能请求或给予筹码，请等待本手结束。
+          对局进行中不能新建请求或主动给予筹码；已收到的请求仍可批准、拒绝或撤销，批准后立即同步余额。
         </p>
       ) : null}
 
@@ -146,7 +180,14 @@ export function ChipExchangePanel({
             <h3>请求筹码</h3>
             <label>
               向谁请求
-              <select name="targetPlayerId" defaultValue="">
+              <select
+                name="targetPlayerId"
+                value={requestTargetId}
+                onChange={(event) => {
+                  setRequestTargetId(event.target.value);
+                  setFormError(null);
+                }}
+              >
                 <option value="">任意玩家</option>
                 {players
                   .filter(({ playerId }) => playerId !== currentPlayerId)
@@ -164,9 +205,11 @@ export function ChipExchangePanel({
                 type="number"
                 min="1"
                 step="1"
-                defaultValue="100"
+                max={requestLimit}
+                defaultValue={Math.min(100, requestLimit)}
               />
             </label>
+            {formError ? <p className="form-error">{formError}</p> : null}
             <button type="submit">发起请求</button>
           </form>
 
@@ -213,10 +256,18 @@ export function ChipExchangePanel({
                 ? `向 ${nameOf(confirmation.targetPlayerId)} 请求 ${confirmation.amount} 筹码`
                 : '确认此筹码操作'}
           </p>
-          <button type="button" onClick={confirm}>
+          <button
+            className="button button--primary"
+            type="button"
+            onClick={confirm}
+          >
             确认
           </button>
-          <button type="button" onClick={() => setConfirmation(null)}>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => setConfirmation(null)}
+          >
             取消
           </button>
         </div>
@@ -229,13 +280,11 @@ export function ChipExchangePanel({
           <ul>
             {records.map((record) => {
               const canRespond =
-                available &&
                 record.status === 'pending' &&
                 record.requesterId !== currentPlayerId &&
                 (record.targetPlayerId === null ||
                   record.targetPlayerId === currentPlayerId);
               const canRevoke =
-                available &&
                 record.status === 'pending' &&
                 record.requesterId === currentPlayerId;
               return (

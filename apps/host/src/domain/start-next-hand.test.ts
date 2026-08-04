@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createChipRequest, createChipRequestBook } from './chip-requests.js';
 import {
   normalizeHandReadyAtDeadline,
+  removePlayerFromHandReady,
   setHandReadyChoice,
 } from './hand-ready-actions.js';
 import { beginHandReadyPhase } from './hand-ready.js';
@@ -94,5 +95,42 @@ describe('startNextRoomHand', () => {
         randomSource: { next: () => 0 },
       }),
     ).toThrow('Hand readiness is not complete');
+  });
+
+  it('preserves a removed seat when the next hand starts', () => {
+    const { room, handReady } = phase();
+    const removedRoom = Object.freeze({
+      ...room,
+      players: Object.freeze(
+        room.players.map((player) =>
+          player.playerId === 'bob'
+            ? Object.freeze({ ...player, status: 'removed' as const })
+            : player,
+        ),
+      ),
+    });
+    let ready = removePlayerFromHandReady(handReady, 'bob');
+    ready = setHandReadyChoice(removedRoom, ready, 'host', 'ready');
+    ready = setHandReadyChoice(removedRoom, ready, 'carol', 'ready');
+
+    const result = startNextRoomHand(
+      removedRoom,
+      ready,
+      createChipRequestBook(ready),
+      {
+        handId: 'h2',
+        previousButtonIndex: 0,
+        smallBlind: 1,
+        randomSource: { next: () => 0 },
+      },
+    );
+
+    expect(result.hand.players.map(({ playerId }) => playerId)).toEqual([
+      'host',
+      'carol',
+    ]);
+    expect(
+      result.room.players.find(({ playerId }) => playerId === 'bob'),
+    ).toMatchObject({ seatIndex: 1, chips: 0, status: 'removed' });
   });
 });

@@ -85,6 +85,28 @@ describe('chip requests', () => {
     expect(book.requests[0]?.status).toBe('revoked');
   });
 
+  it('rejects a request that exceeds the selected donor or table balance', () => {
+    const { room, handReady } = context();
+    const book = createChipRequestBook(handReady);
+
+    expect(() =>
+      createChipRequest(room, handReady, book, {
+        requestId: 'targeted-too-large',
+        requesterId: 'bob',
+        targetPlayerId: 'host',
+        amount: 101,
+      }),
+    ).toThrow('Requested chips exceed the target available chips');
+    expect(() =>
+      createChipRequest(room, handReady, book, {
+        requestId: 'table-too-large',
+        requesterId: 'bob',
+        targetPlayerId: null,
+        amount: 101,
+      }),
+    ).toThrow('Requested chips exceed the target available chips');
+  });
+
   it('records individual all-table rejections until every donor rejects', () => {
     const { room, handReady } = context();
     let book = createChipRequest(

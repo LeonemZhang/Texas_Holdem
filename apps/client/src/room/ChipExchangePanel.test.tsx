@@ -20,14 +20,18 @@ describe('ChipExchangePanel', () => {
       />,
     );
     expect(
-      screen.queryByText('对局进行中不能请求或给予筹码，请等待本手结束。'),
+      screen.queryByText(
+        '对局进行中不能新建请求或主动给予筹码；已收到的请求仍可批准、拒绝或撤销，批准后立即同步余额。',
+      ),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: '准备给予' }),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '展开筹码交换' }));
     expect(
-      screen.getByText('对局进行中不能请求或给予筹码，请等待本手结束。'),
+      screen.getByText(
+        '对局进行中不能新建请求或主动给予筹码；已收到的请求仍可批准、拒绝或撤销，批准后立即同步余额。',
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: '准备给予' }),
@@ -80,7 +84,6 @@ describe('ChipExchangePanel', () => {
         onAction={onAction}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '展开筹码交换' }));
     expect(
       screen.getByText(/Bob 向 Alice 请求 200 · 待处理/),
     ).toBeInTheDocument();
@@ -96,6 +99,9 @@ describe('ChipExchangePanel', () => {
         onAction={onAction}
       />,
     );
+    expect(
+      screen.getByRole('button', { name: '收起筹码交换' }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '撤销' }));
     expect(onAction).toHaveBeenCalledWith({ type: 'revoke', requestId: 'r1' });
   });

@@ -30,6 +30,16 @@ export function createChipRequestBook(
   });
 }
 
+export function carryChipRequestsToHandReady(
+  book: ChipRequestBook,
+  handReady: HandReadyState,
+): ChipRequestBook {
+  if (book.roomId !== handReady.roomId) {
+    throw new RangeError('Chip requests belong to another room');
+  }
+  return freezeChipRequestBook({ ...book, afterHandId: handReady.afterHandId });
+}
+
 export function freezeChipRequestBook(book: ChipRequestBook): ChipRequestBook {
   return Object.freeze({
     ...book,
@@ -101,7 +111,10 @@ export function createChipRequest(
   const requester = room.players.find(
     ({ playerId }) => playerId === input.requesterId,
   );
-  if (!requester || ['left', 'eliminated'].includes(requester.status)) {
+  if (
+    !requester ||
+    ['left', 'removed', 'eliminated'].includes(requester.status)
+  ) {
     throw new RangeError(`Requester is not seated: ${input.requesterId}`);
   }
   if (input.targetPlayerId === input.requesterId) {
@@ -112,12 +125,25 @@ export function createChipRequest(
     !room.players.some(
       ({ playerId, status }) =>
         playerId === input.targetPlayerId &&
-        !['left', 'eliminated'].includes(status),
+        !['left', 'removed', 'eliminated'].includes(status),
     )
   ) {
     throw new RangeError(
       `Target player is not seated: ${input.targetPlayerId}`,
     );
+  }
+  const possibleDonors = room.players.filter(
+    ({ playerId, status }) =>
+      playerId !== input.requesterId &&
+      !['left', 'removed', 'eliminated'].includes(status),
+  );
+  const maximumRequest =
+    input.targetPlayerId === null
+      ? Math.max(0, ...possibleDonors.map(({ chips }) => chips))
+      : (room.players.find(({ playerId }) => playerId === input.targetPlayerId)
+          ?.chips ?? 0);
+  if (input.amount > maximumRequest) {
+    throw new RangeError('Requested chips exceed the target available chips');
   }
   const note = input.note?.trim() || null;
   return freezeChipRequestBook({
@@ -193,7 +219,7 @@ export function rejectChipRequest(
   const possibleDonors = room.players.filter(
     ({ playerId, status }) =>
       playerId !== request.requesterId &&
-      !['left', 'eliminated'].includes(status),
+      !['left', 'removed', 'eliminated'].includes(status),
   );
   const fullyRejected =
     request.targetPlayerId !== null ||

@@ -81,3 +81,20 @@ export function removePlayerFromHandReady(
     players: state.players.filter((player) => player.playerId !== playerId),
   });
 }
+
+export function restorePlayerToHandReady(
+  state: HandReadyState,
+  playerId: string,
+): HandReadyState {
+  const existing = state.players.some((player) => player.playerId === playerId);
+  return freezeHandReady({
+    ...state,
+    players: existing
+      ? state.players.map((player) =>
+          player.playerId === playerId
+            ? { ...player, choice: 'sitting-out' }
+            : player,
+        )
+      : [...state.players, { playerId, choice: 'sitting-out' }],
+  });
+}

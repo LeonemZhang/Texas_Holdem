@@ -23,6 +23,7 @@ export function startNextRoomHand(
     readonly previousButtonIndex: number;
     readonly smallBlind: number;
     readonly randomSource: RandomSource;
+    readonly allowPendingRequests?: boolean;
   },
 ): NextHandStartedResult {
   if (
@@ -35,7 +36,12 @@ export function startNextRoomHand(
   const pendingRequests = requests.requests.filter(
     ({ status }) => status === 'pending',
   ).length;
-  if (!canBeginNextHand(handReady, pendingRequests)) {
+  if (
+    !canBeginNextHand(
+      handReady,
+      input.allowPendingRequests ? 0 : pendingRequests,
+    )
+  ) {
     throw new RangeError('Hand readiness is not complete');
   }
   const choices = new Map(
@@ -46,7 +52,7 @@ export function startNextRoomHand(
       ({ playerId, chips, status }) =>
         choices.get(playerId) === 'ready' &&
         chips > 0 &&
-        !['left', 'eliminated'].includes(status),
+        !['left', 'removed', 'eliminated'].includes(status),
     )
     .map(({ playerId, seatIndex, chips: stack }) => ({
       playerId,
@@ -68,13 +74,14 @@ export function startNextRoomHand(
     phase: 'playing',
     players: room.players.map((player) => ({
       ...player,
-      status: ['left', 'eliminated'].includes(player.status)
+      status: ['left', 'removed', 'eliminated'].includes(player.status)
         ? player.status
         : participants.some(({ playerId }) => playerId === player.playerId)
           ? 'active'
           : 'sitting-out',
     })),
     version: room.version + 1,
+    voluntarilyRevealedHoleCardPlayerIds: [],
   });
   return Object.freeze({ room: nextRoom, hand });
 }

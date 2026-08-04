@@ -228,7 +228,8 @@ export function GameRoom({
   const names = new Map(
     snapshot.room.players.map(({ playerId, nickname }) => [playerId, nickname]),
   );
-  const incomingChipRequest = snapshot.handReady?.pendingRequests.find(
+  const chipRequests = snapshot.chipRequests;
+  const incomingChipRequest = chipRequests.find(
     (request) =>
       request.requesterId !== session.playerId &&
       (request.targetPlayerId === null ||
@@ -569,3 +570,4 @@ export function GameRoom({
     </div>
   );
 }
+              ownChips={own?.chips ?? 0}

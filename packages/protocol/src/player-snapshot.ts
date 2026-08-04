@@ -139,6 +139,17 @@ export const PlayerSnapshotSchema = z.object({
     })
     .nullable(),
   statistics: z.object({
+  chipRequests: z
+    .array(
+      z.object({
+        requestId: IdSchema,
+        requesterId: IdSchema,
+        targetPlayerId: IdSchema.nullable(),
+        amount: AmountSchema,
+        status: z.enum(['pending', 'rejected', 'revoked', 'completed']),
+      }),
+    )
+    .default([]),
     players: z.array(
       z.object({
         playerId: IdSchema,

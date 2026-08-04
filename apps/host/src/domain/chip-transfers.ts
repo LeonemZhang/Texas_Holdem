@@ -29,10 +29,11 @@ function transfer(
     readonly amount: number;
     readonly source: ChipTransferRecord['source'];
     readonly requestId: string | null;
+    readonly availableChipsByPlayerId?: Readonly<Record<string, number>>;
   },
 ): ChipTransferResult {
-  if (room.phase !== 'hand-ready') {
-    throw new RangeError('Chip transfers only occur during hand readiness');
+  if (!['hand-ready', 'playing'].includes(room.phase)) {
+    throw new RangeError('Chip transfers only occur in an active room');
   }
   if (!input.transferId.trim())
     throw new RangeError('Transfer id cannot be empty');
@@ -50,7 +51,16 @@ function transfer(
   );
   if (!giver || !receiver)
     throw new RangeError('Transfer player is not in the room');
-  if (giver.chips < input.amount) {
+  if (
+    [giver, receiver].some(({ status }) =>
+      ['left', 'removed', 'eliminated'].includes(status),
+    )
+  ) {
+    throw new RangeError('Transfer player is not participating in the room');
+  }
+  const available =
+    input.availableChipsByPlayerId?.[giver.playerId] ?? giver.chips;
+  if (!Number.isSafeInteger(available) || available < input.amount) {
     throw new RangeError('Giver has insufficient chips');
   }
   const before = room.players.reduce((sum, player) => sum + player.chips, 0);
@@ -101,6 +111,7 @@ export function approveChipRequest(
   requestId: string,
   approverPlayerId: string,
   transferId: string,
+  availableChipsByPlayerId?: Readonly<Record<string, number>>,
 ): ChipTransferResult {
   const request = requests.requests.find(
     (candidate) => candidate.requestId === requestId,
@@ -135,5 +146,6 @@ export function approveChipRequest(
     amount: request.amount,
     source: 'request-approval',
     requestId,
+    ...(availableChipsByPlayerId ? { availableChipsByPlayerId } : {}),
   });
 }
