@@ -53,6 +53,7 @@ export interface CreateHostServerOptions {
   ) => PlayerSnapshot | null;
   roomSnapshotsProvider?: (roomId: string) => readonly PlayerSnapshot[];
 }
+  onClosedRoomPublished?: (roomId: string) => void;
 
 export interface HostServer {
   app: FastifyInstance;
@@ -139,11 +140,21 @@ export async function createHostServer(
           );
           publishRoomSnapshots(session.roomId);
           return session;
-        } catch (error) {
+        } catch {
+          const runningRoomId = options.roomSessionService!.currentRoomId();
+          if (runningRoomId) {
+            return reply.code(409).send({
+              error: {
+                code: 'ROOM_ALREADY_RUNNING',
+                message: '本机已有进行中的对局，请恢复或关闭后再创建。',
+                roomId: runningRoomId,
+              },
+            });
+          }
           return reply.code(409).send({
             error: {
               code: 'CONFLICT',
-              message: error instanceof Error ? error.message : '创建房间失败',
+              message: '创建房间失败，请重试。',
             },
           });
         }
@@ -311,6 +322,9 @@ export async function createHostServer(
 
   return {
     app,
+          if ('type' in rawCommand && rawCommand.type === 'room.close') {
+            options.onClosedRoomPublished?.(identity.roomId);
+          }
     io,
     publisher,
     async close() {

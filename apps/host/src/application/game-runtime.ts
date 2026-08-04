@@ -176,6 +176,38 @@ export class GameRuntime implements RoomSessionBootstrapService {
   }
 
   onAutomaticStateChange(listener: (roomId: string) => void): () => void {
+  authenticate(credentials: SocketAuthentication): SessionIdentity | null {
+    const identity = this.sessions.authenticate(credentials);
+    if (!identity) return null;
+    const player = this.rooms
+      .get(identity.roomId)
+      ?.players.find(({ playerId }) => playerId === identity.playerId);
+    return player && !['left', 'removed'].includes(player.status)
+      ? identity
+      : null;
+  }
+
+  retireClosedRoom(roomId: string): void {
+    const room = this.rooms.get(roomId);
+    if (!room || room.phase !== 'closed') {
+      throw new RangeError('Only a closed room can be retired');
+    }
+    const handTimer = this.#handReadyTimers.get(roomId);
+    if (handTimer) clearTimeout(handTimer);
+    const actionTimer = this.#actionTimers.get(roomId);
+    if (actionTimer) clearTimeout(actionTimer);
+    this.#handReadyTimers.delete(roomId);
+    this.#actionTimers.delete(roomId);
+    this.#actionDeadlines.delete(roomId);
+    this.#summaries.delete(roomId);
+    this.#facts.delete(roomId);
+    this.#sequences.delete(roomId);
+    this.#completedHands.delete(roomId);
+    this.#reconnectTokens.delete(roomId);
+    this.#roomHandler.retireRoom(roomId);
+    this.rooms.delete(roomId);
+  }
+
     this.#automaticListeners.add(listener);
     return () => this.#automaticListeners.delete(listener);
   }
@@ -215,6 +247,25 @@ export class GameRuntime implements RoomSessionBootstrapService {
   }
 
   exportState(roomId: string): GameRuntimeStateExport | null {
+  closeRunningRoom(): string {
+    const roomId = this.currentRoomId();
+    if (!roomId) throw new RangeError('No room is running');
+    const room = this.rooms.get(roomId);
+    if (!room) throw new RangeError('No room is running');
+    const response = this.dispatch({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: randomUUID(),
+      roomId,
+      playerId: room.hostPlayerId,
+      expectedVersion: room.version,
+      type: 'room.close',
+    });
+    if (response.status !== 'accepted') {
+      throw new RangeError('Running room could not be closed');
+    }
+    return roomId;
+  }
+
     const room = this.rooms.get(roomId);
     if (!room) return null;
     return Object.freeze({

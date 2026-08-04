@@ -23,6 +23,7 @@ const recoverable: RoomRecordSummary = {
   lastActiveAt: '2026-08-02T02:00:00.000Z',
   completedHands: 2,
   playerCount: 2,
+  network: null,
 };
 const archived: RoomRecordSummary = {
   ...recoverable,
@@ -84,6 +85,7 @@ function context(activeRoomId: string | null = null) {
     create: vi.fn(() => roomSession),
     restore: vi.fn(),
     createRecoveredHostSession: vi.fn(() => roomSession),
+    closeRunningRoom: vi.fn(() => activeRoomId ?? 'running-room'),
   };
   const catalog: RoomRecordCatalogPort = {
     list: vi.fn(() => [recoverable, archived]),
@@ -145,6 +147,24 @@ describe('RoomRecordManagementService', () => {
     expect(() =>
       service.recoverRecord(archived.roomId, 'http://127.0.0.1:32100'),
     ).toThrow('interrupted');
+  });
+
+  it('returns to a running record and closes it only when that record is selected', () => {
+    const { service, runtime } = context(recoverable.roomId);
+
+    expect(
+      service.recoverRecord(recoverable.roomId, 'http://127.0.0.1:32100'),
+    ).toMatchObject({ roomId: 'new-room' });
+    expect(runtime.createRecoveredHostSession).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100',
+    );
+    expect(service.closeRunningRecord(recoverable.roomId)).toBe(
+      recoverable.roomId,
+    );
+    expect(runtime.closeRunningRoom).toHaveBeenCalledOnce();
+    expect(() => service.closeRunningRecord(archived.roomId)).toThrow(
+      'not running locally',
+    );
   });
 
   it('archives only non-running records and restores archived records reversibly', () => {

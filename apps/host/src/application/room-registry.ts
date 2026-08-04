@@ -3,6 +3,7 @@ import { freezeRoom, type RoomState } from '../domain/room.js';
 export interface RoomRepository {
   get(roomId: string): RoomState | null;
   save(room: RoomState): void;
+  delete(roomId: string): void;
   listRoomIds(): readonly string[];
 }
 
@@ -16,6 +17,10 @@ export class InMemoryRoomRegistry implements RoomRepository {
 
   save(room: RoomState): void {
     this.#rooms.set(room.roomId, freezeRoom(room));
+  }
+
+  delete(roomId: string): void {
+    this.#rooms.delete(roomId);
   }
 
   listRoomIds(): readonly string[] {

@@ -11,6 +11,11 @@ export const RoomRecordStatusSchema = z.enum([
   'archived',
 ]);
 
+export const RoomRecordNetworkSchema = z.object({
+  name: z.string().trim().min(1).max(256),
+  address: z.ipv4(),
+});
+
 export const RoomRecordSummarySchema = z.object({
   roomId: IdSchema,
   roomName: z.string().trim().min(1).max(128),
@@ -20,6 +25,7 @@ export const RoomRecordSummarySchema = z.object({
   lastActiveAt: z.string().datetime(),
   completedHands: z.number().int().nonnegative().safe(),
   playerCount: z.number().int().min(1).max(10).safe(),
+  network: RoomRecordNetworkSchema.nullable(),
 });
 
 const ManagementRequestSchema = z.object({
@@ -42,6 +48,12 @@ export const RecoverRoomRecordRequestSchema = ManagementRequestSchema.extend({
   type: z.literal('room-record.recover'),
   roomId: IdSchema,
 });
+
+export const CloseRunningRoomRecordRequestSchema =
+  ManagementRequestSchema.extend({
+    type: z.literal('room-record.close-running'),
+    roomId: IdSchema,
+  });
 
 export const ArchiveRoomRecordRequestSchema = ManagementRequestSchema.extend({
   type: z.literal('room-record.archive'),
@@ -67,6 +79,7 @@ export const RoomRecordManagementRequestSchema = z.discriminatedUnion('type', [
   ListRoomRecordsRequestSchema,
   CreateRoomRecordRequestSchema,
   RecoverRoomRecordRequestSchema,
+  CloseRunningRoomRecordRequestSchema,
   ArchiveRoomRecordRequestSchema,
   RestoreRoomRecordRequestSchema,
   DeleteRoomRecordRequestSchema,
@@ -95,6 +108,7 @@ export const RoomRecordManagementResponseSchema = z.discriminatedUnion(
 );
 
 export type RoomRecordStatus = z.infer<typeof RoomRecordStatusSchema>;
+export type RoomRecordNetwork = z.infer<typeof RoomRecordNetworkSchema>;
 export type RoomRecordSummary = z.infer<typeof RoomRecordSummarySchema>;
 export type ListRoomRecordsRequest = z.infer<
   typeof ListRoomRecordsRequestSchema
@@ -104,6 +118,9 @@ export type CreateRoomRecordRequest = z.infer<
 >;
 export type RecoverRoomRecordRequest = z.infer<
   typeof RecoverRoomRecordRequestSchema
+>;
+export type CloseRunningRoomRecordRequest = z.infer<
+  typeof CloseRunningRoomRecordRequestSchema
 >;
 export type ArchiveRoomRecordRequest = z.infer<
   typeof ArchiveRoomRecordRequestSchema

@@ -30,6 +30,7 @@ describe('room record protocol schemas', () => {
       },
     },
     { ...request, type: 'room-record.recover', roomId: 'room-1' },
+    { ...request, type: 'room-record.close-running', roomId: 'room-1' },
     { ...request, type: 'room-record.archive', roomId: 'room-1' },
     { ...request, type: 'room-record.restore', roomId: 'room-1' },
     { ...request, type: 'room-record.delete', roomId: 'room-1' },
@@ -49,6 +50,7 @@ describe('room record protocol schemas', () => {
         lastActiveAt: '2026-08-02T02:00:00.000Z',
         completedHands: 12,
         playerCount: 4,
+        network: { name: 'Virtual LAN', address: '10.126.126.1' },
       }),
     ).toMatchObject({ status: 'recoverable', completedHands: 12 });
   });
@@ -65,6 +67,7 @@ describe('room record protocol schemas', () => {
       lastActiveAt: '2026-08-02T02:00:00.000Z',
       completedHands: -1,
       playerCount: 0,
+      network: null,
     },
   ])('rejects an invalid record management boundary', (value) => {
     const schema =

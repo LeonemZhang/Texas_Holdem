@@ -191,6 +191,17 @@ parentPort?.on('message', ({ data }) => {
         break;
     }
     parentPort.postMessage({
+      case 'room-record.close-running': {
+        const roomId = roomRecordManagement.closeRunningRecord(
+          parsed.data.roomId,
+        );
+        for (const snapshot of runtime.snapshotsForRoom(roomId)) {
+          host?.publisher.publishSnapshot(snapshot);
+        }
+        runtime.retireClosedRoom(roomId);
+        result = null;
+        break;
+      }
       protocolVersion: '1',
       requestId: parsed.data.requestId,
       status: 'accepted',

@@ -30,6 +30,7 @@ export interface RoomRecordRuntimePort {
   ): RoomSessionResponse;
   restore(state: RoomRecoveryState, sequence: number): void;
   createRecoveredHostSession(baseJoinUrl: string): RoomSessionResponse;
+  closeRunningRoom(): string;
 }
 
 export class RoomRecordManagementService {
@@ -73,7 +74,11 @@ export class RoomRecordManagementService {
 
   recoverRecord(roomId: string, baseJoinUrl: string): RoomSessionResponse {
     const parsedRoomId = IdSchema.parse(roomId);
-    if (this.runtime.currentRoomId()) {
+    const runningRoomId = this.runtime.currentRoomId();
+    if (runningRoomId === parsedRoomId) {
+      return this.runtime.createRecoveredHostSession(baseJoinUrl);
+    }
+    if (runningRoomId) {
       throw new RangeError('A room is already running');
     }
     const record = this.getRecord(parsedRoomId);
@@ -84,6 +89,24 @@ export class RoomRecordManagementService {
     if (!recovered) throw new RangeError('Room record is not recoverable');
     this.runtime.restore(recovered.state, recovered.sequence);
     return this.runtime.createRecoveredHostSession(baseJoinUrl);
+  }
+
+  closeRunningRecord(roomId: string): string {
+    const parsedRoomId = IdSchema.parse(roomId);
+    if (this.runtime.currentRoomId() !== parsedRoomId) {
+      throw new RangeError('This room is not running locally');
+    }
+    const record = this.getRecord(parsedRoomId);
+    if (record.status !== 'running') {
+      throw new RangeError('This room is not running locally');
+    }
+    const closedRoomId = this.runtime.closeRunningRoom();
+    if (closedRoomId !== parsedRoomId) {
+      throw new RangeError(
+        'The running room changed before it could be closed',
+      );
+    }
+    return closedRoomId;
   }
 
   archiveRecord(roomId: string): void {
