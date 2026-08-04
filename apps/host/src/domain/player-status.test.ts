@@ -73,7 +73,7 @@ describe('room player statuses', () => {
     );
   });
 
-  it('lets only the host remove another player between hands', () => {
+  it('lets only the host remove another player before the first hand', () => {
     const removed = removePlayer(room(), 'host', 'bob');
     expect(removed.players[1]).toMatchObject({
       playerId: 'bob',
@@ -86,5 +86,26 @@ describe('room player statuses', () => {
     expect(() =>
       removePlayer({ ...room(), phase: 'playing' }, 'host', 'bob'),
     ).toThrow('Players can only be removed between hands');
+  });
+
+  it('permanently removes a player between hands after play has started', () => {
+    const started = Object.freeze({
+      ...room(),
+      phase: 'hand-ready' as const,
+      firstHandStarted: true,
+    });
+
+    const removed = removePlayer(started, 'host', 'bob');
+
+    expect(removed.players[1]).toMatchObject({
+      playerId: 'bob',
+      seatIndex: 1,
+      chips: 100,
+      status: 'removed',
+      lobbyReady: false,
+    });
+    expect(() => removePlayer(removed, 'host', 'bob')).toThrow(
+      'Player cannot be removed',
+    );
   });
 });

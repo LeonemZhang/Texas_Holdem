@@ -77,56 +77,78 @@ export function HostControls({
       </header>
       {open ? (
         <div id="host-controls-content" className="host-controls__actions">
-          {phase === 'paused' ? (
-            <button
-              type="button"
-              onClick={() => onCommand({ type: 'room.resume' })}
-            >
-              继续游戏
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={phase !== 'playing' && phase !== 'hand-ready'}
-              onClick={() => onCommand({ type: 'room.pause' })}
-            >
-              暂停游戏
-            </button>
-          )}
-          <label>
-            移除玩家
-            <select
-              defaultValue=""
-              disabled={!canRemovePlayer}
-              onChange={(event) => {
-                if (event.target.value)
-                  setDangerousIntent({
-                    type: 'room.remove-player',
-                    targetPlayerId: event.target.value,
-                  });
-                event.currentTarget.value = '';
-              }}
-            >
-              <option value="" disabled>
-                选择玩家
-              </option>
-              {players
-                .filter(({ playerId }) => playerId !== hostPlayerId)
-                .map((player) => (
-                  <option key={player.playerId} value={player.playerId}>
-                    {player.nickname}
-                  </option>
-                ))}
-            </select>
-            {!canRemovePlayer ? <small>每手结束后可移除</small> : null}
-          </label>
-          <button
-            className="host-controls__danger"
-            type="button"
-            onClick={() => setDangerousIntent({ type: 'room.close' })}
+          <div
+            className="host-controls__game-actions"
+            role="group"
+            aria-label="游戏控制"
           >
-            关闭房间
-          </button>
+            {phase === 'paused' ? (
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={() => onCommand({ type: 'room.resume' })}
+              >
+                继续游戏
+              </button>
+            ) : (
+              <button
+                className="button button--secondary"
+                type="button"
+                disabled={phase !== 'playing' && phase !== 'hand-ready'}
+                onClick={() => onCommand({ type: 'room.pause' })}
+              >
+                暂停游戏
+              </button>
+            )}
+            <button
+              className="button button--danger"
+              type="button"
+              onClick={() => setDangerousIntent({ type: 'room.close' })}
+            >
+              结束游戏
+            </button>
+          </div>
+
+          <section
+            className="host-controls__player-removal"
+            aria-labelledby="host-controls-player-removal-title"
+          >
+            <header>
+              <div>
+                <h3 id="host-controls-player-removal-title">踢出玩家</h3>
+                {!canRemovePlayer ? <p>每手结束后可移除</p> : null}
+              </div>
+            </header>
+            <ul aria-label="房间玩家列表">
+              {players.map((player) => {
+                const isHostPlayer = player.playerId === hostPlayerId;
+                return (
+                  <li key={player.playerId}>
+                    <span>
+                      {player.nickname}
+                      {isHostPlayer ? <em>房主</em> : null}
+                    </span>
+                    {!isHostPlayer ? (
+                      <button
+                        className="button button--danger"
+                        type="button"
+                        aria-label={`踢出 ${player.nickname}`}
+                        disabled={!canRemovePlayer}
+                        onClick={() =>
+                          setDangerousIntent({
+                            type: 'room.remove-player',
+                            targetPlayerId: player.playerId,
+                          })
+                        }
+                      >
+                        踢出
+                      </button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         </div>
       ) : !drawer ? (
         <p className="host-controls__hint">暂停、移除玩家和关闭房间</p>
@@ -140,14 +162,22 @@ export function HostControls({
         >
           <strong>
             {dangerousIntent.type === 'room.close'
-              ? '确认关闭房间和当前对局？'
+              ? '确认结束游戏并关闭房间？'
               : `确认将 ${targetName ?? '该玩家'} 移出房间？`}
           </strong>
           <p>此操作将通过服务端命令执行，不会由界面直接修改牌局。</p>
-          <button type="button" onClick={confirmDangerous}>
+          <button
+            className="button button--danger"
+            type="button"
+            onClick={confirmDangerous}
+          >
             确认执行
           </button>
-          <button type="button" onClick={() => setDangerousIntent(null)}>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => setDangerousIntent(null)}
+          >
             取消
           </button>
         </div>

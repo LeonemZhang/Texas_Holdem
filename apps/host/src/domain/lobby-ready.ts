@@ -13,7 +13,7 @@ export function setLobbyReady(
   const player = room.players.find(
     (candidate) => candidate.playerId === playerId,
   );
-  if (!player || player.status === 'left') {
+  if (!player || ['left', 'removed'].includes(player.status)) {
     throw new RangeError(`Player is not seated: ${playerId}`);
   }
   if (player.playerId === room.hostPlayerId && !ready) {
@@ -42,6 +42,8 @@ export function canHostStartFirstHand(
   ) {
     return false;
   }
-  const seated = room.players.filter(({ status }) => status !== 'left');
+  const seated = room.players.filter(
+    ({ status }) => !['left', 'removed'].includes(status),
+  );
   return seated.length >= 2 && seated.every(({ lobbyReady }) => lobbyReady);
 }

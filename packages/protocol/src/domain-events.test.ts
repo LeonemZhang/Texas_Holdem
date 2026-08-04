@@ -39,7 +39,7 @@ const events: readonly Record<string, unknown>[] = [
     ...metadata,
     type: 'player.status-changed',
     playerId: 'p1',
-    status: 'active',
+    status: 'removed',
   },
   { ...metadata, type: 'lobby.ready-changed', playerId: 'p1', ready: true },
   {

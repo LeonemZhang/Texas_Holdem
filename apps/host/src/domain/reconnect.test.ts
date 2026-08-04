@@ -5,6 +5,7 @@ import {
   createReconnectRegistry,
   markPlayerDisconnected,
   reconnectPlayer,
+  resumeLeftPlayer,
 } from './reconnect.js';
 import { createRoom } from './room.js';
 
@@ -75,5 +76,28 @@ describe('reconnection identity', () => {
     expect(() =>
       reconnectPlayer(disconnected.room, disconnected.registry, 'Bob'),
     ).toThrow('Invalid reconnect token');
+  });
+
+  it('restores a voluntarily departed player without reissuing chips or a seat', () => {
+    const { room } = context();
+    const left = Object.freeze({
+      ...room,
+      phase: 'lobby' as const,
+      players: Object.freeze(
+        room.players.map((player) =>
+          player.playerId === 'bob'
+            ? Object.freeze({ ...player, status: 'left' as const, chips: 37 })
+            : player,
+        ),
+      ),
+    });
+
+    expect(resumeLeftPlayer(left, 'bob').players[1]).toMatchObject({
+      playerId: 'bob',
+      seatIndex: 1,
+      chips: 37,
+      status: 'waiting',
+      lobbyReady: false,
+    });
   });
 });

@@ -24,6 +24,7 @@ const PlayerStatusSchema = z.enum([
   'sitting-out',
   'eliminated',
   'left',
+  'removed',
   'disconnected',
 ]);
 

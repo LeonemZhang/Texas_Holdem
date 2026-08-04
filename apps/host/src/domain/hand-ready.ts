@@ -46,7 +46,9 @@ export function beginHandReadyPhase(
     deadlineMs,
     players: Object.freeze(
       room.players
-        .filter(({ status }) => !['left', 'eliminated'].includes(status))
+        .filter(
+          ({ status }) => !['left', 'removed', 'eliminated'].includes(status),
+        )
         .map(({ playerId }) =>
           Object.freeze({ playerId, choice: 'pending' as const }),
         ),

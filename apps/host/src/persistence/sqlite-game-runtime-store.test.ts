@@ -106,4 +106,94 @@ describe('SqliteGameRuntimeStore', () => {
       reopened.close();
     }
   });
+
+  it('keeps an in-game removal terminal after runtime recovery', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'texas-removed-store-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'room.sqlite');
+    const firstDatabase = openSqliteDatabase(path);
+    runSqliteMigrations(firstDatabase, HOST_MIGRATIONS);
+    const firstStore = new SqliteGameRuntimeStore(firstDatabase);
+    const firstRuntime = new GameRuntime({
+      sessionFallback: (credentials) => firstStore.authenticate(credentials),
+    });
+    firstRuntime.onStateCommitted((roomId) => {
+      const state = firstRuntime.exportState(roomId);
+      if (state) firstStore.save(state, 1);
+    });
+    const host = firstRuntime.create(
+      {
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      },
+      'http://10.126.126.1:32100',
+    );
+    const guest = firstRuntime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      'http://10.126.126.1:32100',
+    );
+    let commandNumber = 0;
+    const send = (playerId: string, command: Record<string, unknown>) =>
+      firstRuntime.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: `persist-remove-${++commandNumber}`,
+        roomId: host.roomId,
+        playerId,
+        expectedVersion: firstRuntime.snapshot(host.roomId, playerId)!
+          .stateVersion,
+        ...command,
+      });
+    send(guest.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(host.playerId, {
+      type: 'room.start-first-hand',
+      handId: 'persist-remove-hand',
+    });
+    const actorId = firstRuntime.snapshot(host.roomId, host.playerId)!.game!
+      .currentActorId!;
+    send(actorId, { type: 'game.fold' });
+    send(host.playerId, {
+      type: 'room.remove-player',
+      targetPlayerId: guest.playerId,
+    });
+    firstRuntime.dispose();
+    firstDatabase.close();
+
+    const reopened = openSqliteDatabase(path);
+    try {
+      runSqliteMigrations(reopened, HOST_MIGRATIONS);
+      const reopenedStore = new SqliteGameRuntimeStore(reopened);
+      const loaded = reopenedStore.loadRecoverable(host.roomId)!;
+      const restored = new GameRuntime({
+        sessionFallback: (credentials) =>
+          reopenedStore.authenticate(credentials),
+      });
+      restored.restore(loaded.state, loaded.sequence);
+
+      expect(
+        restored
+          .snapshot(host.roomId, host.playerId)
+          ?.room.players.find(({ playerId }) => playerId === guest.playerId),
+      ).toMatchObject({ seatIndex: 1, status: 'removed' });
+      expect(() =>
+        restored.resume(
+          host.roomId,
+          { playerId: guest.playerId, token: guest.token },
+          'http://10.126.126.1:32100',
+        ),
+      ).toThrow('Player was removed from this room');
+      restored.dispose();
+    } finally {
+      reopened.close();
+    }
+  });
 });

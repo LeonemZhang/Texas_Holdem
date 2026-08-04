@@ -219,4 +219,54 @@ export const HOST_MIGRATIONS: readonly SqliteMigration[] = Object.freeze([
       `);
     },
   },
+  {
+    version: 7,
+    name: 'add_room_record_network',
+    up: (database) => {
+      database.exec(`
+        ALTER TABLE rooms ADD COLUMN network_name TEXT;
+        ALTER TABLE rooms ADD COLUMN network_address TEXT;
+      `);
+    },
+  },
+  {
+    version: 8,
+    name: 'add_removed_player_status',
+    disableForeignKeys: true,
+    up: (database) => {
+      database.exec(`
+        CREATE TABLE players_next (
+          room_id TEXT NOT NULL,
+          player_id TEXT NOT NULL,
+          nickname TEXT NOT NULL COLLATE NOCASE,
+          seat_index INTEGER NOT NULL CHECK (seat_index BETWEEN 0 AND 9),
+          chips INTEGER NOT NULL CHECK (chips >= 0),
+          status TEXT NOT NULL CHECK (
+            status IN (
+              'waiting', 'active', 'sitting-out', 'eliminated',
+              'left', 'removed', 'disconnected'
+            )
+          ),
+          is_host INTEGER NOT NULL CHECK (is_host IN (0, 1)),
+          lobby_ready INTEGER NOT NULL DEFAULT 0 CHECK (lobby_ready IN (0, 1)),
+          PRIMARY KEY (room_id, player_id),
+          UNIQUE (room_id, seat_index),
+          UNIQUE (room_id, nickname),
+          FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE
+        ) STRICT;
+
+        INSERT INTO players_next (
+          room_id, player_id, nickname, seat_index, chips, status,
+          is_host, lobby_ready
+        )
+        SELECT
+          room_id, player_id, nickname, seat_index, chips, status,
+          is_host, lobby_ready
+        FROM players;
+
+        DROP TABLE players;
+        ALTER TABLE players_next RENAME TO players;
+      `);
+    },
+  },
 ]);

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { HostControls } from './HostControls.js';
@@ -64,9 +64,17 @@ describe('HostControls', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
-    fireEvent.change(screen.getByLabelText('移除玩家'), {
-      target: { value: 'bob' },
-    });
+    const gameControls = screen.getByRole('group', { name: '游戏控制' });
+    expect(
+      within(gameControls).getByRole('button', { name: '暂停游戏' }),
+    ).toBeInTheDocument();
+    expect(
+      within(gameControls).getByRole('button', { name: '结束游戏' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('房间玩家列表')).toHaveTextContent(
+      'Alice房主Bob踢出',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '踢出 Bob' }));
     expect(screen.getByText('确认将 Bob 移出房间？')).toBeInTheDocument();
     expect(onCommand).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '确认执行' }));
@@ -75,7 +83,7 @@ describe('HostControls', () => {
       targetPlayerId: 'bob',
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭房间' }));
+    fireEvent.click(screen.getByRole('button', { name: '结束游戏' }));
     fireEvent.click(screen.getByRole('button', { name: '确认执行' }));
     expect(onCommand).toHaveBeenCalledWith({ type: 'room.close' });
   });
@@ -91,7 +99,7 @@ describe('HostControls', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
-    expect(screen.getByRole('combobox', { name: /移除玩家/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '踢出 Bob' })).toBeDisabled();
     expect(screen.getByText('每手结束后可移除')).toBeInTheDocument();
   });
 });

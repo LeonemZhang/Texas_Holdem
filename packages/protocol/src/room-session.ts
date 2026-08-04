@@ -13,6 +13,11 @@ export const JoinRoomSessionRequestSchema = z.object({
   nickname: z.string().trim().min(1).max(40),
 });
 
+export const ResumeRoomSessionRequestSchema = z.object({
+  playerId: IdSchema,
+  token: z.string().min(16),
+});
+
 export const RoomSessionResponseSchema = z.object({
   protocolVersion: ProtocolVersionSchema,
   roomId: IdSchema,
@@ -27,5 +32,8 @@ export type CreateRoomSessionRequest = z.infer<
 >;
 export type JoinRoomSessionRequest = z.infer<
   typeof JoinRoomSessionRequestSchema
+>;
+export type ResumeRoomSessionRequest = z.infer<
+  typeof ResumeRoomSessionRequestSchema
 >;
 export type RoomSessionResponse = z.infer<typeof RoomSessionResponseSchema>;

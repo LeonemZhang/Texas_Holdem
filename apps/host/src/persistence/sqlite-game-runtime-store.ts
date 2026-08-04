@@ -25,8 +25,11 @@ export class SqliteGameRuntimeStore {
   readonly #snapshots: SqliteSnapshotStore;
   readonly #identities: SqliteReconnectIdentityStore;
 
-  constructor(private readonly database: DatabaseSync) {
-    this.#lifecycle = new SqliteRoomLifecycleStore(database);
+  constructor(
+    private readonly database: DatabaseSync,
+    network: { readonly name: string; readonly address: string } | null = null,
+  ) {
+    this.#lifecycle = new SqliteRoomLifecycleStore(database, network);
     this.#snapshots = new SqliteSnapshotStore(database);
     this.#identities = new SqliteReconnectIdentityStore(database);
   }
@@ -70,15 +73,16 @@ export class SqliteGameRuntimeStore {
     });
     const registry: ReconnectRegistry = Object.freeze({
       identities: Object.freeze(
-        Object.entries(runtime.reconnectTokens).map(([playerId, token]) => {
+        Object.entries(runtime.reconnectTokens).flatMap(([playerId, token]) => {
           const player = runtime.room.players.find(
             (candidate) => candidate.playerId === playerId,
           );
+          if (player?.status === 'removed') return [];
           const resumeStatus: ResumeStatus =
             player?.status === 'disconnected'
               ? 'waiting'
               : (player?.status ?? 'waiting');
-          return Object.freeze({ playerId, token, resumeStatus });
+          return [Object.freeze({ playerId, token, resumeStatus })];
         }),
       ),
     });

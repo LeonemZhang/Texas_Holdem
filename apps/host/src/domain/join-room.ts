@@ -23,14 +23,14 @@ export function joinRoom(
     throw new RangeError(`Nickname already exists: ${nickname}`);
   }
   const seatedCount = room.players.filter(
-    ({ status }) => status !== 'left',
+    ({ status }) => !['left', 'removed'].includes(status),
   ).length;
   if (seatedCount >= room.settings.maxPlayers) {
     throw new RangeError('Room is full');
   }
   const occupied = new Set(
     room.players
-      .filter(({ status }) => status !== 'left')
+      .filter(({ status }) => !['left', 'removed'].includes(status))
       .map(({ seatIndex }) => seatIndex),
   );
   const seatIndex = Array.from(

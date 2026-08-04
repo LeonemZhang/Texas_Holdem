@@ -7,7 +7,9 @@ import {
   type CreateRoomSessionRequest,
   type JoinRoomSessionRequest,
   type PlayerSnapshot,
+  type ResumeRoomSessionRequest,
   type RoomSessionResponse,
+  type SocketAuthentication,
 } from '@texas-holdem/protocol';
 
 import { GameCommandHandler } from './game-command-handler.js';
@@ -25,7 +27,10 @@ import { InMemoryEventBuffer } from './event-buffer.js';
 import { ReconnectSynchronizer } from './reconnect-synchronizer.js';
 import { RoomCommandHandler } from './room-command-handler.js';
 import { InMemoryRoomRegistry } from './room-registry.js';
-import { InMemorySessionAuthenticator } from './session-authenticator.js';
+import {
+  InMemorySessionAuthenticator,
+  type SessionIdentity,
+} from './session-authenticator.js';
 import { projectPlayerSnapshot } from './snapshot-projector.js';
 import type { HandSummaryEvent } from '@texas-holdem/poker-core';
 import type { RoomRecoveryState } from './persistence-ports.js';
@@ -40,6 +45,11 @@ export interface RoomSessionBootstrapService {
   join(
     roomId: string,
     request: JoinRoomSessionRequest,
+    baseJoinUrl: string,
+  ): RoomSessionResponse;
+  resume(
+    roomId: string,
+    request: ResumeRoomSessionRequest,
     baseJoinUrl: string,
   ): RoomSessionResponse;
 }
@@ -339,6 +349,50 @@ export class GameRuntime implements RoomSessionBootstrapService {
       hand,
       actionDeadlineMs,
       handReady: this.#roomHandler.getHandReady(roomId),
+  resume(
+    roomId: string,
+    request: ResumeRoomSessionRequest,
+    baseJoinUrl: string,
+  ): RoomSessionResponse {
+    const room = this.rooms.get(roomId);
+    if (!room || room.phase === 'closed') {
+      throw new RangeError('Room is not available for recovery');
+    }
+    const identity = this.sessions.authenticate({
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      playerId: request.playerId,
+      token: request.token,
+    });
+    if (
+      !identity ||
+      identity.roomId !== roomId ||
+      identity.playerId !== request.playerId
+    ) {
+      throw new RangeError('Recovery identity is invalid');
+    }
+    const player = room.players.find(
+      ({ playerId }) => playerId === identity.playerId,
+    );
+    if (!player) throw new RangeError('Recovery player is not in this room');
+    if (player.status === 'removed') {
+      throw new RangeError('Player was removed from this room');
+    }
+    this.sessions.register(identity, request.token);
+    this.rememberReconnectToken(roomId, identity.playerId, request.token);
+    if (player.status === 'left') {
+      this.#roomHandler.resumeLeftPlayer(roomId, identity.playerId);
+      this.#sequences.set(roomId, (this.#sequences.get(roomId) ?? 0) + 1);
+      this.#committedListeners.forEach((listener) => listener(roomId));
+    }
+    return this.sessionResponse(
+      roomId,
+      identity.playerId,
+      request.token,
+      baseJoinUrl,
+    );
+  }
+
       chipRequests: this.#roomHandler.getChipRequests(roomId),
       completedHands: this.#completedHands.get(roomId) ?? 0,
       statistics: room.players.map((player) => ({

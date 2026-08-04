@@ -27,7 +27,21 @@ describe('SqliteRoomLifecycleStore', () => {
         },
       });
       room = joinRoom(room, { playerId: 'bob', nickname: 'Bob' });
-      new SqliteRoomLifecycleStore(database).saveActive(room, 1);
+      new SqliteRoomLifecycleStore(database, {
+        name: 'Virtual LAN',
+        address: '10.126.126.1',
+      }).saveActive(room, 1);
+
+      expect(
+        database
+          .prepare(
+            'SELECT network_name, network_address FROM rooms WHERE room_id = ?',
+          )
+          .get('room-1'),
+      ).toEqual({
+        network_name: 'Virtual LAN',
+        network_address: '10.126.126.1',
+      });
 
       expect(
         database

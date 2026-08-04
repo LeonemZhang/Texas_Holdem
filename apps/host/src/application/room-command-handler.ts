@@ -22,9 +22,11 @@ import {
   canBeginNextHand,
   normalizeHandReadyAtDeadline,
   removePlayerFromHandReady,
+  restorePlayerToHandReady,
   setHandReadyChoice,
 } from '../domain/hand-ready-actions.js';
 import { joinRoom } from '../domain/join-room.js';
+import { resumeLeftPlayer } from '../domain/reconnect.js';
 import { setLobbyReady } from '../domain/lobby-ready.js';
 import { leaveRoom, removePlayer } from '../domain/player-status.js';
 import { createRoom, freezeRoom, type RoomState } from '../domain/room.js';
@@ -90,6 +92,27 @@ export class RoomCommandHandler {
 
   getChipRequests(roomId: string): ChipRequestBook | null {
     return this.#chipRequests.get(roomId) ?? null;
+  }
+
+  resumeLeftPlayer(roomId: string, playerId: string): RoomState {
+    const room = this.requireRoom(this.rooms.get(roomId));
+    const resumed = resumeLeftPlayer(room, playerId);
+    if (room.phase === 'hand-ready') {
+      const context = this.requireHandReady(roomId);
+      this.#handReady.set(
+        roomId,
+        restorePlayerToHandReady(context.ready, playerId),
+      );
+    }
+    this.rooms.save(resumed);
+    return resumed;
+  }
+
+  retireRoom(roomId: string): void {
+    this.#hands.delete(roomId);
+    this.#handReady.delete(roomId);
+    this.#chipRequests.delete(roomId);
+    this.#paused.delete(roomId);
   }
 
   enterHandReady(result: BeginHandReadyResult): void {
@@ -414,41 +437,6 @@ export class RoomCommandHandler {
         });
         this.#chipRequests.set(room.roomId, transferred.requests);
         return this.accepted(transferred.room);
-      case 'game.show-hole-cards': {
-        const hand = this.#hands.get(room.roomId);
-        if (room.phase !== 'hand-ready' || !hand || !('settlement' in hand)) {
-          throw new RangeError(
-            'Showing hole cards requires a settled hand-ready room',
-          );
-        }
-        if (
-          !hand.players.some(({ playerId }) => playerId === command.playerId)
-        ) {
-          throw new RangeError('Only a hand participant can show hole cards');
-        }
-        if (
-          room.voluntarilyRevealedHoleCardPlayerIds.includes(command.playerId)
-        ) {
-          throw new RangeError('Hole cards were already voluntarily revealed');
-        }
-        const settledHand = hand as ShowdownSettledHand;
-        if (
-          settledHand.settlement.reason === 'showdown' &&
-          command.playerId in settledHand.settlement.revealedHoleCards
-        ) {
-          throw new RangeError('Showdown hole cards are already public');
-        }
-        return this.accepted(
-          freezeRoom({
-            ...room,
-            version: room.version + 1,
-            voluntarilyRevealedHoleCardPlayerIds: [
-              ...room.voluntarilyRevealedHoleCardPlayerIds,
-              command.playerId,
-            ],
-          }),
-        );
-      }
       }
       default:
         throw new RangeError(

@@ -1,6 +1,9 @@
 import { freezeRoom, type RoomPlayerStatus, type RoomState } from './room.js';
 
-export type ResumeStatus = Exclude<RoomPlayerStatus, 'disconnected'>;
+export type ResumeStatus = Exclude<
+  RoomPlayerStatus,
+  'disconnected' | 'removed'
+>;
 
 export interface ReconnectIdentity {
   readonly playerId: string;
@@ -26,7 +29,8 @@ export function createReconnectRegistry(
 ): ReconnectRegistry {
   const seen = new Set<string>();
   return freezeRegistry({
-    identities: room.players.map((player) => {
+    identities: room.players.flatMap((player) => {
+      if (player.status === 'removed') return [];
       const token = tokens[player.playerId]?.trim();
       if (!token || seen.has(token)) {
         throw new RangeError(
@@ -36,7 +40,7 @@ export function createReconnectRegistry(
       seen.add(token);
       const resumeStatus: ResumeStatus =
         player.status === 'disconnected' ? 'waiting' : player.status;
-      return { playerId: player.playerId, token, resumeStatus };
+      return [{ playerId: player.playerId, token, resumeStatus }];
     }),
   });
 }
@@ -54,7 +58,11 @@ export function markPlayerDisconnected(
   );
   if (!player || !identity)
     throw new RangeError(`Reconnect identity not found: ${playerId}`);
-  if (['left', 'eliminated'].includes(player.status)) {
+  if (
+    player.status === 'left' ||
+    player.status === 'removed' ||
+    player.status === 'eliminated'
+  ) {
     throw new RangeError(
       'A non-participating player cannot become disconnected',
     );
@@ -101,6 +109,29 @@ export function reconnectPlayer(
     players: room.players.map((candidate) =>
       candidate.playerId === identity.playerId
         ? { ...candidate, status: identity.resumeStatus }
+        : candidate,
+    ),
+    version: room.version + 1,
+  });
+}
+
+export function resumeLeftPlayer(room: RoomState, playerId: string): RoomState {
+  if (room.phase === 'closed') throw new RangeError('Room is closed');
+  const player = room.players.find(
+    (candidate) => candidate.playerId === playerId,
+  );
+  if (!player || player.status !== 'left') {
+    throw new RangeError('Player is not waiting to resume');
+  }
+  return freezeRoom({
+    ...room,
+    players: room.players.map((candidate) =>
+      candidate.playerId === playerId
+        ? {
+            ...candidate,
+            status: room.phase === 'lobby' ? 'waiting' : 'sitting-out',
+            lobbyReady: false,
+          }
         : candidate,
     ),
     version: room.version + 1,

@@ -69,6 +69,72 @@ describe('host SQLite schema', () => {
     }
   });
 
+  it('adds the removed status without deleting player-dependent records', () => {
+    const database = openSqliteDatabase(':memory:');
+    try {
+      runSqliteMigrations(
+        database,
+        HOST_MIGRATIONS.filter(({ version }) => version < 8),
+      );
+      insertRoom(database);
+      database
+        .prepare(
+          `
+          INSERT INTO players (
+            room_id, player_id, nickname, seat_index, chips, status, is_host
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        )
+        .run('room-1', 'bob', 'Bob', 1, 100, 'left', 0);
+      database
+        .prepare(
+          `
+          INSERT INTO chip_requests (
+            room_id, request_id, after_hand_id, requester_id, target_player_id,
+            amount, note, status, rejected_by_json, updated_at_ms
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        )
+        .run(
+          'room-1',
+          'request-1',
+          'hand-1',
+          'bob',
+          null,
+          10,
+          null,
+          'revoked',
+          '[]',
+          1,
+        );
+
+      runSqliteMigrations(database, HOST_MIGRATIONS);
+      database
+        .prepare(
+          "UPDATE players SET status = 'removed' WHERE room_id = ? AND player_id = ?",
+        )
+        .run('room-1', 'bob');
+
+      expect(
+        database
+          .prepare(
+            'SELECT status FROM players WHERE room_id = ? AND player_id = ?',
+          )
+          .get('room-1', 'bob'),
+      ).toEqual({ status: 'removed' });
+      expect(
+        database
+          .prepare('SELECT request_id FROM chip_requests WHERE room_id = ?')
+          .all('room-1'),
+      ).toEqual([{ request_id: 'request-1' }]);
+      expect(database.prepare('PRAGMA foreign_keys').get()).toMatchObject({
+        foreign_keys: 1,
+      });
+    } finally {
+      database.close();
+    }
+  });
+
   it('enforces foreign keys and room-scoped seat, nickname and sequence uniqueness', async () => {
     const database = await migratedDatabase();
     try {

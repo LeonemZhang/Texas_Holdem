@@ -16,6 +16,8 @@ interface RoomRecordRow {
   readonly host_nickname: string;
   readonly player_count: number;
   readonly completed_hands: number;
+  readonly network_name: string | null;
+  readonly network_address: string | null;
 }
 
 function timestampToIso(value: number, field: string): string {
@@ -32,7 +34,14 @@ function toSummary(row: RoomRecordRow): RoomRecordSummary {
   if (row.normal_closed !== 0 && row.normal_closed !== 1) {
     throw new RangeError('Room record close state is invalid');
   }
+  if ((row.network_name === null) !== (row.network_address === null)) {
+    throw new RangeError('Room record network state is invalid');
+  }
   const settings = JSON.parse(row.settings_json) as { roomName?: unknown };
+  const network =
+    row.network_name && row.network_address
+      ? { name: row.network_name, address: row.network_address }
+      : null;
   return RoomRecordSummarySchema.parse({
     roomId: row.room_id,
     roomName: settings.roomName,
@@ -50,6 +59,7 @@ function toSummary(row: RoomRecordRow): RoomRecordSummary {
     ),
     completedHands: row.completed_hands,
     playerCount: row.player_count,
+    network,
   });
 }
 
@@ -70,6 +80,8 @@ export class SqliteRoomRecordCatalog {
           host.nickname AS host_nickname,
           (SELECT COUNT(*) FROM players WHERE room_id = rooms.room_id) AS player_count,
           (SELECT COUNT(*) FROM hand_summaries WHERE room_id = rooms.room_id) AS completed_hands
+          , rooms.network_name
+          , rooms.network_address
         FROM rooms
         INNER JOIN players AS host
           ON host.room_id = rooms.room_id

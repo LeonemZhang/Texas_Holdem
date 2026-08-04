@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CreateRoomSessionRequestSchema,
   JoinRoomSessionRequestSchema,
+  ResumeRoomSessionRequestSchema,
   RoomSessionResponseSchema,
 } from './room-session.js';
 import { PROTOCOL_VERSION } from './system.js';
@@ -27,6 +28,12 @@ describe('room session bootstrap protocol', () => {
     expect(JoinRoomSessionRequestSchema.parse({ nickname: 'Bob' })).toEqual({
       nickname: 'Bob',
     });
+    expect(
+      ResumeRoomSessionRequestSchema.parse({
+        playerId: 'bob',
+        token: 'bob-reconnect-token-123456',
+      }),
+    ).toEqual({ playerId: 'bob', token: 'bob-reconnect-token-123456' });
     expect(
       RoomSessionResponseSchema.parse({
         protocolVersion: PROTOCOL_VERSION,

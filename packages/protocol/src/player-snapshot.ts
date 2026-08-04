@@ -43,6 +43,7 @@ export const PublicPlayerSchema = z.object({
     'sitting-out',
     'eliminated',
     'left',
+    'removed',
     'disconnected',
   ]),
   isHost: z.boolean(),

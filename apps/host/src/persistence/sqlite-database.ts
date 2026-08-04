@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 export interface SqliteMigration {
   readonly version: number;
   readonly name: string;
+  readonly disableForeignKeys?: true;
   up(database: DatabaseSync): void;
 }
 
@@ -70,14 +71,28 @@ export function runSqliteMigrations(
       }
       continue;
     }
+    const disableForeignKeys = migration.disableForeignKeys === true;
+    if (disableForeignKeys) database.exec('PRAGMA foreign_keys = OFF');
     database.exec('BEGIN IMMEDIATE');
     try {
       migration.up(database);
+      if (disableForeignKeys) {
+        const violations = database
+          .prepare('PRAGMA foreign_key_check')
+          .all() as unknown[];
+        if (violations.length > 0) {
+          throw new Error(
+            `Migration ${migration.version} introduced foreign-key violations`,
+          );
+        }
+      }
       insert.run(migration.version, migration.name);
       database.exec('COMMIT');
     } catch (error) {
       database.exec('ROLLBACK');
       throw error;
+    } finally {
+      if (disableForeignKeys) database.exec('PRAGMA foreign_keys = ON');
     }
   }
 }

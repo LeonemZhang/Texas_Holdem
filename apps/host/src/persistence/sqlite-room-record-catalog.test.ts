@@ -32,11 +32,16 @@ function insertRoom(
     roomId,
     roomName,
     normalClosed = false,
+    network = null,
     updatedAtMs,
   }: {
     readonly roomId: string;
     readonly roomName: string;
     readonly normalClosed?: boolean;
+    readonly network?: {
+      readonly name: string;
+      readonly address: string;
+    } | null;
     readonly updatedAtMs: number;
   },
 ) {
@@ -45,8 +50,8 @@ function insertRoom(
       `
       INSERT INTO rooms (
         room_id, host_player_id, phase, state_version, normal_closed,
-        settings_json, created_at_ms, updated_at_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        settings_json, created_at_ms, updated_at_ms, network_name, network_address
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
     .run(
@@ -58,6 +63,8 @@ function insertRoom(
       JSON.stringify({ roomName }),
       1_000,
       updatedAtMs,
+      network?.name ?? null,
+      network?.address ?? null,
     );
   database
     .prepare(
@@ -78,6 +85,7 @@ describe('SqliteRoomRecordCatalog', () => {
         roomId: 'recoverable-room',
         roomName: 'Friday poker',
         updatedAtMs: 2_000,
+        network: { name: 'Virtual LAN', address: '10.126.126.1' },
       });
       insertRoom(database, {
         roomId: 'closed-room',
@@ -95,10 +103,12 @@ describe('SqliteRoomRecordCatalog', () => {
           lastActiveAt: '1970-01-01T00:00:03.000Z',
           playerCount: 1,
           completedHands: 0,
+          network: null,
         }),
         expect.objectContaining({
           roomId: 'recoverable-room',
           status: 'recoverable',
+          network: { name: 'Virtual LAN', address: '10.126.126.1' },
         }),
       ]);
     } finally {

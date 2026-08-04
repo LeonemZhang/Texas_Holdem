@@ -30,7 +30,7 @@ export function startFirstHand(
   const hand = startHand({
     handId,
     participants: room.players
-      .filter(({ status }) => status !== 'left')
+      .filter(({ status }) => !['left', 'removed'].includes(status))
       .map(({ playerId, seatIndex, chips: stack }) => ({
         playerId,
         seatIndex,
@@ -46,9 +46,12 @@ export function startFirstHand(
     firstHandStarted: true,
     players: room.players.map((player) => ({
       ...player,
-      status: player.status === 'left' ? 'left' : 'active',
+      status: ['left', 'removed'].includes(player.status)
+        ? player.status
+        : 'active',
     })),
     version: room.version + 1,
+    voluntarilyRevealedHoleCardPlayerIds: [],
   });
   return Object.freeze({ room: nextRoom, hand });
 }

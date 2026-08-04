@@ -23,6 +23,23 @@ const players = (allReady = false): LobbyPlayerView[] => [
 ];
 
 describe('LobbyWaitingRoom', () => {
+  it('lets the host copy the invitation QR code', () => {
+    render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={players(true)}
+        joinUrl="http://10.126.126.1:32100/?room=room-1"
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: '复制二维码' }),
+    ).toBeInTheDocument();
+  });
+
   it('shows the host as a seated player and never starts automatically', () => {
     const onStartFirstHand = vi.fn();
     render(

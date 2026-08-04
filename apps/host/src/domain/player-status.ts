@@ -44,10 +44,14 @@ export function removePlayer(
   const target = room.players.find(
     ({ playerId }) => playerId === targetPlayerId,
   );
-  if (!target || target.status === 'left') {
+  if (!target || ['left', 'removed'].includes(target.status)) {
     throw new RangeError(`Player cannot be removed: ${targetPlayerId}`);
   }
-  return updateStatus(room, targetPlayerId, 'left');
+  return updateStatus(
+    room,
+    targetPlayerId,
+    room.firstHandStarted ? 'removed' : 'left',
+  );
 }
 
 export function sitOutPlayerForHand(
@@ -61,7 +65,7 @@ export function eliminateZeroChipPlayers(room: RoomState): RoomState {
   if (room.settings.zeroChipPolicy !== 'eliminate') return room;
   const eliminated = room.players.filter(
     ({ chips, status }) =>
-      chips === 0 && !['left', 'eliminated'].includes(status),
+      chips === 0 && !['left', 'removed', 'eliminated'].includes(status),
   );
   if (eliminated.length === 0) return room;
   const ids = new Set(eliminated.map(({ playerId }) => playerId));

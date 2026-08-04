@@ -3,7 +3,13 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { RoomState } from '../domain/room.js';
 
 export class SqliteRoomLifecycleStore {
-  constructor(private readonly database: DatabaseSync) {}
+  constructor(
+    private readonly database: DatabaseSync,
+    private readonly network: {
+      readonly name: string;
+      readonly address: string;
+    } | null = null,
+  ) {}
 
   saveActive(room: RoomState, updatedAtMs: number): void {
     if (room.phase === 'closed') {
@@ -32,15 +38,17 @@ export class SqliteRoomLifecycleStore {
         `
         INSERT INTO rooms (
           room_id, host_player_id, phase, state_version, normal_closed,
-          settings_json, created_at_ms, updated_at_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          settings_json, created_at_ms, updated_at_ms, network_name, network_address
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(room_id) DO UPDATE SET
           host_player_id = excluded.host_player_id,
           phase = excluded.phase,
           state_version = excluded.state_version,
           normal_closed = excluded.normal_closed,
           settings_json = excluded.settings_json,
-          updated_at_ms = excluded.updated_at_ms
+          updated_at_ms = excluded.updated_at_ms,
+          network_name = excluded.network_name,
+          network_address = excluded.network_address
       `,
       )
       .run(
@@ -52,6 +60,8 @@ export class SqliteRoomLifecycleStore {
         JSON.stringify(room.settings),
         updatedAtMs,
         updatedAtMs,
+        this.network?.name ?? null,
+        this.network?.address ?? null,
       );
     const upsertPlayer = this.database.prepare(
       `
