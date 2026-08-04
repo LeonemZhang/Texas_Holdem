@@ -1,5 +1,15 @@
 import type { BrowserWindowConstructorOptions } from 'electron';
 
+export interface MaximizableWindow {
+  maximize(): void;
+  show(): void;
+}
+
+export function showWindowMaximized(window: MaximizableWindow): void {
+  window.maximize();
+  window.show();
+}
+
 export function createWindowOptions(
   preloadPath: string,
 ): BrowserWindowConstructorOptions {

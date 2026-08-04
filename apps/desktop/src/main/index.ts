@@ -21,7 +21,7 @@ import {
 } from '../shared/runtime';
 import { listDesktopNetworkInterfaces, scanLanRooms } from './network-services';
 import { isTrustedRendererUrl } from './trusted-renderer';
-import { createWindowOptions } from './window-options';
+import { createWindowOptions, showWindowMaximized } from './window-options';
 import { HostProcessController } from './host-process-controller';
 import { WindowCloseCoordinator } from './window-close-coordinator';
 import {
@@ -214,7 +214,7 @@ async function createMainWindow() {
   window.webContents.setWindowOpenHandler(({ url }) =>
     guardNewWindowOpen(url, (candidate) => shell.openExternal(candidate)),
   );
-  window.once('ready-to-show', () => window.show());
+  window.once('ready-to-show', () => showWindowMaximized(window));
 
   if (developmentUrl) {
     await window.loadURL(developmentUrl);
