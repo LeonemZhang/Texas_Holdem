@@ -18,6 +18,7 @@ describe('runtime adapter', () => {
       async getRuntimeInfo() {
         return { kind: 'desktop', appVersion: '0.0.0', platform: 'win32' };
       },
+      async openRoomRecordManager() {},
       listNetworkInterfaces: async () => [],
       scanLanRooms: async () => [],
       startHostService: async () => ({
@@ -32,6 +33,7 @@ describe('runtime adapter', () => {
       recoverRoomRecord: async () => {
         throw new Error('unavailable');
       },
+      closeRunningRoomRecord: async () => undefined,
       archiveRoomRecord: async () => undefined,
       restoreRoomRecord: async () => undefined,
       deleteRoomRecord: async () => undefined,

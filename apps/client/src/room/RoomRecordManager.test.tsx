@@ -11,7 +11,15 @@ function runtime(): RuntimeAdapter {
       appVersion: '0.0.0',
       platform: 'win32',
     }),
-    listNetworkInterfaces: async () => [],
+    openRoomRecordManager: async () => undefined,
+    listNetworkInterfaces: async () => [
+      {
+        name: 'Virtual LAN',
+        address: '10.126.126.1',
+        netmask: '255.255.255.0',
+        mac: '00:11:22:33:44:55',
+      },
+    ],
     scanLanRooms: async () => [],
     startHostService: async () => ({
       port: 32_100,
@@ -31,6 +39,7 @@ function runtime(): RuntimeAdapter {
         lastActiveAt: '2026-08-01T11:00:00.000Z',
         completedHands: 7,
         playerCount: 3,
+        network: { name: 'Virtual LAN', address: '10.126.126.1' },
       },
     ],
     recoverRoomRecord: async () => ({
@@ -41,6 +50,7 @@ function runtime(): RuntimeAdapter {
       joinUrl: 'http://10.126.126.1:32100/?room=room-1',
       socketPath: '/socket.io',
     }),
+    closeRunningRoomRecord: async () => undefined,
     archiveRoomRecord: async () => undefined,
     restoreRoomRecord: async () => undefined,
     deleteRoomRecord: async () => undefined,
@@ -69,6 +79,9 @@ describe('RoomRecordManager', () => {
     expect(await screen.findByText('周末牌局')).toBeInTheDocument();
     expect(screen.getByText('可恢复')).toBeInTheDocument();
     expect(screen.getByText(/3 人 · 已完成 7 手/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/联机网卡：Virtual LAN · 10.126.126.1/),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '创建新房间' }));
     fireEvent.click(screen.getByRole('button', { name: '返回首页' }));
@@ -94,6 +107,165 @@ describe('RoomRecordManager', () => {
         expect.objectContaining({ roomId: 'room-1', playerId: 'host' }),
       ),
     );
+  });
+
+  it('opens a one-time network choice before recovering a legacy record', async () => {
+    const recoverRoomRecord = vi.fn().mockResolvedValueOnce({
+      protocolVersion: '1' as const,
+      roomId: 'room-1',
+      playerId: 'host',
+      token: 'host-recovery-token-123456',
+      joinUrl: 'http://192.168.1.8:32100/?room=room-1',
+      socketPath: '/socket.io' as const,
+    });
+    const fallbackRuntime: RuntimeAdapter = {
+      ...runtime(),
+      listRoomRecords: async () => [
+        {
+          roomId: 'room-1',
+          roomName: '周末牌局',
+          hostNickname: 'Alice',
+          status: 'recoverable',
+          createdAt: '2026-08-01T10:00:00.000Z',
+          lastActiveAt: '2026-08-01T11:00:00.000Z',
+          completedHands: 7,
+          playerCount: 3,
+          network: null,
+        },
+      ],
+      listNetworkInterfaces: async () => [
+        {
+          name: 'Home LAN',
+          address: '192.168.1.8',
+          netmask: '255.255.255.0',
+          mac: '00:11:22:33:44:55',
+        },
+      ],
+      recoverRoomRecord,
+    };
+    const onRecovered = vi.fn();
+    render(
+      <RoomRecordManager
+        runtime={fallbackRuntime}
+        onCreateRoom={vi.fn()}
+        onClose={vi.fn()}
+        onRecovered={onRecovered}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '恢复对局' }));
+    expect(
+      await screen.findByRole('alertdialog', { name: '选择恢复网卡' }),
+    ).toBeInTheDocument();
+    expect(recoverRoomRecord).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '使用此网卡恢复' }));
+
+    await waitFor(() =>
+      expect(recoverRoomRecord).toHaveBeenLastCalledWith({
+        roomId: 'room-1',
+        network: { name: 'Home LAN', address: '192.168.1.8' },
+      }),
+    );
+    expect(onRecovered).toHaveBeenCalledOnce();
+  });
+
+  it('requires choosing recovery or normal closure before replacing a running room', async () => {
+    const closeRunningRoomRecord = vi.fn(async () => undefined);
+    const stopHostService = vi.fn(async () => undefined);
+    const onCreateRoom = vi.fn();
+    const onRecovered = vi.fn();
+    const runningRuntime: RuntimeAdapter = {
+      ...runtime(),
+      listRoomRecords: async () => [
+        {
+          roomId: 'room-1',
+          roomName: '周末牌局',
+          hostNickname: 'Alice',
+          status: 'running',
+          createdAt: '2026-08-01T10:00:00.000Z',
+          lastActiveAt: '2026-08-01T11:00:00.000Z',
+          completedHands: 7,
+          playerCount: 3,
+        },
+      ],
+      closeRunningRoomRecord,
+      stopHostService,
+    };
+    render(
+      <RoomRecordManager
+        runtime={runningRuntime}
+        onCreateRoom={onCreateRoom}
+        onClose={vi.fn()}
+        onRecovered={onRecovered}
+      />,
+    );
+
+    expect(
+      await screen.findByRole('button', { name: '恢复对局' }),
+    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: '创建新房间' }));
+    expect(
+      screen.getByRole('alertdialog', { name: '确认替换进行中对局' }),
+    ).toHaveTextContent('周末牌局');
+    expect(onCreateRoom).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '恢复上次对局' }));
+    await waitFor(() => expect(onRecovered).toHaveBeenCalledOnce());
+    expect(closeRunningRoomRecord).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '创建新房间' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '关闭上次对局并重新选择网卡' }),
+    );
+    await waitFor(() =>
+      expect(closeRunningRoomRecord).toHaveBeenCalledWith('room-1'),
+    );
+    expect(stopHostService).toHaveBeenCalledOnce();
+    expect(onCreateRoom).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps the replacement choice open when stopping the host fails', async () => {
+    const stopHostService = vi.fn(async () => {
+      throw new Error('Unable to stop host service');
+    });
+    const runningRuntime: RuntimeAdapter = {
+      ...runtime(),
+      listRoomRecords: async () => [
+        {
+          roomId: 'room-1',
+          roomName: '周末牌局',
+          hostNickname: 'Alice',
+          status: 'running',
+          createdAt: '2026-08-01T10:00:00.000Z',
+          lastActiveAt: '2026-08-01T11:00:00.000Z',
+          completedHands: 7,
+          playerCount: 3,
+        },
+      ],
+      stopHostService,
+    };
+    const onCreateRoom = vi.fn();
+    render(
+      <RoomRecordManager
+        runtime={runningRuntime}
+        onCreateRoom={onCreateRoom}
+        onClose={vi.fn()}
+        onRecovered={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '创建新房间' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '关闭上次对局并重新选择网卡' }),
+    );
+
+    expect(
+      await screen.findByText('关闭进行中对局或停止房主服务失败，请重试。'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('alertdialog', { name: '确认替换进行中对局' }),
+    ).toBeInTheDocument();
+    expect(onCreateRoom).not.toHaveBeenCalled();
   });
 
   it('requires a second confirmation before deleting an archived record', async () => {

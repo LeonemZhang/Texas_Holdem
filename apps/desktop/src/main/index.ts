@@ -1,9 +1,11 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
   shell,
   utilityProcess,
 } from 'electron';
@@ -11,8 +13,10 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { DesktopRuntimeInfo } from '../shared/runtime';
 import {
+  ClipboardImageDataUrlSchema,
   DiscoveryScanInputSchema,
   HostStartInputSchema,
+  RoomRecordRecoveryInputSchema,
   WindowRoomContextSchema,
 } from '../shared/runtime';
 import { listDesktopNetworkInterfaces, scanLanRooms } from './network-services';
@@ -25,6 +29,7 @@ import {
   guardNewWindowOpen,
 } from './external-navigation';
 import { hideApplicationMenu } from './application-menu';
+import { recoverRoomRecordFromHost } from './room-record-recovery';
 
 const developmentUrl = process.env.CLIENT_DEV_URL;
 let mainWindow: BrowserWindow | null = null;
@@ -62,9 +67,21 @@ function registerRuntimeHandler(hostController: HostProcessController) {
     assertTrusted(event.senderFrame?.url);
     return hostController.current();
   });
-  ipcMain.handle('host:stop', (event) => {
+  ipcMain.handle('host:stop', async (event) => {
     assertTrusted(event.senderFrame?.url);
-    hostController.stop();
+    await hostController.stop();
+  });
+  ipcMain.handle('room-records:open', async (event) => {
+    assertTrusted(event.senderFrame?.url);
+    await hostController.startManagement();
+  });
+  ipcMain.handle('clipboard:write-image', (event, rawImageDataUrl: unknown) => {
+    assertTrusted(event.senderFrame?.url);
+    const image = nativeImage.createFromDataURL(
+      ClipboardImageDataUrlSchema.parse(rawImageDataUrl),
+    );
+    if (image.isEmpty()) throw new Error('Invalid clipboard image');
+    clipboard.writeImage(image);
   });
   ipcMain.handle(
     'room-records:list',
@@ -84,20 +101,29 @@ function registerRuntimeHandler(hostController: HostProcessController) {
       return result.records;
     },
   );
-  ipcMain.handle('room-records:recover', async (event, roomId: unknown) => {
+  ipcMain.handle('room-records:recover', async (event, rawInput: unknown) => {
     assertTrusted(event.senderFrame?.url);
-    if (typeof roomId !== 'string' || !roomId.trim())
-      throw new Error('Invalid room ID');
-    const result = await hostController.manage({
-      protocolVersion: '1',
-      requestId: randomUUID(),
-      type: 'room-record.recover',
-      roomId,
+    return recoverRoomRecordFromHost({
+      controller: hostController,
+      input: RoomRecordRecoveryInputSchema.parse(rawInput),
+      networkInterfaces: listDesktopNetworkInterfaces,
+      createRequestId: randomUUID,
     });
-    if (!result || typeof result !== 'object' || !('session' in result))
-      throw new Error('Invalid room recovery response');
-    return result.session;
   });
+  ipcMain.handle(
+    'room-records:close-running',
+    async (event, roomId: unknown) => {
+      assertTrusted(event.senderFrame?.url);
+      if (typeof roomId !== 'string' || !roomId.trim())
+        throw new Error('Invalid room ID');
+      await hostController.manage({
+        protocolVersion: '1',
+        requestId: randomUUID(),
+        type: 'room-record.close-running',
+        roomId,
+      });
+    },
+  );
   for (const [channel, type] of [
     ['room-records:archive', 'room-record.archive'],
     ['room-records:restore', 'room-record.restore'],

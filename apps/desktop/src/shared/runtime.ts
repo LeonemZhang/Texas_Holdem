@@ -8,6 +8,7 @@ export interface DesktopRuntimeInfo {
 
 export interface DesktopBridge {
   getRuntimeInfo(): Promise<DesktopRuntimeInfo>;
+  openRoomRecordManager(): Promise<void>;
   listNetworkInterfaces(): Promise<readonly DesktopNetworkInterface[]>;
   scanLanRooms(
     input: DiscoveryScanInput,
@@ -18,10 +19,14 @@ export interface DesktopBridge {
   listRoomRecords(
     includeArchived: boolean,
   ): Promise<readonly RoomRecordSummary[]>;
-  recoverRoomRecord(roomId: string): Promise<RecoveredHostSession>;
+  recoverRoomRecord(
+    input: RoomRecordRecoveryInput,
+  ): Promise<RecoveredHostSession>;
+  closeRunningRoomRecord(roomId: string): Promise<void>;
   archiveRoomRecord(roomId: string): Promise<void>;
   restoreRoomRecord(roomId: string): Promise<void>;
   deleteRoomRecord(roomId: string): Promise<void>;
+  copyImageToClipboard(imageDataUrl: string): Promise<void>;
   onHostServiceExited(
     listener: (event: HostServiceExitEvent) => void,
   ): () => void;
@@ -39,6 +44,12 @@ export interface RoomRecordSummary {
   readonly lastActiveAt: string;
   readonly completedHands: number;
   readonly playerCount: number;
+  readonly network?: RoomRecordNetwork | null;
+}
+
+export interface RoomRecordNetwork {
+  readonly name: string;
+  readonly address: string;
 }
 
 export interface RecoveredHostSession {
@@ -60,6 +71,7 @@ export type DiscoveryScanInput = z.infer<typeof DiscoveryScanInputSchema>;
 export const HostStartInputSchema = z.object({
   port: z.number().int().min(1).max(65_535),
   advertisedAddress: z.ipv4(),
+  networkName: z.string().trim().min(1).max(256).optional(),
 });
 
 export type HostStartInput = z.infer<typeof HostStartInputSchema>;
@@ -69,7 +81,22 @@ export interface HostServiceInfo {
   readonly advertisedAddress: string;
   readonly joinUrl: string;
   readonly dataDirectory: string;
+  readonly networkName?: string;
 }
+
+export const RoomRecordRecoveryInputSchema = z.object({
+  roomId: z.string().trim().min(1).max(128),
+  network: z
+    .object({
+      name: z.string().trim().min(1).max(256),
+      address: z.ipv4(),
+    })
+    .optional(),
+});
+
+export type RoomRecordRecoveryInput = z.infer<
+  typeof RoomRecordRecoveryInputSchema
+>;
 
 export interface HostServiceExitEvent {
   readonly expected: boolean;
@@ -80,6 +107,11 @@ export const WindowRoomContextSchema = z.object({
   inRoom: z.boolean(),
   isHost: z.boolean(),
 });
+
+export const ClipboardImageDataUrlSchema = z
+  .string()
+  .max(2_000_000)
+  .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/);
 
 export type WindowRoomContext = z.infer<typeof WindowRoomContextSchema>;
 

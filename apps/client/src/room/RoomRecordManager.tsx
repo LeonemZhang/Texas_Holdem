@@ -17,7 +17,7 @@ export function RoomRecordManager({
   onRecovered,
 }: {
   readonly runtime: RuntimeAdapter;
-  readonly onCreateRoom: () => void;
+  readonly onCreateRoom: (hostServiceStopped?: boolean) => void;
   readonly onClose: () => void;
   readonly onRecovered: (session: RoomSessionResponse) => void;
 }) {
@@ -26,6 +26,14 @@ export function RoomRecordManager({
   const [deleteTarget, setDeleteTarget] = useState<RoomRecordSummary | null>(
     null,
   );
+  const [replacementTarget, setReplacementTarget] =
+    useState<RoomRecordSummary | null>(null);
+  const [recoveryTarget, setRecoveryTarget] =
+    useState<RoomRecordSummary | null>(null);
+  const [recoveryNetworks, setRecoveryNetworks] = useState<
+    readonly { readonly name: string; readonly address: string }[]
+  >([]);
+  const [recoveryAddress, setRecoveryAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const refresh = async () => {
@@ -54,12 +62,64 @@ export function RoomRecordManager({
     }
   };
 
-  const recover = async (roomId: string) => {
+  const chooseRecoveryNetwork = async (record: RoomRecordSummary) => {
+    try {
+      const networks = await runtime.listNetworkInterfaces();
+      const initialNetwork = networks[0];
+      if (!initialNetwork) {
+        setError('没有可用于恢复对局的 IPv4 网卡。');
+        return;
+      }
+      setRecoveryNetworks(networks);
+      setRecoveryAddress(initialNetwork.address);
+      setRecoveryTarget(record);
+      setError(null);
+    } catch {
+      setError('读取可用网卡失败，请重试。');
+    }
+  };
+
+  const recover = async (
+    record: RoomRecordSummary,
+    network?: { readonly name: string; readonly address: string },
+  ) => {
     try {
       setError(null);
-      onRecovered(await runtime.recoverRoomRecord(roomId));
+      if (!network && record.status === 'recoverable') {
+        const networks = await runtime.listNetworkInterfaces();
+        const savedAddress = record.network?.address;
+        if (
+          !savedAddress ||
+          !networks.some((candidate) => candidate.address === savedAddress)
+        ) {
+          const initialNetwork = networks[0];
+          if (!initialNetwork) {
+            setError('没有可用于恢复对局的 IPv4 网卡。');
+            return;
+          }
+          setRecoveryNetworks(networks);
+          setRecoveryAddress(initialNetwork.address);
+          setRecoveryTarget(record);
+          return;
+        }
+      }
+      const session = await runtime.recoverRoomRecord({
+        roomId: record.roomId,
+        ...(network ? { network } : {}),
+      });
+      setReplacementTarget(null);
+      setRecoveryTarget(null);
+      onRecovered(session);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '恢复对局失败');
+      const message = reason instanceof Error ? reason.message : '恢复对局失败';
+      if (
+        !network &&
+        (message.includes('未保存网卡') || message.includes('网卡已不可用'))
+      ) {
+        await chooseRecoveryNetwork(record);
+        return;
+      }
+      setError(message);
     }
   };
 
@@ -74,6 +134,22 @@ export function RoomRecordManager({
       setError(reason instanceof Error ? reason.message : '删除对局记录失败');
     }
   };
+
+  const closeAndCreate = async () => {
+    if (!replacementTarget) return;
+    try {
+      setError(null);
+      await runtime.closeRunningRoomRecord(replacementTarget.roomId);
+      await runtime.stopHostService();
+      setReplacementTarget(null);
+      onCreateRoom(true);
+    } catch {
+      setError('关闭进行中对局或停止房主服务失败，请重试。');
+    }
+  };
+
+  const runningRecord =
+    records.find(({ status }) => status === 'running') ?? null;
 
   return (
     <section
@@ -90,7 +166,13 @@ export function RoomRecordManager({
           <button
             type="button"
             className="button button--primary"
-            onClick={onCreateRoom}
+            onClick={() => {
+              if (runningRecord) {
+                setReplacementTarget(runningRecord);
+                return;
+              }
+              onCreateRoom();
+            }}
           >
             创建新房间
           </button>
@@ -147,13 +229,20 @@ export function RoomRecordManager({
               <small>
                 最近活动：{new Date(record.lastActiveAt).toLocaleString()}
               </small>
+              <small>
+                联机网卡：
+                {record.network
+                  ? `${record.network.name} · ${record.network.address}`
+                  : '历史记录未保存网卡'}
+              </small>
             </div>
             <div className="desktop-room-records__actions">
-              {record.status === 'recoverable' ? (
+              {record.status === 'running' ||
+              record.status === 'recoverable' ? (
                 <button
                   className="button button--primary"
                   type="button"
-                  onClick={() => void recover(record.roomId)}
+                  onClick={() => void recover(record)}
                 >
                   恢复对局
                 </button>
@@ -219,6 +308,87 @@ export function RoomRecordManager({
             className="button button--secondary"
             type="button"
             onClick={() => setDeleteTarget(null)}
+          >
+            取消
+          </button>
+        </div>
+      ) : null}
+      {replacementTarget ? (
+        <div
+          className="desktop-room-records__delete-confirmation"
+          role="alertdialog"
+          aria-label="确认替换进行中对局"
+          aria-modal="true"
+        >
+          <strong>本地正在进行“{replacementTarget.roomName}”</strong>
+          <p>请选择恢复上次对局，或正常关闭它后创建新房间。</p>
+          <button
+            className="button button--primary"
+            type="button"
+            onClick={() => void recover(replacementTarget)}
+          >
+            恢复上次对局
+          </button>
+          <button
+            className="button button--danger"
+            type="button"
+            onClick={() => void closeAndCreate()}
+          >
+            关闭上次对局并重新选择网卡
+          </button>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => setReplacementTarget(null)}
+          >
+            取消
+          </button>
+        </div>
+      ) : null}
+      {recoveryTarget ? (
+        <div
+          className="desktop-room-records__delete-confirmation"
+          role="alertdialog"
+          aria-label="选择恢复网卡"
+          aria-modal="true"
+        >
+          <strong>选择用于恢复“{recoveryTarget.roomName}”的网卡</strong>
+          <p>上次使用的网卡不可用或该历史记录尚未保存网卡。</p>
+          <label className="desktop-room-setup__adapter">
+            联机网卡
+            <select
+              value={recoveryAddress}
+              onChange={(event) => setRecoveryAddress(event.target.value)}
+            >
+              {recoveryNetworks.map((network) => (
+                <option key={network.address} value={network.address}>
+                  {network.name} · {network.address}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="button button--primary"
+            type="button"
+            disabled={!recoveryAddress}
+            onClick={() => {
+              const network = recoveryNetworks.find(
+                (candidate) => candidate.address === recoveryAddress,
+              );
+              if (network) {
+                void recover(recoveryTarget, {
+                  name: network.name,
+                  address: network.address,
+                });
+              }
+            }}
+          >
+            使用此网卡恢复
+          </button>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => setRecoveryTarget(null)}
           >
             取消
           </button>

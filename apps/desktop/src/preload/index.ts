@@ -1,17 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
+  ClipboardImageDataUrlSchema,
   DiscoveryScanInputSchema,
   HostStartInputSchema,
+  RoomRecordRecoveryInputSchema,
   WindowRoomContextSchema,
   type DesktopBridge,
   type DiscoveryScanInput,
   type HostServiceExitEvent,
   type HostStartInput,
+  type RoomRecordRecoveryInput,
   type WindowRoomContext,
 } from '../shared/runtime';
 
 const bridge: DesktopBridge = Object.freeze({
   getRuntimeInfo: () => ipcRenderer.invoke('runtime:get-info'),
+  openRoomRecordManager: () => ipcRenderer.invoke('room-records:open'),
   listNetworkInterfaces: () => ipcRenderer.invoke('network:list-interfaces'),
   scanLanRooms: (input: DiscoveryScanInput) =>
     ipcRenderer.invoke(
@@ -24,14 +28,24 @@ const bridge: DesktopBridge = Object.freeze({
   stopHostService: () => ipcRenderer.invoke('host:stop'),
   listRoomRecords: (includeArchived: boolean) =>
     ipcRenderer.invoke('room-records:list', includeArchived),
-  recoverRoomRecord: (roomId: string) =>
-    ipcRenderer.invoke('room-records:recover', roomId),
+  recoverRoomRecord: (input: RoomRecordRecoveryInput) =>
+    ipcRenderer.invoke(
+      'room-records:recover',
+      RoomRecordRecoveryInputSchema.parse(input),
+    ),
+  closeRunningRoomRecord: (roomId: string) =>
+    ipcRenderer.invoke('room-records:close-running', roomId),
   archiveRoomRecord: (roomId: string) =>
     ipcRenderer.invoke('room-records:archive', roomId),
   restoreRoomRecord: (roomId: string) =>
     ipcRenderer.invoke('room-records:restore', roomId),
   deleteRoomRecord: (roomId: string) =>
     ipcRenderer.invoke('room-records:delete', roomId),
+  copyImageToClipboard: (imageDataUrl: string) =>
+    ipcRenderer.invoke(
+      'clipboard:write-image',
+      ClipboardImageDataUrlSchema.parse(imageDataUrl),
+    ),
   onHostServiceExited: (listener: (event: HostServiceExitEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
       const parsed = zHostExitEvent(value);

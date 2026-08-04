@@ -94,6 +94,27 @@ describe('HostProcessController', () => {
     ).rejects.toThrow('another address');
   });
 
+  it('starts record management without a LAN listener or health check', async () => {
+    const child = fakeProcess();
+    const spawn = readySpawn(child);
+    const healthCheck = vi.fn(async () => true);
+    const controller = new HostProcessController({
+      dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-records-only`),
+      staticDirectory: 'client-dist',
+      spawn,
+      healthCheck,
+      delay: async () => undefined,
+    });
+
+    await expect(controller.startManagement()).resolves.toBeUndefined();
+    expect(controller.current()).toBeNull();
+    expect(spawn).toHaveBeenCalledWith({
+      env: expect.objectContaining({ HOST_MODE: 'management' }),
+    });
+    expect(spawn.mock.calls[0]?.[0].env.HOST_PORT).toBeUndefined();
+    expect(healthCheck).not.toHaveBeenCalled();
+  });
+
   it('does not mistake another process health response for its own host service', async () => {
     const child = fakeProcess();
     const controller = new HostProcessController({
@@ -137,10 +158,44 @@ describe('HostProcessController', () => {
     const listener = vi.fn();
     controller.subscribe(listener);
     await controller.start({ port: 32_102, advertisedAddress: '127.0.0.2' });
-    controller.stop();
+    const stopped = controller.stop();
     child.exit(0);
+    await stopped;
     expect(listener).toHaveBeenCalledWith({ expected: true, exitCode: 0 });
     expect(controller.current()).toBeNull();
+  });
+
+  it('waits for the host exit before allowing a different network address', async () => {
+    const first = fakeProcess();
+    const second = fakeProcess();
+    const children = [first, second];
+    const spawn = vi.fn((input: SpawnHostProcessInput) => {
+      const child = children[spawn.mock.calls.length - 1]!;
+      queueMicrotask(() =>
+        child.send({
+          type: 'host.ready',
+          instanceId: input.env.HOST_INSTANCE_ID,
+        }),
+      );
+      return child.process;
+    });
+    const controller = new HostProcessController({
+      dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-switch`),
+      staticDirectory: 'client-dist',
+      spawn,
+      healthCheck: async () => true,
+    });
+    await controller.start({ port: 32_100, advertisedAddress: '10.126.126.1' });
+
+    const stopped = controller.stop();
+    expect(first.process.kill).toHaveBeenCalledOnce();
+    first.exit(0);
+    await stopped;
+
+    await expect(
+      controller.start({ port: 32_100, advertisedAddress: '192.168.3.121' }),
+    ).resolves.toMatchObject({ advertisedAddress: '192.168.3.121' });
+    expect(spawn).toHaveBeenCalledTimes(2);
   });
 
   it('relays validated room-record management messages to the host process', async () => {

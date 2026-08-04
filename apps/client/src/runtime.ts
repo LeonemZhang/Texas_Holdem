@@ -10,6 +10,7 @@ export interface RuntimeInfo {
 
 export interface RuntimeAdapter {
   getRuntimeInfo(): Promise<RuntimeInfo>;
+  openRoomRecordManager(): Promise<void>;
   listNetworkInterfaces(): Promise<readonly DesktopNetworkInterface[]>;
   scanLanRooms(input: {
     readonly requestId: string;
@@ -18,16 +19,21 @@ export interface RuntimeAdapter {
   startHostService(input: {
     readonly port: number;
     readonly advertisedAddress: string;
+    readonly networkName?: string;
   }): Promise<HostServiceInfo>;
   getActiveHostService(): Promise<HostServiceInfo | null>;
   stopHostService(): Promise<void>;
   listRoomRecords(
     includeArchived: boolean,
   ): Promise<readonly RoomRecordSummary[]>;
-  recoverRoomRecord(roomId: string): Promise<RoomSessionResponse>;
+  recoverRoomRecord(
+    input: RoomRecordRecoveryInput,
+  ): Promise<RoomSessionResponse>;
+  closeRunningRoomRecord(roomId: string): Promise<void>;
   archiveRoomRecord(roomId: string): Promise<void>;
   restoreRoomRecord(roomId: string): Promise<void>;
   deleteRoomRecord(roomId: string): Promise<void>;
+  copyImageToClipboard?(imageDataUrl: string): Promise<void>;
   onHostServiceExited(
     listener: (event: HostServiceExitEvent) => void,
   ): () => void;
@@ -45,6 +51,17 @@ export interface RoomRecordSummary {
   readonly lastActiveAt: string;
   readonly completedHands: number;
   readonly playerCount: number;
+  readonly network?: RoomRecordNetwork | null;
+}
+
+export interface RoomRecordNetwork {
+  readonly name: string;
+  readonly address: string;
+}
+
+export interface RoomRecordRecoveryInput {
+  readonly roomId: string;
+  readonly network?: RoomRecordNetwork;
 }
 
 export interface WindowRoomContext {
@@ -68,6 +85,7 @@ export interface HostServiceInfo {
   readonly advertisedAddress: string;
   readonly joinUrl: string;
   readonly dataDirectory: string;
+  readonly networkName?: string;
 }
 
 export interface HostServiceExitEvent {
@@ -89,6 +107,9 @@ const browserAdapter: RuntimeAdapter = {
       platform: navigator.platform || 'web',
     };
   },
+  async openRoomRecordManager() {
+    throw new Error('浏览器不能管理对局记录');
+  },
   async listNetworkInterfaces() {
     return [];
   },
@@ -106,6 +127,9 @@ const browserAdapter: RuntimeAdapter = {
     return [];
   },
   async recoverRoomRecord() {
+    throw new Error('浏览器不能管理对局记录');
+  },
+  async closeRunningRoomRecord() {
     throw new Error('浏览器不能管理对局记录');
   },
   async archiveRoomRecord() {
