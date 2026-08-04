@@ -4,6 +4,7 @@ import {
   JoinBootstrapResponseSchema,
   JoinRoomSessionRequestSchema,
   PROTOCOL_VERSION,
+  ResumeRoomSessionRequestSchema,
   ResyncRequestSchema,
   SocketAuthenticationSchema,
   SystemHelloRequestSchema,
@@ -52,8 +53,8 @@ export interface CreateHostServerOptions {
     playerId: string,
   ) => PlayerSnapshot | null;
   roomSnapshotsProvider?: (roomId: string) => readonly PlayerSnapshot[];
-}
   onClosedRoomPublished?: (roomId: string) => void;
+}
 
 export interface HostServer {
   app: FastifyInstance;
@@ -188,6 +189,46 @@ export async function createHostServer(
         }
       },
     );
+    app.post(
+      '/api/rooms/:roomId/resume',
+      async (request, reply): Promise<RoomSessionResponse | object> => {
+        const parsed = ResumeRoomSessionRequestSchema.safeParse(request.body);
+        const roomId = (request.params as { roomId?: unknown }).roomId;
+        if (!parsed.success || typeof roomId !== 'string' || !roomId.trim()) {
+          return reply.code(400).send({
+            error: { code: 'INVALID_MESSAGE', message: '恢复身份无效' },
+          });
+        }
+        try {
+          const session = options.roomSessionService!.resume(
+            roomId,
+            parsed.data,
+            connection().joinUrl,
+          );
+          publishRoomSnapshots(session.roomId);
+          return session;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : '恢复房间失败';
+          const playerRemoved = message === 'Player was removed from this room';
+          const invalidIdentity = message === 'Recovery identity is invalid';
+          return reply
+            .code(playerRemoved ? 403 : invalidIdentity ? 401 : 409)
+            .send({
+              error: {
+                code: playerRemoved
+                  ? 'PLAYER_REMOVED'
+                  : invalidIdentity
+                    ? 'UNAUTHORIZED'
+                    : 'CONFLICT',
+                message: playerRemoved
+                  ? '你已被房主移出房间，无法重新加入本场对局。'
+                  : message,
+              },
+            });
+        }
+      },
+    );
   }
 
   if (
@@ -281,6 +322,9 @@ export async function createHostServer(
         acknowledge(response);
         if (response.status === 'accepted') {
           publishRoomSnapshots(identity.roomId);
+          if ('type' in rawCommand && rawCommand.type === 'room.close') {
+            options.onClosedRoomPublished?.(identity.roomId);
+          }
         }
       } catch {
         acknowledge({
@@ -322,9 +366,6 @@ export async function createHostServer(
 
   return {
     app,
-          if ('type' in rawCommand && rawCommand.type === 'room.close') {
-            options.onClosedRoomPublished?.(identity.roomId);
-          }
     io,
     publisher,
     async close() {

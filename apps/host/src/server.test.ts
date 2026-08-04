@@ -37,7 +37,7 @@ describe('host framework server', () => {
     activeHost = await createHostServer({
       roomSessionService: runtime,
       commandDispatcher: runtime,
-      sessionAuthenticator: runtime.sessions,
+      sessionAuthenticator: runtime,
       reconnectSynchronizer: runtime.reconnect,
       snapshotProvider: (roomId, playerId) =>
         runtime.snapshot(roomId, playerId),
@@ -107,6 +107,162 @@ describe('host framework server', () => {
     } finally {
       client.disconnect();
     }
+  });
+
+  it('restores a voluntarily departed session through the token-only endpoint', async () => {
+    const runtime = new GameRuntime();
+    activeHost = await createHostServer({
+      roomSessionService: runtime,
+      roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
+    });
+    const host = runtime.create(
+      {
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      },
+      'http://127.0.0.1:32100',
+    );
+    const guest = runtime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      'http://127.0.0.1:32100',
+    );
+    runtime.dispatch({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: 'guest-exit',
+      roomId: host.roomId,
+      playerId: guest.playerId,
+      expectedVersion: runtime.snapshot(host.roomId, guest.playerId)!
+        .stateVersion,
+      type: 'room.exit',
+    });
+
+    const resumed = await activeHost.app.inject({
+      method: 'POST',
+      url: `/api/rooms/${host.roomId}/resume`,
+      payload: { playerId: guest.playerId, token: guest.token },
+    });
+
+    expect(resumed.statusCode).toBe(200);
+    expect(resumed.json()).toMatchObject({ playerId: guest.playerId });
+    expect(
+      runtime
+        .snapshot(host.roomId, host.playerId)
+        ?.room.players.find(({ playerId }) => playerId === guest.playerId),
+    ).toMatchObject({ chips: 100, status: 'waiting' });
+  });
+
+  it('returns a permanent removal error when an in-game player tries to recover', async () => {
+    const runtime = new GameRuntime();
+    activeHost = await createHostServer({
+      roomSessionService: runtime,
+      roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
+    });
+    const host = runtime.create(
+      {
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      },
+      'http://127.0.0.1:32100',
+    );
+    const guest = runtime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      'http://127.0.0.1:32100',
+    );
+    let commandNumber = 0;
+    const send = (playerId: string, command: Record<string, unknown>) =>
+      runtime.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: `remove-flow-${++commandNumber}`,
+        roomId: host.roomId,
+        playerId,
+        expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+        ...command,
+      });
+    send(guest.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(host.playerId, {
+      type: 'room.start-first-hand',
+      handId: 'remove-flow-hand',
+    });
+    const actorId = runtime.snapshot(host.roomId, host.playerId)!.game!
+      .currentActorId!;
+    send(actorId, { type: 'game.fold' });
+    send(host.playerId, {
+      type: 'room.remove-player',
+      targetPlayerId: guest.playerId,
+    });
+
+    const response = await activeHost.app.inject({
+      method: 'POST',
+      url: `/api/rooms/${host.roomId}/resume`,
+      payload: { playerId: guest.playerId, token: guest.token },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: {
+        code: 'PLAYER_REMOVED',
+        message: '你已被房主移出房间，无法重新加入本场对局。',
+      },
+    });
+  });
+
+  it('returns a Chinese active-room conflict with the running room id', async () => {
+    const runtime = new GameRuntime();
+    activeHost = await createHostServer({ roomSessionService: runtime });
+    const payload = {
+      hostNickname: 'Alice',
+      settings: {
+        roomName: 'Friends',
+        maxPlayers: 10,
+        initialChips: 100,
+        smallBlind: 1,
+        actionTimeoutSeconds: 30,
+        handReadyTimeoutSeconds: 30,
+        blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+        zeroChipPolicy: 'request-chips',
+      },
+    };
+    const created = await activeHost.app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      payload,
+    });
+    const firstRoomId = created.json<{ roomId: string }>().roomId;
+
+    const conflict = await activeHost.app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      payload,
+    });
+
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json()).toEqual({
+      error: {
+        code: 'ROOM_ALREADY_RUNNING',
+        message: '本机已有进行中的对局，请恢复或关闭后再创建。',
+        roomId: firstRoomId,
+      },
+    });
   });
 
   it('returns a versioned health response', async () => {

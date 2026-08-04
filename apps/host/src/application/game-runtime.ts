@@ -108,7 +108,8 @@ export class GameRuntime implements RoomSessionBootstrapService {
       command.type === 'room.join' ||
       room?.players.some(
         ({ playerId, status }) =>
-          playerId === command.playerId && status !== 'left',
+          playerId === command.playerId &&
+          !['left', 'removed'].includes(status),
       ) === true,
     (command, room) => this.handle(command, room),
   );
@@ -175,7 +176,6 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return this.rooms.listRoomIds()[0] ?? null;
   }
 
-  onAutomaticStateChange(listener: (roomId: string) => void): () => void {
   authenticate(credentials: SocketAuthentication): SessionIdentity | null {
     const identity = this.sessions.authenticate(credentials);
     if (!identity) return null;
@@ -208,6 +208,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     this.rooms.delete(roomId);
   }
 
+  onAutomaticStateChange(listener: (roomId: string) => void): () => void {
     this.#automaticListeners.add(listener);
     return () => this.#automaticListeners.delete(listener);
   }
@@ -246,7 +247,6 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return this.sessionResponse(roomId, playerId, token, baseJoinUrl);
   }
 
-  exportState(roomId: string): GameRuntimeStateExport | null {
   closeRunningRoom(): string {
     const roomId = this.currentRoomId();
     if (!roomId) throw new RangeError('No room is running');
@@ -266,6 +266,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return roomId;
   }
 
+  exportState(roomId: string): GameRuntimeStateExport | null {
     const room = this.rooms.get(roomId);
     if (!room) return null;
     return Object.freeze({
@@ -348,6 +349,50 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return this.sessionResponse(roomId, playerId, token, baseJoinUrl);
   }
 
+  resume(
+    roomId: string,
+    request: ResumeRoomSessionRequest,
+    baseJoinUrl: string,
+  ): RoomSessionResponse {
+    const room = this.rooms.get(roomId);
+    if (!room || room.phase === 'closed') {
+      throw new RangeError('Room is not available for recovery');
+    }
+    const identity = this.sessions.authenticate({
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      playerId: request.playerId,
+      token: request.token,
+    });
+    if (
+      !identity ||
+      identity.roomId !== roomId ||
+      identity.playerId !== request.playerId
+    ) {
+      throw new RangeError('Recovery identity is invalid');
+    }
+    const player = room.players.find(
+      ({ playerId }) => playerId === identity.playerId,
+    );
+    if (!player) throw new RangeError('Recovery player is not in this room');
+    if (player.status === 'removed') {
+      throw new RangeError('Player was removed from this room');
+    }
+    this.sessions.register(identity, request.token);
+    this.rememberReconnectToken(roomId, identity.playerId, request.token);
+    if (player.status === 'left') {
+      this.#roomHandler.resumeLeftPlayer(roomId, identity.playerId);
+      this.#sequences.set(roomId, (this.#sequences.get(roomId) ?? 0) + 1);
+      this.#committedListeners.forEach((listener) => listener(roomId));
+    }
+    return this.sessionResponse(
+      roomId,
+      identity.playerId,
+      request.token,
+      baseJoinUrl,
+    );
+  }
+
   snapshot(roomId: string, playerId: string): PlayerSnapshot | null {
     const room = this.rooms.get(roomId);
     if (!room || !room.players.some((player) => player.playerId === playerId)) {
@@ -400,50 +445,6 @@ export class GameRuntime implements RoomSessionBootstrapService {
       hand,
       actionDeadlineMs,
       handReady: this.#roomHandler.getHandReady(roomId),
-  resume(
-    roomId: string,
-    request: ResumeRoomSessionRequest,
-    baseJoinUrl: string,
-  ): RoomSessionResponse {
-    const room = this.rooms.get(roomId);
-    if (!room || room.phase === 'closed') {
-      throw new RangeError('Room is not available for recovery');
-    }
-    const identity = this.sessions.authenticate({
-      protocolVersion: PROTOCOL_VERSION,
-      roomId,
-      playerId: request.playerId,
-      token: request.token,
-    });
-    if (
-      !identity ||
-      identity.roomId !== roomId ||
-      identity.playerId !== request.playerId
-    ) {
-      throw new RangeError('Recovery identity is invalid');
-    }
-    const player = room.players.find(
-      ({ playerId }) => playerId === identity.playerId,
-    );
-    if (!player) throw new RangeError('Recovery player is not in this room');
-    if (player.status === 'removed') {
-      throw new RangeError('Player was removed from this room');
-    }
-    this.sessions.register(identity, request.token);
-    this.rememberReconnectToken(roomId, identity.playerId, request.token);
-    if (player.status === 'left') {
-      this.#roomHandler.resumeLeftPlayer(roomId, identity.playerId);
-      this.#sequences.set(roomId, (this.#sequences.get(roomId) ?? 0) + 1);
-      this.#committedListeners.forEach((listener) => listener(roomId));
-    }
-    return this.sessionResponse(
-      roomId,
-      identity.playerId,
-      request.token,
-      baseJoinUrl,
-    );
-  }
-
       chipRequests: this.#roomHandler.getChipRequests(roomId),
       completedHands: this.#completedHands.get(roomId) ?? 0,
       statistics: room.players.map((player) => ({

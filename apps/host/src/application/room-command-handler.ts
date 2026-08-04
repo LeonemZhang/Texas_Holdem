@@ -7,10 +7,10 @@ import type {
 import {
   createChipRequest,
   createChipRequestBook,
+  carryChipRequestsToHandReady,
   rejectChipRequest,
   revokeChipRequest,
   revokeChipRequestsForPlayer,
-  revokePendingChipRequests,
   type ChipRequestBook,
 } from '../domain/chip-requests.js';
 import { approveChipRequest, giveChips } from '../domain/chip-transfers.js';
@@ -118,9 +118,12 @@ export class RoomCommandHandler {
   enterHandReady(result: BeginHandReadyResult): void {
     this.rooms.save(result.room);
     this.#handReady.set(result.room.roomId, result.handReady);
+    const existing = this.#chipRequests.get(result.room.roomId);
     this.#chipRequests.set(
       result.room.roomId,
-      createChipRequestBook(result.handReady),
+      existing
+        ? carryChipRequestsToHandReady(existing, result.handReady)
+        : createChipRequestBook(result.handReady),
     );
   }
 
@@ -141,7 +144,6 @@ export class RoomCommandHandler {
           });
       this.#hands.set(input.room.roomId, hand);
     }
-    const existing = this.#chipRequests.get(result.room.roomId);
     if (input.handReady)
       this.#handReady.set(input.room.roomId, input.handReady);
     if (input.chipRequests) {
@@ -166,7 +168,6 @@ export class RoomCommandHandler {
     const requests = context.requests;
     if (input.deadlineElapsed) {
       ready = normalizeHandReadyAtDeadline(room, ready, input.nowMs);
-      requests = revokePendingChipRequests(requests);
       this.#handReady.set(roomId, ready);
       this.#chipRequests.set(roomId, requests);
     }
@@ -194,6 +195,7 @@ export class RoomCommandHandler {
       previousButtonIndex: previousHand.positions.button.index,
       smallBlind: input.smallBlind,
       randomSource: this.randomSource,
+      allowPendingRequests: input.deadlineElapsed,
     });
     this.rooms.save(started.room);
     this.#hands.set(roomId, started.hand);
@@ -218,37 +220,12 @@ export class RoomCommandHandler {
   } {
     const ready = this.#handReady.get(roomId);
     const requests = this.#chipRequests.get(roomId);
-      allowPendingRequests: input.deadlineElapsed,
     if (!ready || !requests) {
       throw new RangeError('Hand-ready context is not active');
     }
     return { ready, requests };
   }
 
-  private handleCommand(
-    command: ClientCommand,
-    currentRoom: RoomState | null,
-  ): CommandHandlerResult {
-    if (command.type === 'room.create') {
-      if (currentRoom) throw new RangeError('Room already exists');
-      return this.accepted(
-        createRoom({
-          roomId: command.roomId,
-          hostPlayerId: command.playerId,
-          hostNickname: command.hostNickname,
-          settings: {
-            ...command.settings,
-            blind: blindSetting(command.settings.smallBlind),
-          },
-        }),
-      );
-    }
-
-    const room = this.requireRoom(currentRoom);
-    switch (command.type) {
-      case 'room.join':
-        return this.accepted(
-          joinRoom(room, {
   private requireChipRequests(roomId: string): ChipRequestBook {
     const requests = this.#chipRequests.get(roomId);
     if (!requests) throw new RangeError('Chip requests are not active');
@@ -297,6 +274,30 @@ export class RoomCommandHandler {
     );
   }
 
+  private handleCommand(
+    command: ClientCommand,
+    currentRoom: RoomState | null,
+  ): CommandHandlerResult {
+    if (command.type === 'room.create') {
+      if (currentRoom) throw new RangeError('Room already exists');
+      return this.accepted(
+        createRoom({
+          roomId: command.roomId,
+          hostPlayerId: command.playerId,
+          hostNickname: command.hostNickname,
+          settings: {
+            ...command.settings,
+            blind: blindSetting(command.settings.smallBlind),
+          },
+        }),
+      );
+    }
+
+    const room = this.requireRoom(currentRoom);
+    switch (command.type) {
+      case 'room.join':
+        return this.accepted(
+          joinRoom(room, {
             playerId: command.playerId,
             nickname: command.nickname,
           }),
@@ -353,6 +354,41 @@ export class RoomCommandHandler {
       }
       case 'room.close':
         return this.accepted(closeRoom(room, command.playerId).room);
+      case 'game.show-hole-cards': {
+        const hand = this.#hands.get(room.roomId);
+        if (room.phase !== 'hand-ready' || !hand || !('settlement' in hand)) {
+          throw new RangeError(
+            'Showing hole cards requires a settled hand-ready room',
+          );
+        }
+        if (
+          !hand.players.some(({ playerId }) => playerId === command.playerId)
+        ) {
+          throw new RangeError('Only a hand participant can show hole cards');
+        }
+        if (
+          room.voluntarilyRevealedHoleCardPlayerIds.includes(command.playerId)
+        ) {
+          throw new RangeError('Hole cards were already voluntarily revealed');
+        }
+        const settledHand = hand as ShowdownSettledHand;
+        if (
+          settledHand.settlement.reason === 'showdown' &&
+          command.playerId in settledHand.settlement.revealedHoleCards
+        ) {
+          throw new RangeError('Showdown hole cards are already public');
+        }
+        return this.accepted(
+          freezeRoom({
+            ...room,
+            version: room.version + 1,
+            voluntarilyRevealedHoleCardPlayerIds: [
+              ...room.voluntarilyRevealedHoleCardPlayerIds,
+              command.playerId,
+            ],
+          }),
+        );
+      }
       case 'hand-ready.set-choice': {
         const context = this.requireHandReady(room.roomId);
         this.#handReady.set(
@@ -382,7 +418,7 @@ export class RoomCommandHandler {
         return this.accepted(incrementVersion(room));
       }
       case 'chips.revoke': {
-        const context = this.requireHandReady(room.roomId);
+        const requests = this.requireChipRequests(room.roomId);
         this.#chipRequests.set(
           room.roomId,
           revokeChipRequest(requests, command.requestId, command.playerId),
@@ -390,6 +426,19 @@ export class RoomCommandHandler {
         return this.accepted(incrementVersion(room));
       }
       case 'chips.reject': {
+        const requests = this.requireChipRequests(room.roomId);
+        this.#chipRequests.set(
+          room.roomId,
+          rejectChipRequest(
+            room,
+            requests,
+            command.requestId,
+            command.playerId,
+          ),
+        );
+        return this.accepted(incrementVersion(room));
+      }
+      case 'chips.approve': {
         const requests = this.requireChipRequests(room.roomId);
         const request = requests.requests.find(
           ({ requestId }) => requestId === command.requestId,
@@ -404,31 +453,27 @@ export class RoomCommandHandler {
                 ]),
               )
             : undefined;
-        this.#chipRequests.set(
-          room.roomId,
-          rejectChipRequest(
-            room,
-            requests,
-            command.requestId,
-            command.playerId,
-          ),
-        );
-        return this.accepted(incrementVersion(room));
-      }
-      case 'chips.approve': {
-        const requests = this.requireChipRequests(room.roomId);
         const transferred = approveChipRequest(
           room,
           requests,
           command.requestId,
           command.playerId,
           command.transferId,
+          availableChipsByPlayerId,
         );
+        if (room.phase === 'playing' && request) {
+          this.applyPlayingChipTransfer(
+            room,
+            command.playerId,
+            request.requesterId,
+            request.amount,
+          );
+        }
         this.#chipRequests.set(room.roomId, transferred.requests);
         return this.accepted(transferred.room);
       }
       case 'chips.give': {
-        const requests = this.requireChipRequests(room.roomId);
+        const context = this.requireHandReady(room.roomId);
         const transferred = giveChips(room, context.requests, {
           transferId: command.transferId,
           giverPlayerId: command.playerId,
@@ -445,11 +490,3 @@ export class RoomCommandHandler {
     }
   }
 }
-        if (room.phase === 'playing' && request) {
-          this.applyPlayingChipTransfer(
-            room,
-            command.playerId,
-            request.requesterId,
-            request.amount,
-          );
-        }

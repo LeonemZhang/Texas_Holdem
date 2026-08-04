@@ -36,6 +36,8 @@ const defaultStaticDirectory = resolve(currentDirectory, '../../client/dist');
 const port = Number.parseInt(process.env.HOST_PORT ?? '32100', 10);
 const address = process.env.HOST_ADDRESS ?? '0.0.0.0';
 const advertisedHost = process.env.HOST_ADVERTISED_ADDRESS ?? '127.0.0.1';
+const networkName = process.env.HOST_NETWORK_NAME?.trim() || '本机网卡';
+const hostMode = process.env.HOST_MODE === 'management' ? 'management' : 'room';
 const staticDirectory = process.env.CLIENT_DIST_DIR ?? defaultStaticDirectory;
 const dataDirectory = process.env.HOST_DATA_DIR?.trim() || null;
 const discoveryPort = Number.parseInt(
@@ -65,7 +67,14 @@ const database = dataDirectory
       return opened;
     })()
   : null;
-const runtimeStore = database ? new SqliteGameRuntimeStore(database) : null;
+const runtimeStore = database
+  ? new SqliteGameRuntimeStore(
+      database,
+      hostMode === 'room'
+        ? { name: networkName, address: advertisedHost }
+        : null,
+    )
+  : null;
 const statisticsStore = database ? new SqliteStatisticsStore(database) : null;
 const roomRecordCatalog = database
   ? new SqliteRoomRecordCatalog(database)
@@ -87,28 +96,36 @@ const stopPersistence = runtime.onStateCommitted((roomId) => {
   const state = runtime.exportState(roomId);
   if (state) runtimeStore?.save(state, Date.now());
 });
-const host = await createHostServer({
-  staticDirectory,
-  advertisedHost,
-  port,
-  commandDispatcher: runtime,
-  sessionAuthenticator: runtime.sessions,
-  reconnectSynchronizer: runtime.reconnect,
-  roomSessionService: runtime,
-  snapshotProvider: (roomId, playerId) => runtime.snapshot(roomId, playerId),
-  roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
-});
+const host =
+  hostMode === 'room'
+    ? await createHostServer({
+        staticDirectory,
+        advertisedHost,
+        port,
+        commandDispatcher: runtime,
+        sessionAuthenticator: runtime,
+        reconnectSynchronizer: runtime.reconnect,
+        roomSessionService: runtime,
+        snapshotProvider: (roomId, playerId) =>
+          runtime.snapshot(roomId, playerId),
+        roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
+        onClosedRoomPublished: (roomId) => runtime.retireClosedRoom(roomId),
+      })
+    : null;
 const stopAutomaticUpdates = runtime.onAutomaticStateChange((roomId) => {
   for (const snapshot of runtime.snapshotsForRoom(roomId)) {
-    host.publisher.publishSnapshot(snapshot);
+    host?.publisher.publishSnapshot(snapshot);
   }
 });
-const discovery = new UdpDiscoveryResponder({
-  discoveryPort,
-  advertisedAddress: advertisedHost,
-  httpPort: port,
-  roomSummary: () => currentDiscoverySummary(runtime),
-});
+const discovery =
+  hostMode === 'room'
+    ? new UdpDiscoveryResponder({
+        discoveryPort,
+        advertisedAddress: advertisedHost,
+        httpPort: port,
+        roomSummary: () => currentDiscoverySummary(runtime),
+      })
+    : null;
 let stopParentProcessMonitor: () => void = () => undefined;
 let shuttingDown = false;
 const parentPort = (
@@ -174,6 +191,17 @@ parentPort?.on('message', ({ data }) => {
           ),
         };
         break;
+      case 'room-record.close-running': {
+        const roomId = roomRecordManagement.closeRunningRecord(
+          parsed.data.roomId,
+        );
+        for (const snapshot of runtime.snapshotsForRoom(roomId)) {
+          host?.publisher.publishSnapshot(snapshot);
+        }
+        runtime.retireClosedRoom(roomId);
+        result = null;
+        break;
+      }
       case 'room-record.archive':
         roomRecordManagement.archiveRecord(parsed.data.roomId);
         result = null;
@@ -191,17 +219,6 @@ parentPort?.on('message', ({ data }) => {
         break;
     }
     parentPort.postMessage({
-      case 'room-record.close-running': {
-        const roomId = roomRecordManagement.closeRunningRecord(
-          parsed.data.roomId,
-        );
-        for (const snapshot of runtime.snapshotsForRoom(roomId)) {
-          host?.publisher.publishSnapshot(snapshot);
-        }
-        runtime.retireClosedRoom(roomId);
-        result = null;
-        break;
-      }
       protocolVersion: '1',
       requestId: parsed.data.requestId,
       status: 'accepted',
@@ -213,15 +230,21 @@ parentPort?.on('message', ({ data }) => {
 });
 
 try {
-  await host.app.listen({ host: address, port });
-  try {
-    await discovery.start();
-  } catch (error) {
-    process.stderr.write(
-      `LAN discovery unavailable; direct IP remains enabled: ${error instanceof Error ? error.message : String(error)}\n`,
+  if (hostMode === 'room') {
+    await host!.app.listen({ host: address, port });
+    try {
+      await discovery!.start();
+    } catch (error) {
+      process.stderr.write(
+        `LAN discovery unavailable; direct IP remains enabled: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
+    process.stdout.write(
+      `Texas Hold’em host listening on ${address}:${port}\n`,
     );
+  } else {
+    process.stdout.write('Texas Hold’em record management ready\n');
   }
-  process.stdout.write(`Texas Hold’em host listening on ${address}:${port}\n`);
   if (hostInstanceId) {
     parentPort?.postMessage({ type: 'host.ready', instanceId: hostInstanceId });
   }
@@ -230,7 +253,7 @@ try {
     onParentExit: () => shutdown(),
   });
 } catch (error) {
-  await host.close();
+  await host?.close();
   throw error;
 }
 
@@ -241,8 +264,8 @@ async function shutdown() {
   stopPersistence();
   stopAutomaticUpdates();
   runtime.dispose();
-  await discovery.close();
-  await host.close();
+  await discovery?.close();
+  await host?.close();
   database?.close();
   process.exit(0);
 }
