@@ -95,6 +95,44 @@ describe('GameCommandHandler', () => {
     expect(rooms.get('room-1')?.phase).toBe('hand-ready');
   });
 
+  it('settles after the final all-in command without waiting for a timer', () => {
+    const { rooms, runtime } = playingRoom();
+    const handler = new GameCommandHandler(rooms, runtime, () => 5_000);
+    runtime.replaceCurrentHand(
+      'room-1',
+      startHand({
+        handId: 'hand-1',
+        participants: [
+          { playerId: 'host', seatIndex: 0, stack: 10 },
+          { playerId: 'bob', seatIndex: 1, stack: 10 },
+        ],
+        previousButtonIndex: null,
+        smallBlind: 1,
+        randomSource: { next: () => 0.5 },
+      }),
+    );
+
+    handler.handle(
+      { ...identity, commandId: 'host-all-in', type: 'game.all-in' },
+      rooms.get('room-1'),
+    );
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'bob-all-in',
+        playerId: 'bob',
+        type: 'game.all-in',
+      },
+      rooms.get('room-1'),
+    );
+
+    const settled = runtime.getCurrentHand('room-1');
+    expect(settled?.street).toBe('river');
+    expect(settled?.communityCards).toHaveLength(5);
+    expect('settlement' in (settled ?? {})).toBe(true);
+    expect(rooms.get('room-1')?.phase).toBe('hand-ready');
+  });
+
   it('delegates a legal current-player action to poker-core', () => {
     const { rooms, runtime } = playingRoom();
     const handler = new GameCommandHandler(rooms, runtime);

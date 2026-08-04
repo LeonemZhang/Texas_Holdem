@@ -154,6 +154,20 @@ describe('PlayerSnapshotSchema', () => {
     );
   });
 
+  it('accepts a permanently removed player in an authoritative snapshot', () => {
+    const parsed = PlayerSnapshotSchema.parse({
+      ...snapshot,
+      room: {
+        ...snapshot.room,
+        players: snapshot.room.players.map((player) =>
+          player.playerId === 'p2' ? { ...player, status: 'removed' } : player,
+        ),
+      },
+    });
+
+    expect(parsed.room.players[1]?.status).toBe('removed');
+  });
+
   it('rejects an invalid legal-action amount', () => {
     expect(
       PlayerSnapshotSchema.safeParse({

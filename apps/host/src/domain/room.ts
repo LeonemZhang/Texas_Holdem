@@ -33,6 +33,7 @@ function assertIdentity(value: string, label: string): string {
   const normalized = value.trim();
   if (!normalized) throw new RangeError(`${label} cannot be empty`);
   return normalized;
+  readonly voluntarilyRevealedHoleCardPlayerIds: readonly string[];
 }
 
 export function freezeRoom(room: RoomState): RoomState {
@@ -52,6 +53,9 @@ export function freezeRoom(room: RoomState): RoomState {
 export function createRoom(input: {
   readonly roomId: string;
   readonly hostPlayerId: string;
+    voluntarilyRevealedHoleCardPlayerIds: Object.freeze([
+      ...(room.voluntarilyRevealedHoleCardPlayerIds ?? []),
+    ]),
   readonly hostNickname: string;
   readonly settings: RoomSettingsInput;
 }): RoomState {
@@ -78,3 +82,4 @@ export function createRoom(input: {
     firstHandStarted: false,
   });
 }
+    voluntarilyRevealedHoleCardPlayerIds: [],

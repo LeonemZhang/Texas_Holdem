@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { PlayingCard, type StreetPotView } from '../table/CardsAndPots.js';
+
 export interface HandReadyRequestView {
   readonly requestId: string;
   readonly requesterId: string;
@@ -13,6 +15,7 @@ export interface HandReadyOverlayProps {
   readonly ownChoice: 'pending' | 'ready' | 'sitting-out';
   readonly pendingRequests: readonly HandReadyRequestView[];
   readonly complete: boolean;
+  readonly ownChips: number;
   readonly nowMs?: number;
   readonly onChoose: (choice: 'ready' | 'sitting-out') => void;
   readonly requestToReview?: HandReadyRequestView | null;
@@ -21,11 +24,104 @@ export interface HandReadyOverlayProps {
   readonly settlement?: {
     readonly handId: string;
     readonly reason: 'uncontested' | 'showdown';
-    readonly winners: readonly {
+    readonly communityCards?: readonly string[];
+    readonly totalPot?: number;
+    readonly streetPots?: readonly StreetPotView[];
+    readonly players: readonly {
+      readonly playerId: string;
       readonly nickname: string;
-      readonly payout: number;
+      readonly netChange: number;
+      readonly holeCards?: readonly string[];
+      readonly bestFiveCards?: readonly string[];
+      readonly voluntarilyRevealedHoleCards?: readonly string[];
+      readonly handType?: string;
     }[];
   } | null;
+}
+
+const streetLabels: Record<StreetPotView['street'], string> = {
+  preflop: '翻牌前',
+  flop: '翻牌',
+  turn: '转牌',
+  river: '河牌',
+};
+
+const rankValues: Record<string, number> = {
+  '2': 2,
+  '3': 3,
+  '4': 4,
+  '5': 5,
+  '6': 6,
+  '7': 7,
+  '8': 8,
+  '9': 9,
+  T: 10,
+  J: 11,
+  Q: 12,
+  K: 13,
+  A: 14,
+};
+
+const suitValues: Record<string, number> = {
+  s: 4,
+  h: 3,
+  d: 2,
+  c: 1,
+};
+
+function cardRank(card: string) {
+  return rankValues[card.slice(0, -1)] ?? 0;
+}
+
+function cardSuit(card: string) {
+  return suitValues[card.slice(-1)] ?? 0;
+}
+
+const straightHandTypes = new Set([
+  'straight',
+  'straight-flush',
+  '顺子',
+  '同花顺',
+]);
+
+function isStraightHand(handType: string | undefined) {
+  return handType !== undefined && straightHandTypes.has(handType);
+}
+
+/** Orders the already-authoritative best five for readable presentation only. */
+export function sortBestFiveCards(cards: readonly string[], handType?: string) {
+  const rankCounts = new Map<number, number>();
+  for (const card of cards) {
+    const rank = cardRank(card);
+    rankCounts.set(rank, (rankCounts.get(rank) ?? 0) + 1);
+  }
+
+  const straightHighRank = isStraightHand(handType)
+    ? Math.max(...rankCounts.keys()) === 14 && rankCounts.has(2)
+      ? 5
+      : Math.max(...rankCounts.keys())
+    : null;
+
+  return [...cards].sort((left, right) => {
+    const leftRank = cardRank(left);
+    const rightRank = cardRank(right);
+    if (straightHighRank !== null) {
+      const straightRank = (rank: number) =>
+        straightHighRank === 5 && rank === 14 ? 1 : rank;
+      return (
+        straightRank(rightRank) - straightRank(leftRank) ||
+        cardSuit(right) - cardSuit(left)
+      );
+    }
+
+    const countDifference =
+      (rankCounts.get(rightRank) ?? 0) - (rankCounts.get(leftRank) ?? 0);
+    return (
+      countDifference ||
+      rightRank - leftRank ||
+      cardSuit(right) - cardSuit(left)
+    );
+  });
 }
 
 function useCurrentTime(fixedNowMs?: number) {
@@ -43,6 +139,7 @@ export function HandReadyOverlay({
   ownChoice,
   pendingRequests,
   complete,
+  ownChips,
   nowMs,
   onChoose,
   requestToReview = null,
@@ -50,11 +147,8 @@ export function HandReadyOverlay({
   onRejectRequest,
   settlement = null,
 }: HandReadyOverlayProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [dismissedSettlementHandId, setDismissedSettlementHandId] = useState<
-    string | null
-  >(null);
   const currentTime = useCurrentTime(nowMs);
+  const settlementCommunityCards = settlement?.communityCards ?? [];
   const secondsLeft = Math.max(
     0,
     Math.ceil((deadlineMs - currentTime) / 1_000),
@@ -63,41 +157,42 @@ export function HandReadyOverlay({
   if (complete) return null;
 
   return (
-    <section className="hand-ready-overlay" aria-labelledby="hand-ready-title">
+    <section className="hand-ready-overlay" aria-label="发牌前准备">
       <div className="hand-ready-card">
         <header>
-          <div>
-            <h2
-              id="hand-ready-title"
-              className={expanded ? undefined : 'sr-only'}
-            >
-              下一手准备
-            </h2>
-            {expanded ? (
-              <p className="connection-home__kicker">发牌前准备</p>
-            ) : null}
-          </div>
           <strong
-            className="hand-ready-card__timer"
-            aria-label={`剩余 ${secondsLeft} 秒`}
+            className={`hand-ready-card__timer${secondsLeft === 0 ? ' hand-ready-card__timer--waiting' : ''}`}
+            aria-label={
+              secondsLeft > 0
+                ? `剩余 ${secondsLeft} 秒`
+                : '等待至少两名玩家重新就绪'
+            }
           >
-            {secondsLeft}s
+            {secondsLeft > 0 ? `${secondsLeft}s` : '等待重就绪'}
           </strong>
           <button
             className="button button--primary"
             type="button"
-            disabled={pendingRequests.length > 0}
+            disabled={
+              ownChoice === 'ready' ||
+              ownChips <= 0 ||
+              pendingRequests.length > 0
+            }
             onClick={() => onChoose('ready')}
           >
-            就绪
+            {ownChoice === 'ready'
+              ? '已就绪'
+              : ownChoice === 'sitting-out'
+                ? '加入下一手'
+                : '就绪'}
           </button>
           <button
-            className="hand-ready-card__details"
+            className="button button--secondary"
             type="button"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((current) => !current)}
+            disabled={ownChoice === 'sitting-out'}
+            onClick={() => onChoose('sitting-out')}
           >
-            {expanded ? '收起详情' : '准备详情'}
+            暂不参与
           </button>
         </header>
 
@@ -131,7 +226,7 @@ export function HandReadyOverlay({
           </section>
         ) : null}
 
-        {settlement && dismissedSettlementHandId !== settlement.handId ? (
+        {settlement ? (
           <section
             className="hand-ready-card__settlement"
             role="alertdialog"
@@ -140,24 +235,140 @@ export function HandReadyOverlay({
             <strong>
               本手结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
             </strong>
-            <ul>
-              {settlement.winners.map(({ nickname, payout }) => (
-                <li key={nickname}>
-                  {nickname} 赢得 {payout.toLocaleString('zh-CN')} 筹码
+            <section
+              className="hand-ready-card__settlement-table-summary"
+              aria-label="本手牌面与底池"
+            >
+              {settlementCommunityCards.length > 0 ? (
+                <div
+                  className="hand-ready-card__settlement-community-cards"
+                  aria-label="本手公共牌"
+                >
+                  <span className="hand-ready-card__card-label">公共牌</span>
+                  <div>
+                    {settlementCommunityCards.map((card, index) => (
+                      <PlayingCard
+                        code={card}
+                        key={`${card}-${index}`}
+                        label={`本手第 ${index + 1} 张公共牌`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <dl
+                className="hand-ready-card__settlement-pots"
+                aria-label="本手结算底池"
+              >
+                <div>
+                  <dt>总池</dt>
+                  <dd>{(settlement.totalPot ?? 0).toLocaleString('zh-CN')}</dd>
+                </div>
+                {(settlement.streetPots ?? []).map((pot) => (
+                  <div key={pot.street}>
+                    <dt>{streetLabels[pot.street]}</dt>
+                    <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+            <ul
+              className="hand-ready-card__showdown-results"
+              aria-label="本手结算玩家牌型"
+            >
+              {settlement.players.map((player) => (
+                <li key={player.playerId}>
+                  <div className="hand-ready-card__showdown-summary">
+                    <strong>{player.nickname}</strong>
+                    <span
+                      className={
+                        player.netChange > 0
+                          ? 'hand-ready-card__net-change--positive'
+                          : player.netChange < 0
+                            ? 'hand-ready-card__net-change--negative'
+                            : undefined
+                      }
+                    >
+                      {player.netChange > 0
+                        ? `赢得 ${player.netChange.toLocaleString('zh-CN')} 筹码`
+                        : player.netChange < 0
+                          ? `输掉 ${Math.abs(player.netChange).toLocaleString('zh-CN')} 筹码`
+                          : '持平'}
+                    </span>
+                  </div>
+                  <div className="hand-ready-card__settlement-cards">
+                    <div aria-label={`${player.nickname} 的底牌`}>
+                      <span className="hand-ready-card__card-label">底牌</span>
+                      {player.holeCards ? (
+                        player.holeCards.map((card, index) => (
+                          <PlayingCard
+                            code={card}
+                            key={`${card}-${index}`}
+                            label={`${player.nickname} 的第 ${index + 1} 张底牌`}
+                          />
+                        ))
+                      ) : player.voluntarilyRevealedHoleCards ? (
+                        player.voluntarilyRevealedHoleCards.map(
+                          (card, index) => (
+                            <PlayingCard
+                              code={card}
+                              key={`${card}-${index}`}
+                              label={`${player.nickname} 的公开第 ${index + 1} 张底牌`}
+                            />
+                          ),
+                        )
+                      ) : (
+                        <>
+                          <PlayingCard
+                            code={null}
+                            label={`${player.nickname} 的第 1 张底牌`}
+                          />
+                          <PlayingCard
+                            code={null}
+                            label={`${player.nickname} 的第 2 张底牌`}
+                          />
+                        </>
+                      )}
+                    </div>
+                    {player.bestFiveCards ? (
+                      <div
+                        aria-label={`${player.nickname} 的${player.handType ?? '牌型'}`}
+                      >
+                        <span className="hand-ready-card__card-label">
+                          {player.handType ?? '牌型'}
+                        </span>
+                        {sortBestFiveCards(
+                          player.bestFiveCards,
+                          player.handType,
+                        ).map((card, index) => (
+                          <PlayingCard
+                            code={card}
+                            key={`${card}-${index}`}
+                            label={`${player.nickname} 的最佳第 ${index + 1} 张牌`}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                    {!player.holeCards &&
+                    !player.voluntarilyRevealedHoleCards ? (
+                      <span className="hand-ready-card__showdown-status">
+                        未摊牌
+                      </span>
+                    ) : null}
+                    {player.voluntarilyRevealedHoleCards &&
+                    !player.holeCards ? (
+                      <span className="hand-ready-card__showdown-status">
+                        主动摊牌
+                      </span>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={() => setDismissedSettlementHandId(settlement.handId)}
-            >
-              知道了
-            </button>
           </section>
         ) : null}
 
-        {expanded && pendingRequests.length > 0 ? (
+        {pendingRequests.length > 0 ? (
           <div className="hand-ready-card__requests" role="status">
             <strong>尚有筹码请求待处理</strong>
             <ul>
@@ -168,30 +379,6 @@ export function HandReadyOverlay({
                 </li>
               ))}
             </ul>
-          </div>
-        ) : null}
-
-        {expanded ? (
-          <p className="hand-ready-card__choice">
-            当前选择：
-            <strong>
-              {ownChoice === 'pending'
-                ? '尚未选择'
-                : ownChoice === 'ready'
-                  ? '已就绪'
-                  : '下一手暂不参与'}
-            </strong>
-          </p>
-        ) : null}
-        {expanded ? (
-          <div className="hand-ready-card__actions">
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={() => onChoose('sitting-out')}
-            >
-              下一手暂不参与
-            </button>
           </div>
         ) : null}
       </div>

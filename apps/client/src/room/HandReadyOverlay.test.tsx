@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { HandReadyOverlay } from './HandReadyOverlay.js';
+import { HandReadyOverlay, sortBestFiveCards } from './HandReadyOverlay.js';
 
 describe('HandReadyOverlay', () => {
-  it('starts compact with a deadline and a ready action, then expands the other choice', () => {
+  it('shows ready and sitting-out actions alongside the preparation information', () => {
     const onChoose = vi.fn();
     render(
       <HandReadyOverlay
@@ -13,14 +13,14 @@ describe('HandReadyOverlay', () => {
         ownChoice="pending"
         pendingRequests={[]}
         complete={false}
+        ownChips={100}
         onChoose={onChoose}
       />,
     );
+    expect(screen.queryByText('下一手准备')).toBeNull();
     expect(screen.getByLabelText('剩余 30 秒')).toHaveTextContent('30s');
     fireEvent.click(screen.getByRole('button', { name: '就绪' }));
-    expect(screen.queryByRole('button', { name: '下一手暂不参与' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '准备详情' }));
-    fireEvent.click(screen.getByRole('button', { name: '下一手暂不参与' }));
+    fireEvent.click(screen.getByRole('button', { name: '暂不参与' }));
     expect(onChoose).toHaveBeenNthCalledWith(1, 'ready');
     expect(onChoose).toHaveBeenNthCalledWith(2, 'sitting-out');
   });
@@ -41,27 +41,76 @@ describe('HandReadyOverlay', () => {
           },
         ]}
         complete={false}
+        ownChips={100}
         onChoose={vi.fn()}
       />,
     );
-    expect(screen.getByRole('button', { name: '就绪' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '准备详情' }));
+    expect(screen.getByRole('button', { name: '已就绪' })).toBeDisabled();
     expect(screen.getByText('Bob 请求 200 筹码')).toBeInTheDocument();
-    expect(screen.getByText('已就绪')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '已就绪' })).toBeInTheDocument();
+    expect(screen.queryByText('当前选择：')).toBeNull();
   });
 
-  it('automatically disappears after the server marks preparation complete', () => {
-    const { container } = render(
+  it('automatically disappears after the next round starts', () => {
+    const { container, rerender } = render(
       <HandReadyOverlay
         deadlineMs={30_000}
-        nowMs={30_000}
+        nowMs={5_000}
+        ownChoice="ready"
+        pendingRequests={[]}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+      />,
+    );
+    expect(container).not.toBeEmptyDOMElement();
+    rerender(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={5_000}
         ownChoice="ready"
         pendingRequests={[]}
         complete
+        ownChips={100}
         onChoose={vi.fn()}
       />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows the ready state but prevents a zero-chip player from sending it', () => {
+    render(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        complete={false}
+        ownChips={0}
+        onChoose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '就绪' })).toBeDisabled();
+  });
+
+  it('lets a timed-out sitting-out player join the next hand again', () => {
+    const onChoose = vi.fn();
+    render(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={30_000}
+        ownChoice="sitting-out"
+        pendingRequests={[]}
+        complete={false}
+        ownChips={100}
+        onChoose={onChoose}
+      />,
+    );
+    expect(screen.getByLabelText('等待至少两名玩家重新就绪')).toHaveTextContent(
+      '等待重就绪',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '加入下一手' }));
+    expect(onChoose).toHaveBeenCalledWith('ready');
   });
 
   it('presents an incoming chip request for approval or rejection', () => {
@@ -74,6 +123,7 @@ describe('HandReadyOverlay', () => {
         ownChoice="pending"
         pendingRequests={[]}
         complete={false}
+        ownChips={100}
         onChoose={vi.fn()}
         requestToReview={{
           requestId: 'request-1',
@@ -95,7 +145,73 @@ describe('HandReadyOverlay', () => {
     expect(onRejectRequest).toHaveBeenCalledWith('request-1');
   });
 
-  it('shows a dismissible settlement summary during hand preparation', () => {
+  it('shows the settlement summary until the next round starts', () => {
+    const props = {
+      deadlineMs: 30_000,
+      nowMs: 5_000,
+      ownChoice: 'pending' as const,
+      pendingRequests: [],
+      ownChips: 100,
+      onChoose: vi.fn(),
+      settlement: {
+        handId: 'hand-1',
+        reason: 'showdown' as const,
+        communityCards: ['2c', 'Td', 'Jh', 'Qs', 'Ac'],
+        totalPot: 240,
+        streetPots: [
+          { street: 'preflop' as const, amount: 40 },
+          { street: 'flop' as const, amount: 200 },
+        ],
+        players: [
+          {
+            playerId: 'alice',
+            nickname: 'Alice',
+            netChange: 240,
+            holeCards: ['As', 'Kd'],
+            bestFiveCards: ['As', 'Ad', 'Ac', 'Ks', 'Qd'],
+            handType: '一对',
+          },
+          {
+            playerId: 'bob',
+            nickname: 'Bob',
+            netChange: -240,
+          },
+        ],
+      },
+    };
+    const { rerender } = render(
+      <HandReadyOverlay {...props} complete={false} />,
+    );
+    expect(
+      screen.getByRole('alertdialog', { name: '本手结算' }),
+    ).toHaveTextContent(/Alice\s*赢得 240 筹码/);
+    expect(screen.getByLabelText('本手结算玩家牌型')).toHaveTextContent(
+      /Bob\s*输掉 240 筹码\s*底牌\s*未摊牌/,
+    );
+    expect(screen.getByLabelText('Alice 的底牌')).toHaveTextContent('底牌A♠K♦');
+    expect(screen.getByLabelText('本手公共牌')).toHaveTextContent(
+      '公共牌2♣10♦J♥Q♠A♣',
+    );
+    expect(screen.getByLabelText('本手结算底池')).toHaveTextContent(
+      '总池240翻牌前40翻牌200',
+    );
+    expect(screen.getByLabelText('Alice 的一对')).toHaveTextContent(
+      '一对A♠A♦A♣K♠Q♦',
+    );
+    expect(screen.queryByText('最大牌')).toBeNull();
+    expect(
+      screen.getByLabelText('Alice 的最佳第 1 张牌 A♠'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Bob 的底牌')).toHaveTextContent('底牌');
+    expect(screen.getAllByLabelText(/Bob 的第 .* 张底牌，未公开/)).toHaveLength(
+      2,
+    );
+    expect(screen.queryByRole('button', { name: '知道了' })).toBeNull();
+    rerender(<HandReadyOverlay {...props} complete />);
+    expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
+  });
+
+  it('shows only the already public community cards for an early settlement', () => {
     render(
       <HandReadyOverlay
         deadlineMs={30_000}
@@ -103,18 +219,122 @@ describe('HandReadyOverlay', () => {
         ownChoice="pending"
         pendingRequests={[]}
         complete={false}
+        ownChips={100}
         onChoose={vi.fn()}
         settlement={{
-          handId: 'hand-1',
-          reason: 'showdown',
-          winners: [{ nickname: 'Alice', payout: 240 }],
+          handId: 'hand-early-turn',
+          reason: 'uncontested',
+          communityCards: ['As', 'Kd', 'Qh', 'Jc'],
+          players: [
+            { playerId: 'alice', nickname: 'Alice', netChange: 40 },
+            { playerId: 'bob', nickname: 'Bob', netChange: -40 },
+          ],
         }}
       />,
     );
+
+    expect(screen.getByLabelText('本手公共牌')).toHaveTextContent(
+      '公共牌A♠K♦Q♥J♣',
+    );
+    expect(screen.getAllByLabelText(/本手第 .* 张公共牌/)).toHaveLength(4);
+    expect(screen.queryByLabelText('本手第 5 张公共牌')).toBeNull();
+    expect(screen.getAllByLabelText(/的第 .* 张底牌，未公开/)).toHaveLength(4);
+  });
+
+  it('orders every hand type for readable settlement cards', () => {
+    expect(sortBestFiveCards(['2c', 'As', 'Td', 'Kd', 'Qh'], '高牌')).toEqual([
+      'As',
+      'Kd',
+      'Qh',
+      'Td',
+      '2c',
+    ]);
+    expect(sortBestFiveCards(['Ks', 'Ad', 'Ac', 'Qh', 'Jc'], '一对')).toEqual([
+      'Ad',
+      'Ac',
+      'Ks',
+      'Qh',
+      'Jc',
+    ]);
+    expect(sortBestFiveCards(['3c', 'Kd', 'Kh', 'Ad', 'As'], '两对')).toEqual([
+      'As',
+      'Ad',
+      'Kh',
+      'Kd',
+      '3c',
+    ]);
+    expect(sortBestFiveCards(['2c', 'Jd', 'Jh', 'Js', 'Ac'], '三条')).toEqual([
+      'Js',
+      'Jh',
+      'Jd',
+      'Ac',
+      '2c',
+    ]);
+    expect(sortBestFiveCards(['2s', '5d', 'Ah', '3c', '4s'], '顺子')).toEqual([
+      '5d',
+      '4s',
+      '3c',
+      '2s',
+      'Ah',
+    ]);
+    expect(sortBestFiveCards(['2h', 'Ah', '9h', 'Kh', 'Jh'], '同花')).toEqual([
+      'Ah',
+      'Kh',
+      'Jh',
+      '9h',
+      '2h',
+    ]);
+    expect(sortBestFiveCards(['Kd', 'Ac', 'As', 'Kh', 'Ad'], '葫芦')).toEqual([
+      'As',
+      'Ad',
+      'Ac',
+      'Kh',
+      'Kd',
+    ]);
+    expect(sortBestFiveCards(['2c', 'Qs', 'Qd', 'Qc', 'Qh'], '四条')).toEqual([
+      'Qs',
+      'Qh',
+      'Qd',
+      'Qc',
+      '2c',
+    ]);
     expect(
-      screen.getByRole('alertdialog', { name: '本手结算' }),
-    ).toHaveTextContent('Alice 赢得 240 筹码');
-    fireEvent.click(screen.getByRole('button', { name: '知道了' }));
-    expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
+      sortBestFiveCards(['2h', '5h', 'Ah', '3h', '4h'], 'straight-flush'),
+    ).toEqual(['5h', '4h', '3h', '2h', 'Ah']);
+  });
+
+  it('replaces settlement card backs with a player’s voluntarily revealed cards', () => {
+    render(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+        settlement={{
+          handId: 'hand-1',
+          reason: 'uncontested',
+          players: [
+            {
+              playerId: 'bob',
+              nickname: 'Bob',
+              netChange: -20,
+              voluntarilyRevealedHoleCards: ['2c', '3d'],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText('主动摊牌')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Bob 的公开第 1 张底牌 2♣'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Bob 的公开第 2 张底牌 3♦'),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Bob 的第 1 张底牌，未公开/)).toBeNull();
   });
 });

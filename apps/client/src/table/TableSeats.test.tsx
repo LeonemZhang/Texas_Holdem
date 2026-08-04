@@ -59,6 +59,23 @@ describe('TableSeats', () => {
     );
   });
 
+  it('keeps a permanently removed player on their seat as exited', () => {
+    const { container } = render(
+      <TableSeats
+        players={[
+          makePlayers(2)[0]!,
+          { ...makePlayers(2)[1]!, status: 'removed' },
+        ]}
+        ownPlayerId="p0"
+      />,
+    );
+
+    expect(container.querySelector('.table-seat--removed')).toHaveTextContent(
+      '已退出',
+    );
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
   it('labels a completed action on the corresponding player seat', () => {
     render(
       <TableSeats
@@ -98,5 +115,50 @@ describe('TableSeats', () => {
     );
     expect(screen.getByText('行动顺位 1')).toBeInTheDocument();
     expect(screen.getByText('行动顺位 2')).toBeInTheDocument();
+  });
+
+  it('shows settlement results without displaying hole cards on player seats', () => {
+    render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[
+          {
+            ...makePlayers(2)[0]!,
+            settlement: { netChange: 140, handType: '一对' },
+          },
+          {
+            ...makePlayers(2)[1]!,
+            settlement: { netChange: -140 },
+          },
+        ]}
+      />,
+    );
+    expect(screen.queryByLabelText('玩家 1 的底牌')).toBeNull();
+    expect(screen.queryByLabelText('玩家 2 的底牌')).toBeNull();
+    expect(screen.getByText('一对')).toBeInTheDocument();
+    expect(screen.getByText('+140')).toBeInTheDocument();
+    expect(screen.getByText('-140')).toBeInTheDocument();
+  });
+
+  it('keeps the folded player’s show-hole-cards action prominent', () => {
+    render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[
+          {
+            ...makePlayers(2)[0]!,
+            status: 'folded',
+            onShowHoleCards: () => {},
+          },
+          makePlayers(2)[1]!,
+        ]}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: '摊牌' });
+    expect(button).toHaveClass('table-seat__show-hole-cards');
+    expect(button.closest('.table-seat')).toHaveClass(
+      'table-seat--can-show-hole-cards',
+    );
   });
 });

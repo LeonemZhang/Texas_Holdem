@@ -3,6 +3,7 @@ import {
   HandReadyCommandSchema,
   PROTOCOL_VERSION,
   RoomCommandSchema,
+  ShowHoleCardsCommandSchema,
   type CommandResponse,
 } from '@texas-holdem/protocol';
 import { z } from 'zod';
@@ -14,6 +15,7 @@ export const ClientCommandSchema = z.union([
   RoomCommandSchema,
   BettingCommandSchema,
   HandReadyCommandSchema,
+  ShowHoleCardsCommandSchema,
 ]);
 export type ClientCommand = z.infer<typeof ClientCommandSchema>;
 

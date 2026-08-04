@@ -92,7 +92,10 @@ function showdownHoleCards(
   );
 }
 
-function settlementSummary(hand: StartedHandState | null): {
+function settlementSummary(
+  hand: StartedHandState | null,
+  voluntarilyRevealedHoleCardPlayerIds: readonly string[],
+): {
   readonly reason: 'uncontested' | 'showdown';
   readonly winnerIds: readonly string[];
   readonly payouts: Readonly<Record<string, number>>;
@@ -108,12 +111,49 @@ function settlementSummary(hand: StartedHandState | null): {
 function actionOrderByPlayerId(
   hand: StartedHandState | null,
 ): ReadonlyMap<string, number> {
+  readonly netChanges: Readonly<Record<string, number>>;
+  readonly showdownResults: readonly {
+    readonly playerId: string;
+    readonly handType: (typeof handTypeByCategory)[keyof typeof handTypeByCategory];
+    readonly bestFiveCards: readonly string[];
+  }[];
+  readonly voluntaryRevealedHoleCards: Readonly<
+    Record<string, readonly string[]>
+  >;
   if (!hand) return new Map();
   return new Map(
+  const netChanges = Object.fromEntries(
+    hand.players.map((player) => [
+      player.playerId,
+      (hand.settlement.payouts[player.playerId] ?? 0) - player.totalCommitted,
+    ]),
+  );
+  const showdownResults = isShowdownSettledHand(hand)
+    ? Object.entries(hand.settlement.bestHands ?? {}).map(
+        ([playerId, best]) => ({
+          playerId,
+          handType: handTypeByCategory[best.rank[0]],
+          bestFiveCards: best.cards.map(formatCard),
+        }),
+      )
+    : [];
+  const voluntaryRevealedHoleCards = Object.fromEntries(
+    voluntarilyRevealedHoleCardPlayerIds.flatMap((playerId) => {
+      const player = hand.players.find(
+        (candidate) => candidate.playerId === playerId,
+      );
+      return player
+        ? [[playerId, player.holeCards.map(formatCard)] as const]
+        : [];
+    }),
+  );
     actionOrderForStreet(
       hand.players.map(({ playerId, seatIndex }) => ({
         playerId,
         index: seatIndex,
+    netChanges,
+    showdownResults,
+    voluntaryRevealedHoleCards,
         status: 'active' as const,
       })),
       hand.positions,
@@ -217,7 +257,10 @@ function totalPotAmount(hand: StartedHandState): number {
             ? currentViewer.holeCards.map(formatCard)
             : null,
           showdownHoleCards: showdownHoleCards(hand),
-          settlement: settlementSummary(hand),
+          settlement: settlementSummary(
+            hand,
+            input.room.voluntarilyRevealedHoleCardPlayerIds,
+          ),
           legalActions:
             hand.betting.currentActorId === input.viewerPlayerId
               ? legalBettingActions(hand.betting, input.viewerPlayerId)

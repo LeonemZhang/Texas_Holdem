@@ -365,10 +365,27 @@ export function GameRoom({
     ? {
         handId: game.handId,
         reason: gameSettlement.reason,
-        winners: gameSettlement.winnerIds.map((playerId) => ({
-          nickname: names.get(playerId) ?? playerId,
-          payout: gameSettlement.payouts[playerId] ?? 0,
-        })),
+        communityCards: game.communityCards,
+        totalPot: game.totalPot,
+        streetPots: game.streetPots,
+        players: snapshot.room.players.map((player) => {
+          const handType = settlementHandTypes.get(player.playerId);
+          const bestFiveCards = settlementBestFiveCards.get(player.playerId);
+          const holeCards = settlementHoleCards.get(player.playerId);
+          const voluntarilyRevealedHoleCards =
+            gameSettlement.voluntaryRevealedHoleCards[player.playerId];
+          return {
+            playerId: player.playerId,
+            nickname: player.nickname,
+            netChange: gameSettlement.netChanges[player.playerId] ?? 0,
+            ...(handType ? { handType } : {}),
+            ...(holeCards ? { holeCards } : {}),
+            ...(bestFiveCards ? { bestFiveCards } : {}),
+            ...(voluntarilyRevealedHoleCards
+              ? { voluntarilyRevealedHoleCards }
+              : {}),
+          };
+        }),
       }
     : null;
   const actionActor = game?.currentActorId
@@ -429,7 +446,34 @@ export function GameRoom({
             ownPlayerId={session.playerId}
             players={snapshot.room.players.map((player) => ({
               ...player,
-              isCurrentActor: game?.currentActorId === player.playerId,
+              ...(gameSettlement
+                ? (() => {
+                    const handType = settlementHandTypes.get(player.playerId);
+                    return {
+                      settlement: {
+                        netChange:
+                          gameSettlement.netChanges[player.playerId] ?? 0,
+                        ...(handType ? { handType } : {}),
+                      },
+                    };
+                  })()
+                : {}),
+              ...(player.playerId === session.playerId &&
+              snapshot.handReady &&
+              gameSettlement &&
+              game.ownHoleCards &&
+              !gameSettlement.voluntaryRevealedHoleCards[player.playerId] &&
+              !gameSettlement.showdownResults.some(
+                (result) => result.playerId === player.playerId,
+              )
+                ? {
+                    onShowHoleCards: () =>
+                      void send({ type: 'game.show-hole-cards' }),
+                  }
+                : {}),
+              isCurrentActor:
+                snapshot.room.phase !== 'paused' &&
+                game?.currentActorId === player.playerId,
               isDealer: game?.buttonPlayerId === player.playerId,
               isSmallBlind: game?.smallBlindPlayerId === player.playerId,
               isBigBlind: game?.bigBlindPlayerId === player.playerId,
@@ -458,6 +502,21 @@ export function GameRoom({
             />
           ) : null
         }
+  const settlementHandTypes = new Map(
+    gameSettlement?.showdownResults.map((result) => [
+      result.playerId,
+      handTypeLabels[result.handType] ?? result.handType,
+    ]) ?? [],
+  );
+  const settlementBestFiveCards = new Map(
+    gameSettlement?.showdownResults.map((result) => [
+      result.playerId,
+      result.bestFiveCards,
+    ]) ?? [],
+  );
+  const settlementHoleCards = new Map(
+    game ? Object.entries(game.showdownHoleCards) : [],
+  );
         tableOverlay={
           snapshot.handReady ? (
             <HandReadyOverlay

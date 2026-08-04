@@ -1,4 +1,8 @@
-import type { RandomSource, StartedHandState } from '@texas-holdem/poker-core';
+import type {
+  RandomSource,
+  ShowdownSettledHand,
+  StartedHandState,
+} from '@texas-holdem/poker-core';
 
 import {
   createChipRequest,
@@ -350,6 +354,41 @@ export class RoomCommandHandler {
         });
         this.#chipRequests.set(room.roomId, transferred.requests);
         return this.accepted(transferred.room);
+      case 'game.show-hole-cards': {
+        const hand = this.#hands.get(room.roomId);
+        if (room.phase !== 'hand-ready' || !hand || !('settlement' in hand)) {
+          throw new RangeError(
+            'Showing hole cards requires a settled hand-ready room',
+          );
+        }
+        if (
+          !hand.players.some(({ playerId }) => playerId === command.playerId)
+        ) {
+          throw new RangeError('Only a hand participant can show hole cards');
+        }
+        if (
+          room.voluntarilyRevealedHoleCardPlayerIds.includes(command.playerId)
+        ) {
+          throw new RangeError('Hole cards were already voluntarily revealed');
+        }
+        const settledHand = hand as ShowdownSettledHand;
+        if (
+          settledHand.settlement.reason === 'showdown' &&
+          command.playerId in settledHand.settlement.revealedHoleCards
+        ) {
+          throw new RangeError('Showdown hole cards are already public');
+        }
+        return this.accepted(
+          freezeRoom({
+            ...room,
+            version: room.version + 1,
+            voluntarilyRevealedHoleCardPlayerIds: [
+              ...room.voluntarilyRevealedHoleCardPlayerIds,
+              command.playerId,
+            ],
+          }),
+        );
+      }
       }
       default:
         throw new RangeError(

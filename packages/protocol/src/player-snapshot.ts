@@ -94,6 +94,30 @@ export const PlayerSnapshotSchema = z.object({
           winnerIds: z.array(IdSchema).min(1),
           payouts: z.record(IdSchema, AmountSchema),
         })
+          netChanges: z.record(IdSchema, z.number().int().safe()),
+          showdownResults: z
+            .array(
+              z.object({
+                playerId: IdSchema,
+                handType: z.enum([
+                  'high-card',
+                  'one-pair',
+                  'two-pair',
+                  'three-of-a-kind',
+                  'straight',
+                  'flush',
+                  'full-house',
+                  'four-of-a-kind',
+                  'straight-flush',
+                ]),
+                bestFiveCards: z.array(CardCodeSchema).length(5),
+              }),
+            )
+            .default([]),
+          voluntaryRevealedHoleCards: z
+            .record(IdSchema, z.array(CardCodeSchema).length(2))
+            .optional()
+            .default({}),
         .nullable()
         .optional(),
       legalActions: LegalActionsSchema.nullable(),

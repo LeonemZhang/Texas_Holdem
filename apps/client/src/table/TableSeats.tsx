@@ -8,6 +8,7 @@ export type TableSeatStatus =
   | 'sitting-out'
   | 'eliminated'
   | 'left'
+  | 'removed'
   | 'disconnected';
 
 export interface TableSeatPlayer {
@@ -24,6 +25,11 @@ export interface TableSeatPlayer {
   readonly isBigBlind?: boolean;
   readonly lastAction?:
     'fold' | 'check' | 'call' | 'raiseTo' | 'allIn' | null | undefined;
+  readonly settlement?: {
+    readonly netChange: number;
+    readonly handType?: string;
+  };
+  readonly onShowHoleCards?: () => void;
 }
 
 export interface TableSeatsProps {
@@ -39,6 +45,7 @@ const statusLabels: Record<TableSeatStatus, string> = {
   'sitting-out': '暂不参与',
   eliminated: '已出局',
   left: '已离开',
+  removed: '已退出',
   disconnected: '已掉线',
 };
 
@@ -83,6 +90,7 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
           `table-seat--${player.status}`,
           `table-seat--color-${player.seatIndex % 6}`,
           player.isCurrentActor ? 'table-seat--acting' : '',
+          player.onShowHoleCards ? 'table-seat--can-show-hole-cards' : '',
           player.playerId === ownPlayerId ? 'table-seat--own' : '',
         ]
           .filter(Boolean)
@@ -90,6 +98,7 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
         return (
           <li
             className={stateClasses}
+            data-player-id={player.playerId}
             key={player.playerId}
             style={positionFor(index, sorted.length)}
             aria-current={player.isCurrentActor ? 'true' : undefined}
@@ -115,11 +124,37 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
                 {actionLabels[player.lastAction]}
               </span>
             ) : null}
+            {player.onShowHoleCards ? (
+              <button
+                className="table-seat__show-hole-cards"
+                type="button"
+                onClick={player.onShowHoleCards}
+              >
+                摊牌
+              </button>
+            ) : null}
             <strong>{player.chips.toLocaleString('zh-CN')}</strong>
+            <small>{statusLabels[player.status]}</small>
+            {player.settlement ? (
+              <div className="table-seat__settlement" role="status">
+                {player.settlement.handType ? (
+                  <span>{player.settlement.handType}</span>
+                ) : null}
+                <strong
+                  className={
+                    player.settlement.netChange >= 0
+                      ? 'table-seat__settlement--positive'
+                      : 'table-seat__settlement--negative'
+                  }
+                >
+                  {player.settlement.netChange >= 0 ? '+' : ''}
+                  {player.settlement.netChange.toLocaleString('zh-CN')}
+                </strong>
+              </div>
+            ) : null}
             <span className="table-seat__street-bet">
               本轮下注 {player.streetCommitted?.toLocaleString('zh-CN') ?? 0}
             </span>
-            <small>{statusLabels[player.status]}</small>
           </li>
         );
       })}
