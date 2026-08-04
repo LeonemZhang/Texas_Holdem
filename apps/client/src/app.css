@@ -1,13 +1,14 @@
 :root {
   color: #ecfdf5;
   background: #04110e;
-  font-family: Inter,
-  ui-sans-serif,
-  system-ui,
-  -apple-system,
-  BlinkMacSystemFont,
-  'Segoe UI',
-  sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -26,12 +27,13 @@ body,
 
 body {
   min-height: 100vh;
-  background: radial-gradient(
-    circle at 15% 10%,
-    rgb(16 185 129 / 18%),
-    transparent 30rem
-  ),
-  linear-gradient(145deg, #04110e, #071a16 60%, #09251d);
+  background:
+    radial-gradient(
+      circle at 15% 10%,
+      rgb(16 185 129 / 18%),
+      transparent 30rem
+    ),
+    linear-gradient(145deg, #04110e, #071a16 60%, #09251d);
 }
 
 .page-shell {
@@ -713,10 +715,12 @@ body:has(.poker-table-page) .poker-table-page {
   aspect-ratio: 4 / 3;
   border: clamp(0.5rem, 2vw, 1rem) solid #342318;
   border-radius: 35%;
-  background: radial-gradient(circle at 50% 45%, rgb(16 185 129 / 18%), transparent 48%),
-  #064e3b;
-  box-shadow: inset 0 0 0 2px rgb(251 191 36 / 22%),
-  0 1rem 3rem rgb(0 0 0 / 28%);
+  background:
+    radial-gradient(circle at 50% 45%, rgb(16 185 129 / 18%), transparent 48%),
+    #064e3b;
+  box-shadow:
+    inset 0 0 0 2px rgb(251 191 36 / 22%),
+    0 1rem 3rem rgb(0 0 0 / 28%);
 }
 
 body:has(.poker-table-page) .poker-table {
@@ -812,9 +816,10 @@ body:has(.poker-table-page) .poker-table {
 
   to {
     transform: translate(
-      calc(-50% + var(--chip-flight-travel-x)),
-      calc(-50% + var(--chip-flight-travel-y))
-    ) scale(0.62);
+        calc(-50% + var(--chip-flight-travel-x)),
+        calc(-50% + var(--chip-flight-travel-y))
+      )
+      scale(0.62);
     opacity: 0;
   }
 }
@@ -897,13 +902,15 @@ body:has(.poker-table-page) .poker-table-controls {
   display: grid;
   width: clamp(5.2rem, 13vw, 8.5rem);
   min-height: 3.4rem;
-  padding: clamp(1rem, 1.7vw, 1.3rem) clamp(0.35rem, 1vw, 0.65rem) clamp(0.35rem, 1vw, 0.65rem);
+  padding: clamp(1rem, 1.7vw, 1.3rem) clamp(0.35rem, 1vw, 0.65rem)
+    clamp(0.35rem, 1vw, 0.65rem);
   transform: translate(-50%, -50%);
   border: 2px solid var(--seat-accent, rgb(167 243 208 / 20%));
   border-radius: 0.8rem;
   background: #071a16;
-  box-shadow: inset 0 0.2rem 0 var(--seat-accent, transparent),
-  0 0.4rem 1rem rgb(0 0 0 / 30%);
+  box-shadow:
+    inset 0 0.2rem 0 var(--seat-accent, transparent),
+    0 0.4rem 1rem rgb(0 0 0 / 30%);
   text-align: center;
 }
 
@@ -1000,8 +1007,9 @@ body:has(.poker-table-page) .poker-table-controls {
 .table-seat--acting {
   border-color: #fbbf24;
   background: #17351f;
-  box-shadow: 0 0 0 3px rgb(251 191 36 / 30%),
-  0 0 1.2rem rgb(251 191 36 / 30%);
+  box-shadow:
+    0 0 0 3px rgb(251 191 36 / 30%),
+    0 0 1.2rem rgb(251 191 36 / 30%);
 }
 
 .table-seat--color-0 {
@@ -1075,8 +1083,9 @@ body:has(.poker-table-page) .poker-table-controls {
   border-radius: 999px;
   color: #2d1600;
   background: linear-gradient(145deg, #fef08a, #f59e0b);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 72%),
-  0 0.35rem 0.9rem rgb(245 158 11 / 48%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 72%),
+    0 0.35rem 0.9rem rgb(245 158 11 / 48%);
   cursor: pointer;
   font: inherit;
   font-size: 0.88rem;
@@ -1166,12 +1175,13 @@ body:has(.poker-table-page) .poker-table-controls {
 
 .playing-card--back {
   border-color: #93c5fd;
-  background: repeating-linear-gradient(
-    45deg,
-    rgb(255 255 255 / 12%) 0 2px,
-    transparent 2px 6px
-  ),
-  #1d4ed8;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgb(255 255 255 / 12%) 0 2px,
+      transparent 2px 6px
+    ),
+    #1d4ed8;
 }
 
 .playing-card--back::after {
@@ -1357,7 +1367,8 @@ body:has(.poker-table-page) .poker-table-controls {
   border-radius: 50%;
   color: inherit !important;
   background: transparent !important;
-  font-family: ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif !important;
+  font-family:
+    ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif !important;
   font-size: 0.82rem !important;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -1375,9 +1386,10 @@ body:has(.poker-table-page) .poker-table-controls {
   border-radius: 50%;
   color: var(--chip-color, #fff);
   background: var(--chip-background, #2563eb);
-  box-shadow: inset 0 0 0 0.14rem rgb(0 0 0 / 26%),
-  inset 0 0 0 0.36rem rgb(255 255 255 / 14%),
-  0 0.14rem 0.22rem rgb(0 0 0 / 42%);
+  box-shadow:
+    inset 0 0 0 0.14rem rgb(0 0 0 / 26%),
+    inset 0 0 0 0.36rem rgb(255 255 255 / 14%),
+    0 0.14rem 0.22rem rgb(0 0 0 / 42%);
   text-shadow: 0 1px 1px rgb(0 0 0 / 48%);
 }
 
@@ -1468,8 +1480,9 @@ body:has(.poker-table-page) .poker-table-controls {
 }
 
 .raise-control__quick-chips button {
-  transition: transform 120ms ease,
-  filter 120ms ease;
+  transition:
+    transform 120ms ease,
+    filter 120ms ease;
 }
 
 .raise-control__quick-chips button:not(:disabled):hover {
@@ -2247,7 +2260,8 @@ body:has(.poker-table-page) .poker-table-controls {
   padding: clamp(1rem, 3vw, 1.75rem);
   border: 1px solid rgb(110 231 183 / 32%);
   border-radius: 1.2rem;
-  background: linear-gradient(135deg, rgb(6 78 59 / 34%), rgb(4 47 46 / 18%)), #061b17;
+  background:
+    linear-gradient(135deg, rgb(6 78 59 / 34%), rgb(4 47 46 / 18%)), #061b17;
   box-shadow: 0 1.25rem 3rem rgb(0 0 0 / 22%);
 }
 
@@ -3062,8 +3076,8 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   body:has(.poker-table-page)
-  .connection-guard__footer
-  .connection-guard__exit-action {
+    .connection-guard__footer
+    .connection-guard__exit-action {
     display: grid;
     width: 44px;
     min-width: 44px;
@@ -3075,29 +3089,29 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   body:has(.poker-table-page)
-  .connection-guard__footer
-  .connection-guard__exit-action--expanded {
+    .connection-guard__footer
+    .connection-guard__exit-action--expanded {
     width: 6.5rem;
     border-radius: 0.7rem;
   }
 
   body:has(.poker-table-page)
-  .connection-guard__footer
-  .connection-guard__exit-label--compact,
+    .connection-guard__footer
+    .connection-guard__exit-label--compact,
   body:has(.poker-table-page)
-  .connection-guard__footer
-  .connection-guard__exit-action--expanded
-  .connection-guard__exit-label--expanded {
+    .connection-guard__footer
+    .connection-guard__exit-action--expanded
+    .connection-guard__exit-label--expanded {
     display: inline;
   }
 
   body:has(.poker-table-page)
-  .connection-guard__footer
-  .connection-guard__exit-action--expanded
-  .connection-guard__exit-label--compact,
+    .connection-guard__footer
+    .connection-guard__exit-action--expanded
+    .connection-guard__exit-label--compact,
   body:has(.poker-table-page)
-  .connection-guard__footer
-  .connection-guard__exit-label--expanded {
+    .connection-guard__footer
+    .connection-guard__exit-label--expanded {
     display: none;
   }
 
@@ -3106,7 +3120,7 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   body:has(.connection-guard__exit-action--expanded)
-  .poker-table-page__utility-actions {
+    .poker-table-page__utility-actions {
     padding-right: 6.75rem;
   }
 
@@ -3457,7 +3471,8 @@ body:has(.poker-table-page) .poker-table-controls {
     display: block;
     width: 100%;
     height: 100dvh;
-    padding: calc(0.5rem + env(safe-area-inset-top)) 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
+    padding: calc(0.5rem + env(safe-area-inset-top)) 0.5rem
+      calc(0.5rem + env(safe-area-inset-bottom));
     overflow-y: auto;
     background: rgb(4 17 14 / 96%);
     transform: none;
@@ -3723,19 +3738,21 @@ body:has(.room-closed) .room-closed {
   padding: clamp(1rem, 3vw, 2.5rem);
   align-content: center;
   border-color: rgb(251 191 36 / 42%);
-  background: radial-gradient(
-    circle at 74% 22%,
-    rgb(251 191 36 / 14%),
-    transparent 24rem
-  ),
-  radial-gradient(
-    circle at 16% 90%,
-    rgb(16 185 129 / 15%),
-    transparent 20rem
-  ),
-  linear-gradient(135deg, rgb(4 47 46 / 94%), rgb(22 30 21 / 94%));
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 4%),
-  0 1.5rem 4rem rgb(0 0 0 / 36%);
+  background:
+    radial-gradient(
+      circle at 74% 22%,
+      rgb(251 191 36 / 14%),
+      transparent 24rem
+    ),
+    radial-gradient(
+      circle at 16% 90%,
+      rgb(16 185 129 / 15%),
+      transparent 20rem
+    ),
+    linear-gradient(135deg, rgb(4 47 46 / 94%), rgb(22 30 21 / 94%));
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 4%),
+    0 1.5rem 4rem rgb(0 0 0 / 36%);
   gap: clamp(1rem, 4vh, 2.5rem);
 }
 
@@ -3770,8 +3787,9 @@ body:has(.room-closed) .room-closed {
   border-color: #fcd34d;
   color: #231506;
   background: linear-gradient(145deg, #fde68a, #f59e0b);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%),
-  0 0.35rem 0.8rem rgb(69 26 3 / 30%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 55%),
+    0 0.35rem 0.8rem rgb(69 26 3 / 30%);
 }
 
 .button--secondary {
