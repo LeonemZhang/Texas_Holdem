@@ -26,9 +26,12 @@ export interface FunTitleView {
 
 export interface StatisticsPanelProps {
   readonly open: boolean;
+  readonly collapsed?: boolean;
   readonly players: readonly PlayerStatisticsView[];
   readonly titles: readonly FunTitleView[];
   readonly onClose: () => void;
+  readonly onCollapse?: () => void;
+  readonly onExpand?: () => void;
 }
 
 const titleNames: Record<string, string> = {
@@ -43,11 +46,23 @@ const titleNames: Record<string, string> = {
 
 export function StatisticsPanel({
   open,
+  collapsed = false,
   players,
   titles,
   onClose,
+  onCollapse,
+  onExpand,
 }: StatisticsPanelProps) {
   if (!open) return null;
+  if (collapsed) {
+    return (
+      <aside className="statistics-tab" aria-label="已收起的统计">
+        <button type="button" onClick={onExpand}>
+          统计
+        </button>
+      </aside>
+    );
+  }
   const ranked = [...players].sort(
     (left, right) => right.currentChips - left.currentChips,
   );
@@ -62,9 +77,14 @@ export function StatisticsPanel({
           <p className="connection-home__kicker">服务端统计</p>
           <h2 id="statistics-title">牌局战报</h2>
         </div>
-        <button type="button" onClick={onClose} aria-label="关闭统计">
-          ×
-        </button>
+        <div className="statistics-drawer__actions">
+          <button type="button" onClick={onCollapse}>
+            收起
+          </button>
+          <button type="button" onClick={onClose} aria-label="关闭统计">
+            ×
+          </button>
+        </div>
       </header>
 
       <ol className="statistics-ranking" aria-label="筹码排名">

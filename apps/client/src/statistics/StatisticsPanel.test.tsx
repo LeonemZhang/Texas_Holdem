@@ -91,4 +91,32 @@ describe('StatisticsPanel', () => {
     );
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   });
+
+  it('can collapse into a compact statistics tab and expand again', () => {
+    const onCollapse = vi.fn();
+    const onExpand = vi.fn();
+    const { rerender } = render(
+      <StatisticsPanel
+        open
+        players={[]}
+        titles={[]}
+        onClose={vi.fn()}
+        onCollapse={onCollapse}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '收起' }));
+    expect(onCollapse).toHaveBeenCalledOnce();
+    rerender(
+      <StatisticsPanel
+        open
+        collapsed
+        players={[]}
+        titles={[]}
+        onClose={vi.fn()}
+        onExpand={onExpand}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '统计' }));
+    expect(onExpand).toHaveBeenCalledOnce();
+  });
 });
