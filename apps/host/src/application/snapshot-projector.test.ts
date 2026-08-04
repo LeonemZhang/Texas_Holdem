@@ -57,6 +57,10 @@ describe('projectPlayerSnapshot', () => {
     expect(hostSnapshot.game?.ownHoleCards).toEqual(hostCards);
     expect(bobSnapshot.game?.ownHoleCards).toEqual(bobCards);
     expect(hostSnapshot.game?.actionDeadlineMs).toBe(30_000);
+    expect(hostSnapshot.game?.totalPot).toBe(3);
+    expect(hostSnapshot.game?.streetPots).toEqual([
+      { street: 'preflop', amount: 3 },
+    ]);
     expect(hostSnapshot.room.players).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -71,6 +75,32 @@ describe('projectPlayerSnapshot', () => {
     expect(JSON.stringify(bobSnapshot)).not.toContain(hostCards[0]);
     expect(JSON.stringify(bobSnapshot)).not.toContain(hostCards[1]);
     expect(JSON.stringify(hostSnapshot)).not.toContain('deck');
+  });
+
+  it('keeps completed street totals fixed while publishing the live street total', () => {
+    const started = startedRoom();
+    const hand = {
+      ...started.hand,
+      street: 'flop' as const,
+      completedStreetPots: [{ street: 'preflop' as const, amount: 3 }],
+      players: started.hand.players.map((player, index) => ({
+        ...player,
+        streetCommitted: index === 0 ? 4 : 6,
+        totalCommitted: index === 0 ? 5 : 8,
+      })),
+    };
+    const snapshot = projectPlayerSnapshot({
+      room: started.room,
+      viewerPlayerId: 'host',
+      sequence: 2,
+      hand,
+    });
+
+    expect(snapshot.game?.totalPot).toBe(13);
+    expect(snapshot.game?.streetPots).toEqual([
+      { street: 'preflop', amount: 3 },
+      { street: 'flop', amount: 10 },
+    ]);
   });
 
   it('only projects legal actions for the server-selected current actor', () => {
@@ -132,10 +162,14 @@ describe('projectPlayerSnapshot', () => {
 
     expect(hostSnapshot.game?.showdownHoleCards).toEqual(expected);
     expect(bobSnapshot.game?.showdownHoleCards).toEqual(expected);
-    expect(hostSnapshot.game?.settlement).toEqual({
+    expect(hostSnapshot.game?.settlement).toMatchObject({
       reason: 'showdown',
       winnerIds: ['host'],
       payouts: { host: 100 },
+    });
+    expect(hostSnapshot.game?.settlement?.netChanges).toEqual({
+      host: 99,
+      bob: -2,
     });
   });
 });

@@ -1,6 +1,6 @@
 import {
+  HAND_CATEGORY,
   actionOrderForStreet,
-  buildPots,
   formatCard,
   legalBettingActions,
   type StartedHandState,
@@ -35,6 +35,18 @@ export interface SnapshotPlayerStatistics {
     readonly allIn: number;
   };
 }
+
+const handTypeByCategory = {
+  [HAND_CATEGORY.HIGH_CARD]: 'high-card',
+  [HAND_CATEGORY.ONE_PAIR]: 'one-pair',
+  [HAND_CATEGORY.TWO_PAIR]: 'two-pair',
+  [HAND_CATEGORY.THREE_OF_A_KIND]: 'three-of-a-kind',
+  [HAND_CATEGORY.STRAIGHT]: 'straight',
+  [HAND_CATEGORY.FLUSH]: 'flush',
+  [HAND_CATEGORY.FULL_HOUSE]: 'full-house',
+  [HAND_CATEGORY.FOUR_OF_A_KIND]: 'four-of-a-kind',
+  [HAND_CATEGORY.STRAIGHT_FLUSH]: 'straight-flush',
+} as const;
 
 export interface SnapshotProjectionInput {
   readonly room: RoomState;
@@ -99,18 +111,6 @@ function settlementSummary(
   readonly reason: 'uncontested' | 'showdown';
   readonly winnerIds: readonly string[];
   readonly payouts: Readonly<Record<string, number>>;
-} | null {
-  if (!hand || !isSettledHand(hand)) return null;
-  return {
-    reason: hand.settlement.reason,
-    winnerIds: hand.settlement.winnerIds,
-    payouts: hand.settlement.payouts,
-  };
-}
-
-function actionOrderByPlayerId(
-  hand: StartedHandState | null,
-): ReadonlyMap<string, number> {
   readonly netChanges: Readonly<Record<string, number>>;
   readonly showdownResults: readonly {
     readonly playerId: string;
@@ -120,8 +120,8 @@ function actionOrderByPlayerId(
   readonly voluntaryRevealedHoleCards: Readonly<
     Record<string, readonly string[]>
   >;
-  if (!hand) return new Map();
-  return new Map(
+} | null {
+  if (!hand || !isSettledHand(hand)) return null;
   const netChanges = Object.fromEntries(
     hand.players.map((player) => [
       player.playerId,
@@ -147,18 +147,49 @@ function actionOrderByPlayerId(
         : [];
     }),
   );
+  return {
+    reason: hand.settlement.reason,
+    winnerIds: hand.settlement.winnerIds,
+    payouts: hand.settlement.payouts,
+    netChanges,
+    showdownResults,
+    voluntaryRevealedHoleCards,
+  };
+}
+
+function actionOrderByPlayerId(
+  hand: StartedHandState | null,
+): ReadonlyMap<string, number> {
+  if (!hand) return new Map();
+  return new Map(
     actionOrderForStreet(
       hand.players.map(({ playerId, seatIndex }) => ({
         playerId,
         index: seatIndex,
-    netChanges,
-    showdownResults,
-    voluntaryRevealedHoleCards,
         status: 'active' as const,
       })),
       hand.positions,
       hand.street,
     ).map(({ playerId }, index) => [playerId, index + 1]),
+  );
+}
+
+function streetPotHistory(hand: StartedHandState) {
+  const completed = hand.completedStreetPots ?? [];
+  const currentStreetAmount = hand.players.reduce(
+    (total, player) => total + player.streetCommitted,
+    0,
+  );
+  return [
+    ...completed.filter(({ street }) => street !== hand.street),
+    { street: hand.street, amount: currentStreetAmount },
+  ];
+}
+
+function totalPotAmount(hand: StartedHandState): number {
+  return hand.players.reduce(
+    (total, player) => total + player.totalCommitted,
+    0,
   );
 }
 
@@ -214,25 +245,6 @@ export function projectPlayerSnapshot(
         chips: currentChips(player),
         streetCommitted:
           handPlayer(hand, player.playerId)?.streetCommitted ?? 0,
-function streetPotHistory(hand: StartedHandState) {
-  const completed = hand.completedStreetPots ?? [];
-  const currentStreetAmount = hand.players.reduce(
-    (total, player) => total + player.streetCommitted,
-    0,
-  );
-  return [
-    ...completed.filter(({ street }) => street !== hand.street),
-    { street: hand.street, amount: currentStreetAmount },
-  ];
-}
-
-function totalPotAmount(hand: StartedHandState): number {
-  return hand.players.reduce(
-    (total, player) => total + player.totalCommitted,
-    0,
-  );
-}
-
         totalCommitted: handPlayer(hand, player.playerId)?.totalCommitted ?? 0,
         actionOrder: actionOrder.get(player.playerId) ?? null,
         lastAction: handPlayer(hand, player.playerId)?.lastAction ?? null,
@@ -287,6 +299,15 @@ function totalPotAmount(hand: StartedHandState): number {
             ),
         }
       : null,
+    chipRequests: (requests?.requests ?? [])
+      .filter(({ status }) => status === 'pending')
+      .map(({ requestId, requesterId, targetPlayerId, amount, status }) => ({
+        requestId,
+        requesterId,
+        targetPlayerId,
+        amount,
+        status,
+      })),
     statistics: {
       players: statistics,
       titles: input.titles ?? [],

@@ -94,7 +94,6 @@ export const PlayerSnapshotSchema = z.object({
           reason: z.enum(['uncontested', 'showdown']),
           winnerIds: z.array(IdSchema).min(1),
           payouts: z.record(IdSchema, AmountSchema),
-        })
           netChanges: z.record(IdSchema, z.number().int().safe()),
           showdownResults: z
             .array(
@@ -119,6 +118,7 @@ export const PlayerSnapshotSchema = z.object({
             .record(IdSchema, z.array(CardCodeSchema).length(2))
             .optional()
             .default({}),
+        })
         .nullable()
         .optional(),
       legalActions: LegalActionsSchema.nullable(),
@@ -139,7 +139,6 @@ export const PlayerSnapshotSchema = z.object({
       ),
     })
     .nullable(),
-  statistics: z.object({
   chipRequests: z
     .array(
       z.object({
@@ -151,6 +150,7 @@ export const PlayerSnapshotSchema = z.object({
       }),
     )
     .default([]),
+  statistics: z.object({
     players: z.array(
       z.object({
         playerId: IdSchema,

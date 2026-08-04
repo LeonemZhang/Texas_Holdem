@@ -1,10 +1,17 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PROTOCOL_VERSION, type PlayerSnapshot } from '@texas-holdem/protocol';
 
 import type { ConnectionAdapter } from '../connection/connection.js';
-import { GameRoom } from './GameRoom.js';
+import { GameRoom, potContributionFlights } from './GameRoom.js';
 
 const snapshot: PlayerSnapshot = {
   protocolVersion: PROTOCOL_VERSION,
@@ -46,10 +53,69 @@ const snapshot: PlayerSnapshot = {
   },
   game: null,
   handReady: null,
+  chipRequests: [],
   statistics: { players: [], titles: [] },
 };
 
 describe('GameRoom', () => {
+  it('creates chip flights only for confirmed same-hand pot contributions', () => {
+    const previous: PlayerSnapshot = {
+      ...snapshot,
+      sequence: 10,
+      room: {
+        ...snapshot.room,
+        phase: 'playing',
+        players: snapshot.room.players.map((player, index) => ({
+          ...player,
+          status: 'active' as const,
+          streetCommitted: index === 0 ? 1 : 2,
+        })),
+      },
+      game: {
+        handId: 'hand-1',
+        street: 'preflop',
+        buttonPlayerId: 'host',
+        smallBlindPlayerId: 'host',
+        bigBlindPlayerId: 'bob',
+        currentActorId: 'host',
+        actionDeadlineMs: null,
+        communityCards: [],
+        ownHoleCards: ['As', 'Kd'],
+        showdownHoleCards: {},
+        totalPot: 3,
+        streetPots: [{ street: 'preflop', amount: 3 }],
+        legalActions: null,
+      },
+    };
+    const next: PlayerSnapshot = {
+      ...previous,
+      sequence: 11,
+      room: {
+        ...previous.room,
+        players: previous.room.players.map((player) =>
+          player.playerId === 'host'
+            ? { ...player, streetCommitted: 20 }
+            : player,
+        ),
+      },
+      game: {
+        ...previous.game!,
+        totalPot: 22,
+        streetPots: [{ street: 'preflop', amount: 22 }],
+      },
+    };
+
+    expect(potContributionFlights(previous, next)).toEqual([
+      { id: '11-host', playerId: 'host', amount: 19 },
+    ]);
+    expect(
+      potContributionFlights(next, {
+        ...next,
+        game: { ...next.game!, handId: 'hand-2', totalPot: 24 },
+      }),
+    ).toEqual([]);
+  });
+
   it('renders the authoritative lobby snapshot and sends ready with its version', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
     const sendCommand = vi.fn().mockResolvedValue({
@@ -122,7 +188,8 @@ describe('GameRoom', () => {
         currentActorId: 'host',
         actionDeadlineMs: Date.now() + 30_000,
         communityCards: [],
-        pots: [],
+        totalPot: 0,
+        streetPots: [],
         ownHoleCards: ['As', 'Kd'],
         showdownHoleCards: {},
         legalActions: {
@@ -252,6 +319,95 @@ describe('GameRoom', () => {
     );
   });
 
+  it('keeps voluntary exit available to ordinary players and returns only after acceptance', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const onExited = vi.fn();
+    const sendCommand = vi.fn().mockResolvedValue({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: 'exit-1',
+      status: 'accepted',
+      stateVersion: 3,
+      sequence: 3,
+    });
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => consumeSnapshot(snapshot)),
+      disconnect: vi.fn(),
+      sendCommand,
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+        onExited={onExited}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '退出房间' }));
+    await waitFor(() =>
+      expect(sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'room.exit', expectedVersion: 2 }),
+      ),
+    );
+    expect(onExited).toHaveBeenCalledOnce();
+  });
+
+  it('keeps an ordinary player in the room when voluntary exit is rejected', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const onExited = vi.fn();
+    const sendCommand = vi.fn().mockResolvedValue({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: 'exit-rejected-1',
+      status: 'rejected',
+      error: { code: 'NOT_ALLOWED', message: '暂时不能退出房间' },
+    });
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => consumeSnapshot(snapshot)),
+      disconnect: vi.fn(),
+      sendCommand,
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+        onExited={onExited}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '退出房间' }));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('暂时不能退出房间'),
+    );
+    expect(onExited).not.toHaveBeenCalled();
+  });
+
   it('keeps the host invitation available on demand and management actions operable', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
     const sendCommand = vi.fn().mockResolvedValue({
@@ -289,20 +445,13 @@ describe('GameRoom', () => {
       />,
     );
 
-    await screen.findByRole('button', { name: '展开邀请信息' });
-    expect(screen.queryByTitle('加入房间二维码')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '展开邀请信息' }));
-    expect(screen.getByTitle('加入房间二维码')).toBeInTheDocument();
+    await screen.findByRole('button', { name: '复制邀请链接' });
     expect(
-      screen.getByRole('link', {
-        name: 'http://10.126.126.1:32100/?room=room-1',
-      }),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
-    fireEvent.change(screen.getByLabelText('移除玩家'), {
-      target: { value: 'bob' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '确认执行' }));
+      screen.queryByRole('button', { name: '退出房间' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTitle('加入房间二维码')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '移出' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认移出' }));
     await waitFor(() =>
       expect(sendCommand).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -312,6 +461,162 @@ describe('GameRoom', () => {
         }),
       ),
     );
+  });
+
+  it('does not render voluntarily departed players as lobby seats or removal targets', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () =>
+        consumeSnapshot({
+          ...snapshot,
+          playerId: 'host',
+          room: {
+            ...snapshot.room,
+            players: snapshot.room.players.map((player) =>
+              player.playerId === 'bob'
+                ? { ...player, status: 'left' as const }
+                : player,
+            ),
+          },
+        }),
+      ),
+      disconnect: vi.fn(),
+      sendCommand: vi.fn(),
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'host',
+          token: 'host-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+      />,
+    );
+
+    await screen.findByRole('heading', { name: 'Friends' });
+    expect(screen.queryByText('Bob')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '移出' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('immediately reports when the authoritative snapshot removes this player', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    let commandPort:
+      ((command: Record<string, unknown>) => Promise<boolean>) | null = null;
+    const onExited = vi.fn();
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => consumeSnapshot(snapshot)),
+      disconnect: vi.fn(),
+      sendCommand: vi.fn(),
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+        onExited={onExited}
+        onCommandPortChange={(port) => {
+          commandPort = port;
+        }}
+      />,
+    );
+    await screen.findByRole('heading', { name: 'Friends' });
+
+    act(() =>
+      consumeSnapshot({
+        ...snapshot,
+        sequence: 3,
+        stateVersion: 3,
+        room: {
+          ...snapshot.room,
+          phase: 'hand-ready',
+          players: snapshot.room.players.map((player) =>
+            player.playerId === 'bob'
+              ? { ...player, status: 'removed' as const }
+              : player,
+          ),
+        },
+      }),
+    );
+
+    expect(onExited).toHaveBeenCalledOnce();
+    expect(onExited).toHaveBeenCalledWith('removed');
+    await expect(
+      commandPort!({ type: 'hand-ready.set-choice', choice: 'ready' }),
+    ).resolves.toBe(false);
+    expect(connection.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('keeps a removed seat visible without offering it as a host removal target', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () =>
+        consumeSnapshot({
+          ...snapshot,
+          playerId: 'host',
+          room: {
+            ...snapshot.room,
+            phase: 'hand-ready',
+            players: snapshot.room.players.map((player) =>
+              player.playerId === 'bob'
+                ? { ...player, status: 'removed' as const }
+                : player,
+            ),
+          },
+        }),
+      ),
+      disconnect: vi.fn(),
+      sendCommand: vi.fn(),
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'host',
+          token: 'host-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+      />,
+    );
+
+    expect(await screen.findByText('已退出')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
+    expect(screen.queryByRole('button', { name: '踢出 Bob' })).toBeNull();
   });
 
   it('keeps chip requests and statistics operable in the mobile hand-ready flow', async () => {
@@ -331,6 +636,35 @@ describe('GameRoom', () => {
         deadlineMs: Date.now() + 30_000,
         ownChoice: 'pending',
         pendingRequests: [],
+      },
+      game: {
+        handId: 'hand-1',
+        street: 'settled',
+        buttonPlayerId: 'host',
+        smallBlindPlayerId: 'host',
+        bigBlindPlayerId: 'bob',
+        currentActorId: null,
+        actionDeadlineMs: null,
+        communityCards: ['As', 'Ad', 'Kc', 'Qd', 'Jh'],
+        totalPot: 0,
+        streetPots: [],
+        ownHoleCards: ['2c', '3d'],
+        showdownHoleCards: { host: ['Ac', 'Ks'] },
+        legalActions: null,
+        settlement: {
+          reason: 'showdown',
+          winnerIds: ['host'],
+          payouts: { host: 20 },
+          netChanges: { host: 20, bob: -20 },
+          showdownResults: [
+            {
+              playerId: 'host',
+              handType: 'one-pair',
+              bestFiveCards: ['As', 'Ad', 'Ac', 'Ks', 'Qd'],
+            },
+          ],
+          voluntaryRevealedHoleCards: {},
+        },
       },
       statistics: {
         players: [
@@ -398,6 +732,30 @@ describe('GameRoom', () => {
       />,
     );
 
+    const settlementPlayers = await screen.findByLabelText('本手结算玩家牌型');
+    expect(screen.queryByLabelText('公共牌牌面')).toBeNull();
+    expect(screen.queryByLabelText('本手底池')).toBeNull();
+    expect(screen.queryByLabelText('我的底牌')).toBeNull();
+    expect(screen.queryByLabelText('摊牌玩家手牌')).toBeNull();
+    expect(screen.getByLabelText('本手牌面与底池')).toBeInTheDocument();
+    expect(
+      within(settlementPlayers).getByLabelText('Alice 的底牌'),
+    ).toBeInTheDocument();
+    expect(
+      within(settlementPlayers).getAllByLabelText(/Alice 的最佳第 .* 张牌/),
+    ).toHaveLength(5);
+    expect(
+      within(settlementPlayers).getAllByLabelText(/Bob 的第 .* 张底牌，未公开/),
+    ).toHaveLength(2);
+    fireEvent.click(await screen.findByRole('button', { name: '摊牌' }));
+    await waitFor(() =>
+      expect(sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expectedVersion: 5,
+          type: 'game.show-hole-cards',
+        }),
+      ),
+    );
     fireEvent.click(await screen.findByRole('button', { name: '筹码交换' }));
     fireEvent.click(await screen.findByRole('button', { name: '发起请求' }));
     fireEvent.click(screen.getByRole('button', { name: /^确认$/ }));
@@ -447,7 +805,8 @@ describe('GameRoom', () => {
         currentActorId: 'host',
         actionDeadlineMs: Date.now() + 30_000,
         communityCards: [],
-        pots: [],
+        totalPot: 0,
+        streetPots: [],
         ownHoleCards: null,
         showdownHoleCards: {},
         legalActions: null,
@@ -493,6 +852,7 @@ describe('GameRoom', () => {
   it('shows a terminal closed-room state and returns without another command', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
     const onExited = vi.fn();
+    const onHostRoomClosed = vi.fn(async () => undefined);
     const sendCommand = vi.fn();
     const connection: ConnectionAdapter = {
       connect: vi.fn(async () =>
@@ -523,6 +883,7 @@ describe('GameRoom', () => {
         }}
         connectionFactory={() => connection}
         onExited={onExited}
+        onHostRoomClosed={onHostRoomClosed}
       />,
     );
 
@@ -532,5 +893,49 @@ describe('GameRoom', () => {
     fireEvent.click(screen.getByRole('button', { name: '返回联机首页' }));
     expect(onExited).toHaveBeenCalledOnce();
     expect(sendCommand).not.toHaveBeenCalled();
+    expect(onHostRoomClosed).not.toHaveBeenCalled();
+  });
+
+  it('stops the host service once after the host receives a closed snapshot', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const onHostRoomClosed = vi.fn(async () => undefined);
+    const closedSnapshot: PlayerSnapshot = {
+      ...snapshot,
+      playerId: 'host',
+      room: { ...snapshot.room, phase: 'closed' },
+    };
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => consumeSnapshot(closedSnapshot)),
+      disconnect: vi.fn(),
+      sendCommand: vi.fn(),
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'host',
+          token: 'host-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+        onHostRoomClosed={onHostRoomClosed}
+      />,
+    );
+
+    await waitFor(() => expect(onHostRoomClosed).toHaveBeenCalledOnce());
+    consumeSnapshot({
+      ...closedSnapshot,
+      sequence: closedSnapshot.sequence + 1,
+    });
+    await waitFor(() => expect(onHostRoomClosed).toHaveBeenCalledOnce());
   });
 });

@@ -29,12 +29,14 @@ function snapshot(overrides: Partial<PlayerSnapshot> = {}): PlayerSnapshot {
       currentActorId: 'alice',
       actionDeadlineMs: 30_000,
       communityCards: [],
-      pots: [],
+      totalPot: 0,
+      streetPots: [],
       ownHoleCards: null,
       showdownHoleCards: {},
       legalActions: null,
     },
     handReady: null,
+    chipRequests: [],
     statistics: {
       players: [
         {

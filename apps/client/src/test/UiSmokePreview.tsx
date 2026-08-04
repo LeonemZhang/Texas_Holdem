@@ -39,6 +39,31 @@ const players = [
 ];
 
 export function UiSmokePreview({ page }: { readonly page: string }) {
+  if (page === 'lobby') {
+    return (
+      <div className="game-room-shell">
+        <LobbyWaitingRoom
+          roomName="朋友局"
+          currentPlayerId="alice"
+          players={players.map((player) => ({
+            ...player,
+            isHost: player.playerId === 'alice',
+            ready: player.playerId !== 'carol',
+            connected: true,
+          }))}
+          joinUrl="http://10.126.126.1:32100/?room=preview"
+          onSetReady={noop}
+          onStartFirstHand={noop}
+          onRemovePlayer={noop}
+          onCloseRoom={noop}
+        />
+        <button className="button button--secondary" type="button">
+          退出房间
+        </button>
+      </div>
+    );
+  }
+
   if (page === 'table' || page === 'ready') {
     const handReady = page === 'ready';
     return (
@@ -77,7 +102,6 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
           seats={<TableSeats players={players} ownPlayerId="alice" />}
           communityCards={
             <CardsAndPots
-              ownHoleCards={['Ah', 'Ks']}
               communityCards={['2c', 'Td', 'Jh']}
               totalPot={580}
               currentStreet="flop"
@@ -85,9 +109,9 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
                 { street: 'preflop', amount: 420 },
                 { street: 'flop', amount: 160 },
               ]}
+              ownHoleCards={['Ah', 'Ks']}
             />
           }
-          pots={null}
           actionTimer={
             handReady ? null : (
               <ActionCountdown
@@ -111,6 +135,7 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
                   },
                 ]}
                 complete={false}
+                ownChips={2_000}
                 onChoose={noop}
               />
             ) : null

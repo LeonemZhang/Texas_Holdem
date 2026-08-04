@@ -7,7 +7,13 @@ import {
 export type RoomPhase =
   'lobby' | 'playing' | 'hand-ready' | 'paused' | 'closed';
 export type RoomPlayerStatus =
-  'waiting' | 'active' | 'sitting-out' | 'eliminated' | 'left' | 'disconnected';
+  | 'waiting'
+  | 'active'
+  | 'sitting-out'
+  | 'eliminated'
+  | 'left'
+  | 'removed'
+  | 'disconnected';
 
 export interface RoomPlayer {
   readonly playerId: string;
@@ -27,13 +33,13 @@ export interface RoomState {
   readonly players: readonly RoomPlayer[];
   readonly version: number;
   readonly firstHandStarted: boolean;
+  readonly voluntarilyRevealedHoleCardPlayerIds: readonly string[];
 }
 
 function assertIdentity(value: string, label: string): string {
   const normalized = value.trim();
   if (!normalized) throw new RangeError(`${label} cannot be empty`);
   return normalized;
-  readonly voluntarilyRevealedHoleCardPlayerIds: readonly string[];
 }
 
 export function freezeRoom(room: RoomState): RoomState {
@@ -47,15 +53,15 @@ export function freezeRoom(room: RoomState): RoomState {
         }),
       ),
     ),
+    voluntarilyRevealedHoleCardPlayerIds: Object.freeze([
+      ...(room.voluntarilyRevealedHoleCardPlayerIds ?? []),
+    ]),
   });
 }
 
 export function createRoom(input: {
   readonly roomId: string;
   readonly hostPlayerId: string;
-    voluntarilyRevealedHoleCardPlayerIds: Object.freeze([
-      ...(room.voluntarilyRevealedHoleCardPlayerIds ?? []),
-    ]),
   readonly hostNickname: string;
   readonly settings: RoomSettingsInput;
 }): RoomState {
@@ -80,6 +86,6 @@ export function createRoom(input: {
     players: [host],
     version: 0,
     firstHandStarted: false,
+    voluntarilyRevealedHoleCardPlayerIds: [],
   });
 }
-    voluntarilyRevealedHoleCardPlayerIds: [],

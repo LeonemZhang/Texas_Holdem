@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
-
 import {
   PROTOCOL_VERSION,
   type PlayerSnapshot,
@@ -18,6 +16,7 @@ import {
 import { ActionCountdown } from '../table/ActionCountdown.js';
 import { CardsAndPots } from '../table/CardsAndPots.js';
 import { PokerTableLayout } from '../table/PokerTableLayout.js';
+import { PotChipFlights, type PotChipFlight } from '../table/PotChipFlights.js';
 import { TableSeats } from '../table/TableSeats.js';
 import {
   ChipExchangePanel,
@@ -40,12 +39,62 @@ const streetLabels = {
   settled: '结算',
 } as const;
 
+const handTypeLabels: Record<string, string> = {
+  'high-card': '高牌',
+  'one-pair': '一对',
+  'two-pair': '两对',
+  'three-of-a-kind': '三条',
+  straight: '顺子',
+  flush: '同花',
+  'full-house': '葫芦',
+  'four-of-a-kind': '四条',
+  'straight-flush': '同花顺',
+};
+
+export function potContributionFlights(
+  previous: PlayerSnapshot | null,
+  next: PlayerSnapshot,
+): readonly PotChipFlight[] {
+  const previousGame = previous?.game;
+  const nextGame = next.game;
+  if (
+    !previousGame ||
+    !nextGame ||
+    previousGame.handId !== nextGame.handId ||
+    previous?.room.phase !== 'playing' ||
+    next.room.phase !== 'playing' ||
+    nextGame.totalPot <= previousGame.totalPot
+  ) {
+    return [];
+  }
+  const previousCommitted = new Map(
+    previous.room.players.map((player) => [
+      player.playerId,
+      player.streetCommitted,
+    ]),
+  );
+  return next.room.players.flatMap((player) => {
+    const amount =
+      player.streetCommitted - (previousCommitted.get(player.playerId) ?? 0);
+    return amount > 0
+      ? [
+          {
+            id: `${next.sequence}-${player.playerId}`,
+            playerId: player.playerId,
+            amount,
+          },
+        ]
+      : [];
+  });
+}
+
 export interface GameRoomProps {
   readonly session: RoomSessionResponse;
   readonly connectionFactory?: (
     session: RoomSessionResponse,
   ) => ConnectionAdapter;
-  readonly onExited?: () => void;
+  readonly onExited?: (reason: 'left' | 'removed' | 'closed') => void;
+  readonly onHostRoomClosed?: () => Promise<void>;
   readonly onCommandPortChange?: (
     port: ((command: Record<string, unknown>) => Promise<boolean>) | null,
   ) => void;
@@ -60,6 +109,7 @@ export function GameRoom({
   session,
   connectionFactory = defaultConnection,
   onExited,
+  onHostRoomClosed,
   onCommandPortChange,
 }: GameRoomProps) {
   const connection = useMemo(
@@ -69,10 +119,20 @@ export function GameRoom({
   const [snapshot, setSnapshot] = useState<PlayerSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
-  const [hostShareOpen, setHostShareOpen] = useState(false);
+  const [statisticsCollapsed, setStatisticsCollapsed] = useState(false);
   const [sending, setSending] = useState(false);
+  const [potChipFlights, setPotChipFlights] = useState<
+    readonly PotChipFlight[]
+  >([]);
   const latestSnapshot = useRef<PlayerSnapshot | null>(null);
+  const stoppedHostRoomId = useRef<string | null>(null);
+  const removedExitNotified = useRef(false);
+  const onExitedRef = useRef(onExited);
   const soundEffects = useMemo(() => new PokerSoundEffects(), []);
+
+  useEffect(() => {
+    onExitedRef.current = onExited;
+  }, [onExited]);
 
   useEffect(() => {
     soundEffects.enableOnFirstInteraction();
@@ -87,10 +147,24 @@ export function GameRoom({
       ) {
         return;
       }
+      const flights = potContributionFlights(latestSnapshot.current, next);
+      if (flights.length > 0) {
+        setPotChipFlights((current) => [...current, ...flights]);
+      }
       soundEffects.play(pokerSoundCues(latestSnapshot.current, next));
       latestSnapshot.current = next;
       setSnapshot(next);
       setError(null);
+      if (
+        !removedExitNotified.current &&
+        next.room.players.some(
+          ({ playerId, status }) =>
+            playerId === session.playerId && status === 'removed',
+        )
+      ) {
+        removedExitNotified.current = true;
+        onExitedRef.current?.('removed');
+      }
     });
     const stopLost = connection.onConnectionLost(() =>
       setError('网络异常，请重试'),
@@ -119,7 +193,16 @@ export function GameRoom({
   const send = useCallback(
     async (command: Record<string, unknown>): Promise<boolean> => {
       const submittedSnapshot = latestSnapshot.current;
-      if (!submittedSnapshot || sending) return false;
+      if (
+        !submittedSnapshot ||
+        sending ||
+        submittedSnapshot.room.players.some(
+          ({ playerId, status }) =>
+            playerId === session.playerId && status === 'removed',
+        )
+      ) {
+        return false;
+      }
       setSending(true);
       setError(null);
       try {
@@ -161,6 +244,12 @@ export function GameRoom({
     [connection, sending, session],
   );
 
+  const dismissPotChipFlight = useCallback((id: string) => {
+    setPotChipFlights((current) =>
+      current.filter((flight) => flight.id !== id),
+    );
+  }, []);
+
   useEffect(() => {
     return () => {
       latestSnapshot.current = null;
@@ -171,6 +260,22 @@ export function GameRoom({
     onCommandPortChange?.(send);
     return () => onCommandPortChange?.(null);
   }, [onCommandPortChange, send]);
+
+  useEffect(() => {
+    if (
+      !snapshot ||
+      snapshot.room.phase !== 'closed' ||
+      !onHostRoomClosed ||
+      stoppedHostRoomId.current === snapshot.roomId ||
+      !snapshot.room.players.some(
+        ({ playerId, isHost }) => playerId === session.playerId && isHost,
+      )
+    ) {
+      return;
+    }
+    stoppedHostRoomId.current = snapshot.roomId;
+    void onHostRoomClosed().catch(() => setError('停止房主服务失败，请重试。'));
+  }, [onHostRoomClosed, session.playerId, snapshot]);
 
   const sendBetting = (intent: BettingActionIntent) => void send(intent);
   const sendHostControl = (intent: HostControlIntent) => {
@@ -261,14 +366,17 @@ export function GameRoom({
         <LobbyWaitingRoom
           roomName={snapshot.room.roomName}
           currentPlayerId={session.playerId}
-          players={snapshot.room.players.map((player) => ({
-            playerId: player.playerId,
-            nickname: player.nickname,
-            seatIndex: player.seatIndex,
-            isHost: player.isHost,
-            ready: player.lobbyReady,
-            connected: player.status !== 'disconnected',
-          }))}
+          players={snapshot.room.players
+            .filter((player) => !['left', 'removed'].includes(player.status))
+            .map((player) => ({
+              playerId: player.playerId,
+              nickname: player.nickname,
+              seatIndex: player.seatIndex,
+              isHost: player.isHost,
+              ready: player.lobbyReady,
+              connected: player.status !== 'disconnected',
+            }))}
+          {...(own?.isHost ? { joinUrl: session.joinUrl } : {})}
           onSetReady={(ready) =>
             void send({ type: 'room.set-lobby-ready', ready })
           }
@@ -278,58 +386,24 @@ export function GameRoom({
               handId: createRandomId(),
             })
           }
+          onRemovePlayer={(targetPlayerId) =>
+            void send({ type: 'room.remove-player', targetPlayerId })
+          }
+          onCloseRoom={() => void send({ type: 'room.close' })}
         />
-        {own?.isHost ? (
-          <HostControls
-            isHost
-            hostPlayerId={session.playerId}
-            phase={snapshot.room.phase}
-            players={snapshot.room.players
-              .filter(({ status }) => status !== 'left')
-              .map(({ playerId, nickname }) => ({ playerId, nickname }))}
-            onCommand={sendHostControl}
-          />
+        {!own?.isHost ? (
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => {
+              void send({ type: 'room.exit' }).then((accepted) => {
+                if (accepted) onExited?.('left');
+              });
+            }}
+          >
+            退出房间
+          </button>
         ) : null}
-        {own?.isHost ? (
-          <section className="host-share" aria-labelledby="game-invite-title">
-            <header className="host-share__header">
-              <div>
-                <p className="connection-home__kicker">邀请朋友加入</p>
-                <h2 id="game-invite-title">房间邀请</h2>
-              </div>
-              <button
-                className="button button--secondary"
-                type="button"
-                aria-expanded={hostShareOpen}
-                aria-controls="host-share-content"
-                onClick={() => setHostShareOpen((current) => !current)}
-              >
-                {hostShareOpen ? '收起邀请信息' : '展开邀请信息'}
-              </button>
-            </header>
-            {hostShareOpen ? (
-              <div id="host-share-content" className="host-share__content">
-                <a href={session.joinUrl}>{session.joinUrl}</a>
-                <QRCodeSVG
-                  value={session.joinUrl}
-                  size={144}
-                  title="加入房间二维码"
-                />
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => {
-            void send({ type: 'room.exit' }).then((accepted) => {
-              if (accepted) onExited?.();
-            });
-          }}
-        >
-          退出房间
-        </button>
       </div>
     );
   }
@@ -337,15 +411,31 @@ export function GameRoom({
   if (snapshot.room.phase === 'closed') {
     return (
       <div className="game-room-shell">
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
         <section className="room-closed" aria-labelledby="room-closed-title">
           <p className="connection-home__kicker">对局已结束</p>
           <h1 id="room-closed-title">房间已关闭</h1>
           <p>{snapshot.room.roomName} 已由房主关闭，牌局数据已保存。</p>
-          <div>
-            <button type="button" onClick={() => setStatisticsOpen(true)}>
+          <div className="room-closed__actions">
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={() => {
+                setStatisticsCollapsed(false);
+                setStatisticsOpen(true);
+              }}
+            >
               查看最终统计
             </button>
-            <button type="button" onClick={onExited}>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => onExited?.('closed')}
+            >
               返回联机首页
             </button>
           </div>
@@ -354,7 +444,13 @@ export function GameRoom({
           open={statisticsOpen}
           players={statistics}
           titles={snapshot.statistics.titles}
-          onClose={() => setStatisticsOpen(false)}
+          collapsed={statisticsCollapsed}
+          onCollapse={() => setStatisticsCollapsed(true)}
+          onExpand={() => setStatisticsCollapsed(false)}
+          onClose={() => {
+            setStatisticsCollapsed(false);
+            setStatisticsOpen(false);
+          }}
         />
       </div>
     );
@@ -362,6 +458,21 @@ export function GameRoom({
 
   const game = snapshot.game;
   const gameSettlement = game?.settlement;
+  const settlementHandTypes = new Map(
+    gameSettlement?.showdownResults.map((result) => [
+      result.playerId,
+      handTypeLabels[result.handType] ?? result.handType,
+    ]) ?? [],
+  );
+  const settlementBestFiveCards = new Map(
+    gameSettlement?.showdownResults.map((result) => [
+      result.playerId,
+      result.bestFiveCards,
+    ]) ?? [],
+  );
+  const settlementHoleCards = new Map(
+    game ? Object.entries(game.showdownHoleCards) : [],
+  );
   const settlementView = gameSettlement
     ? {
         handId: game.handId,
@@ -408,9 +519,11 @@ export function GameRoom({
       <PokerTableLayout
         roomName={snapshot.room.roomName}
         handLabel={
-          game
-            ? `第 1 局 · 第 ${snapshot.room.completedHands + 1} 手 · ${streetLabels[game.street]}${actionActor ? ` · 当前行动：${actionActor.nickname}` : ''}`
-            : '等待牌局开始'
+          snapshot.room.phase === 'paused'
+            ? '游戏暂停中'
+            : game
+              ? `第 1 局 · 第 ${snapshot.room.completedHands + 1} 手 · ${streetLabels[game.street]}${actionActor ? ` · 当前行动：${actionActor.nickname}` : ''}`
+              : '等待牌局开始'
         }
         status={
           <div className="poker-table-page__utility-actions">
@@ -418,8 +531,11 @@ export function GameRoom({
               presentation="drawer"
               phase={snapshot.room.phase}
               currentPlayerId={session.playerId}
-              players={snapshot.room.players}
-              records={snapshot.handReady?.pendingRequests ?? []}
+              players={snapshot.room.players.filter(
+                ({ status }) =>
+                  !['left', 'removed', 'eliminated'].includes(status),
+              )}
+              records={chipRequests}
               onAction={sendChipIntent}
             />
             <HostControls
@@ -430,13 +546,18 @@ export function GameRoom({
                 ''
               }
               phase={snapshot.room.phase}
-              players={snapshot.room.players}
+              players={snapshot.room.players.filter(
+                ({ status }) => !['left', 'removed'].includes(status),
+              )}
               onCommand={sendHostControl}
             />
             <button
               className="button button--secondary"
               type="button"
-              onClick={() => setStatisticsOpen(true)}
+              onClick={() => {
+                setStatisticsCollapsed(false);
+                setStatisticsOpen(true);
+              }}
             >
               查看统计
             </button>
@@ -492,8 +613,8 @@ export function GameRoom({
             />
           )
         }
-        pots={null}
         actionTimer={
+          snapshot.room.phase !== 'paused' &&
           game?.actionDeadlineMs !== null &&
           game?.actionDeadlineMs !== undefined &&
           actionActor ? (
@@ -503,26 +624,12 @@ export function GameRoom({
             />
           ) : null
         }
-  const settlementHandTypes = new Map(
-    gameSettlement?.showdownResults.map((result) => [
-      result.playerId,
-      handTypeLabels[result.handType] ?? result.handType,
-    ]) ?? [],
-  );
-  const settlementBestFiveCards = new Map(
-    gameSettlement?.showdownResults.map((result) => [
-      result.playerId,
-      result.bestFiveCards,
-    ]) ?? [],
-  );
-  const settlementHoleCards = new Map(
-    game ? Object.entries(game.showdownHoleCards) : [],
-  );
         tableOverlay={
           snapshot.handReady ? (
             <HandReadyOverlay
               deadlineMs={snapshot.handReady.deadlineMs}
               ownChoice={snapshot.handReady.ownChoice}
+              ownChips={own?.chips ?? 0}
               pendingRequests={snapshot.handReady.pendingRequests.map(
                 (request) => ({
                   requestId: request.requestId,
@@ -548,6 +655,12 @@ export function GameRoom({
             />
           ) : null
         }
+        chipFlights={
+          <PotChipFlights
+            flights={potChipFlights}
+            onFlightEnd={dismissPotChipFlight}
+          />
+        }
         controls={
           snapshot.handReady ? null : (
             <BettingControls
@@ -565,9 +678,14 @@ export function GameRoom({
         open={statisticsOpen}
         players={statistics}
         titles={snapshot.statistics.titles}
-        onClose={() => setStatisticsOpen(false)}
+        collapsed={statisticsCollapsed}
+        onCollapse={() => setStatisticsCollapsed(true)}
+        onExpand={() => setStatisticsCollapsed(false)}
+        onClose={() => {
+          setStatisticsCollapsed(false);
+          setStatisticsOpen(false);
+        }}
       />
     </div>
   );
 }
-              ownChips={own?.chips ?? 0}
