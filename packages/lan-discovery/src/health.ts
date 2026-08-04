@@ -44,31 +44,31 @@ export function parseManualJoinAddress(
   defaultPort = DEFAULT_HTTP_PORT,
 ): URL {
   const normalized = input.trim();
-  if (!normalized) throw new RangeError('Host address cannot be empty');
+  if (!normalized) throw new RangeError('请输入房主 IP 地址');
   if (
     !Number.isSafeInteger(defaultPort) ||
     defaultPort <= 0 ||
     defaultPort > 65_535
   ) {
-    throw new RangeError('Default HTTP port must be between 1 and 65535');
+    throw new RangeError('默认 HTTP 端口必须在 1 到 65535 之间');
   }
   const hasScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(normalized);
   let url: URL;
   try {
     url = new URL(hasScheme ? normalized : `http://${normalized}`);
   } catch (error) {
-    throw new RangeError('Host address is not a valid IP or URL', {
+    throw new RangeError('房主地址不是有效的 IP 或 URL', {
       cause: error,
     });
   }
   if (!['http:', 'https:'].includes(url.protocol)) {
-    throw new RangeError('Only HTTP and HTTPS room URLs are supported');
+    throw new RangeError('房间地址仅支持 HTTP 或 HTTPS');
   }
   if (url.username || url.password) {
-    throw new RangeError('Room URLs cannot contain credentials');
+    throw new RangeError('房间地址不能包含用户名或密码');
   }
   if (!isIpv4(url.hostname)) {
-    throw new RangeError('Room host must be an IPv4 address');
+    throw new RangeError('房主地址必须是 IPv4 地址');
   }
   if (!url.port) url.port = String(defaultPort);
   return url;
@@ -89,7 +89,7 @@ export async function validateRoomHealth(
     address instanceof URL ? new URL(address) : parseManualJoinAddress(address);
   const timeoutMs = options.timeoutMs ?? 1_500;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
-    throw new RangeError('Health timeout must be a positive integer');
+    throw new RangeError('健康检查超时时间必须是正整数');
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -104,7 +104,7 @@ export async function validateRoomHealth(
       return {
         status: 'unreachable',
         joinUrl: joinUrl.toString(),
-        error: `Health endpoint returned HTTP ${response.status}`,
+        error: `房间健康检查返回 HTTP ${response.status}`,
       };
     }
     const parsed = HealthResponseSchema.safeParse(await response.json());
@@ -112,7 +112,7 @@ export async function validateRoomHealth(
       return {
         status: 'incompatible',
         joinUrl: joinUrl.toString(),
-        error: 'Health response uses an incompatible protocol',
+        error: '房间健康检查协议不兼容',
       };
     }
     return {
@@ -124,7 +124,7 @@ export async function validateRoomHealth(
     return {
       status: 'unreachable',
       joinUrl: joinUrl.toString(),
-      error: error instanceof Error ? error.message : 'Health request failed',
+      error: error instanceof Error ? error.message : '房间健康检查请求失败',
     };
   } finally {
     clearTimeout(timeout);

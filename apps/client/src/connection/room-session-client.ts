@@ -1,9 +1,11 @@
 import {
   CreateRoomSessionRequestSchema,
   JoinRoomSessionRequestSchema,
+  ResumeRoomSessionRequestSchema,
   RoomSessionResponseSchema,
   type CreateRoomSessionRequest,
   type JoinRoomSessionRequest,
+  type ResumeRoomSessionRequest,
   type RoomSessionResponse,
 } from '@texas-holdem/protocol';
 
@@ -18,6 +20,8 @@ export class RoomSessionRequestError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code: string | null = null,
+    readonly roomId: string | null = null,
   ) {
     super(message);
     this.name = 'RoomSessionRequestError';
@@ -75,11 +79,29 @@ export class RoomSessionClient {
     return RoomSessionResponseSchema.parse(await response.json());
   }
 
+  async resume(
+    roomId: string,
+    input: ResumeRoomSessionRequest,
+  ): Promise<RoomSessionResponse> {
+    const body = ResumeRoomSessionRequestSchema.parse(input);
+    const response = await this.request(
+      `/api/rooms/${encodeURIComponent(roomId)}/resume`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    return RoomSessionResponseSchema.parse(await response.json());
+  }
+
   private async request(path: string, init?: RequestInit): Promise<Response> {
     const fetcher = this.fetcher;
     const response = await fetcher(new URL(path, this.#baseUrl), init);
     if (response.ok) return response;
     let message = `房主服务请求失败（${response.status}）`;
+    let code: string | null = null;
+    let roomId: string | null = null;
     try {
       const value: unknown = await response.json();
       if (
@@ -93,9 +115,23 @@ export class RoomSessionClient {
       ) {
         message = value.error.message;
       }
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        'error' in value &&
+        typeof value.error === 'object' &&
+        value.error !== null
+      ) {
+        if ('code' in value.error && typeof value.error.code === 'string') {
+          code = value.error.code;
+        }
+        if ('roomId' in value.error && typeof value.error.roomId === 'string') {
+          roomId = value.error.roomId;
+        }
+      }
     } catch {
       // Keep the status-based fallback when the response is not JSON.
     }
-    throw new RoomSessionRequestError(message, response.status);
+    throw new RoomSessionRequestError(message, response.status, code, roomId);
   }
 }

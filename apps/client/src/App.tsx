@@ -1,12 +1,9 @@
 import { PageShell } from '@texas-holdem/ui';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { RoomSessionResponse } from '@texas-holdem/protocol';
 
-import {
-  browserReconnectSessionStore,
-  type StoredReconnectSession,
-} from './connection/reconnect-session-store.js';
+import { browserReconnectSessionStore } from './connection/reconnect-session-store.js';
 import {
   RoomSessionClient,
   RoomSessionRequestError,
@@ -24,6 +21,7 @@ import { RoomRecordManager } from './room/RoomRecordManager.js';
 import {
   getRuntimeAdapter,
   type HostServiceInfo,
+  type RoomRecordSummary,
   type RuntimeInfo,
 } from './runtime.js';
 import { createRandomId } from './random-id.js';
@@ -34,7 +32,28 @@ interface JoinTarget {
   readonly roomId: string;
 }
 
-type DesktopSetupMode = 'create' | 'records';
+type DesktopSetupMode = 'create';
+type HomeDataPage = 'discovery' | 'diagnostics';
+
+function isIpv4Host(hostname: string): boolean {
+  const parts = hostname.split('.');
+  return (
+    parts.length === 4 &&
+    parts.every((part) => {
+      const value = Number(part);
+      return /^\d{1,3}$/.test(part) && value >= 0 && value <= 255;
+    })
+  );
+}
+
+export function browserAddressFromUrl(url: URL): string {
+  return isIpv4Host(url.hostname) ? url.host : '';
+}
+
+function inviteAddressFromLocation(): string {
+  if (window.texasHoldemDesktop) return '';
+  return browserAddressFromUrl(new URL(window.location.href));
+}
 
 export function rememberBrowserRoomInUrl(roomId: string): void {
   const roomUrl = new URL(window.location.href);
@@ -49,20 +68,6 @@ export function forgetBrowserRoomInUrl(roomId: string): void {
   window.history.replaceState(null, '', roomUrl);
 }
 
-function roomSessionFromStored(
-  stored: StoredReconnectSession,
-  joinUrl = stored.joinUrl,
-): RoomSessionResponse {
-  return {
-    protocolVersion: stored.protocolVersion,
-    roomId: stored.roomId,
-    playerId: stored.playerId,
-    token: stored.token,
-    joinUrl,
-    socketPath: '/socket.io',
-  };
-}
-
 export function App() {
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
   const [desktopSetupMode, setDesktopSetupMode] =
@@ -70,7 +75,14 @@ export function App() {
   const [rooms, setRooms] = useState<readonly RoomDiscoveryListItem[]>([]);
   const [refreshingRooms, setRefreshingRooms] = useState(false);
   const [hostService, setHostService] = useState<HostServiceInfo | null>(null);
+  const [runningRoomRecord, setRunningRoomRecord] =
+    useState<RoomRecordSummary | null>(null);
+  const [recoveringRunningRoom, setRecoveringRunningRoom] = useState(false);
+  const [runningRoomRecoveryError, setRunningRoomRecoveryError] = useState<
+    string | null
+  >(null);
   const [managingRecords, setManagingRecords] = useState(false);
+  const [homeDataPage, setHomeDataPage] = useState<HomeDataPage | null>(null);
   const [joinTarget, setJoinTarget] = useState<JoinTarget | null>(null);
   const [session, setSession] = useState<RoomSessionResponse | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -79,52 +91,119 @@ export function App() {
   >(null);
   const adapter = getRuntimeAdapter();
 
+  function saveSession(created: RoomSessionResponse, isHost: boolean): void {
+    browserReconnectSessionStore().save({
+      protocolVersion: created.protocolVersion,
+      roomId: created.roomId,
+      playerId: created.playerId,
+      token: created.token,
+      joinUrl: created.joinUrl,
+    });
+    if (!window.texasHoldemDesktop) {
+      rememberBrowserRoomInUrl(created.roomId);
+    }
+    setSession(created);
+    setJoinTarget(null);
+    void adapter.setWindowRoomContext({ inRoom: true, isHost });
+  }
+
+  async function restoreStoredSession(
+    baseUrl: string,
+    roomId: string,
+  ): Promise<boolean> {
+    const stored = browserReconnectSessionStore().load(roomId);
+    if (!stored) return false;
+    try {
+      const restored = await new RoomSessionClient(baseUrl).resume(roomId, {
+        playerId: stored.playerId,
+        token: stored.token,
+      });
+      saveSession(restored, false);
+      return true;
+    } catch (reason) {
+      if (
+        reason instanceof RoomSessionRequestError &&
+        reason.code === 'PLAYER_REMOVED'
+      ) {
+        browserReconnectSessionStore().clear(roomId);
+        forgetBrowserRoomInUrl(roomId);
+        setJoinTarget(null);
+        setJoinError('你已被房主移出房间，无法重新加入本场对局。');
+        return true;
+      }
+      if (
+        reason instanceof RoomSessionRequestError &&
+        (reason.status === 401 || reason.status === 404)
+      ) {
+        browserReconnectSessionStore().clear(roomId);
+        if (reason.status === 404) forgetBrowserRoomInUrl(roomId);
+        return false;
+      }
+      setJoinError(
+        networkErrorMessage(reason instanceof Error ? reason.message : null),
+      );
+      return true;
+    }
+  }
+
   useEffect(() => {
-    void adapter.getRuntimeInfo().then(setRuntime);
+    void adapter.getRuntimeInfo().then((info) => {
+      setRuntime(info);
+      if (info.kind === 'desktop') {
+        void adapter
+          .openRoomRecordManager()
+          .then(() => setManagingRecords(true))
+          .catch(() => setJoinError('读取对局记录失败，请重试。'));
+      }
+    });
     if (typeof adapter.getActiveHostService === 'function') {
       void adapter.getActiveHostService().then(setHostService);
     }
     const roomId = new URLSearchParams(window.location.search).get('room');
     if (roomId) {
-      const stored = browserReconnectSessionStore().load(roomId);
-      if (stored) {
-        void new RoomSessionClient(window.location.origin)
-          .currentRoomId()
-          .then((activeRoomId) => {
-            if (activeRoomId === roomId) {
-              const joinUrl = new URL(window.location.origin);
-              joinUrl.searchParams.set('room', roomId);
-              setSession(roomSessionFromStored(stored, joinUrl.toString()));
+      void new RoomSessionClient(window.location.origin)
+        .currentRoomId()
+        .then(async (activeRoomId) => {
+          if (activeRoomId === roomId) {
+            if (await restoreStoredSession(window.location.origin, roomId))
               return;
-            }
+            setJoinTarget({ baseUrl: window.location.origin, roomId });
+            return;
+          }
+          browserReconnectSessionStore().clear(roomId);
+          forgetBrowserRoomInUrl(roomId);
+          setJoinError('该房间已结束，已回到加入房间页面。');
+        })
+        .catch((reason: unknown) => {
+          if (
+            reason instanceof RoomSessionRequestError &&
+            reason.status === 404
+          ) {
             browserReconnectSessionStore().clear(roomId);
             forgetBrowserRoomInUrl(roomId);
             setJoinError('该房间已结束，已回到加入房间页面。');
-          })
-          .catch((reason: unknown) => {
-            if (
-              reason instanceof RoomSessionRequestError &&
-              reason.status === 404
-            ) {
-              browserReconnectSessionStore().clear(roomId);
-              forgetBrowserRoomInUrl(roomId);
-              setJoinError('该房间已结束，已回到加入房间页面。');
-              return;
-            }
-            const joinUrl = new URL(window.location.origin);
-            joinUrl.searchParams.set('room', roomId);
-            setSession(roomSessionFromStored(stored, joinUrl.toString()));
-          });
-      } else setJoinTarget({ baseUrl: window.location.origin, roomId });
+            return;
+          }
+          setJoinError(
+            networkErrorMessage(
+              reason instanceof Error ? reason.message : null,
+            ),
+          );
+        });
     } else if (!window.texasHoldemDesktop) {
       void new RoomSessionClient(window.location.origin)
         .currentRoomId()
-        .then((activeRoomId) =>
+        .then(async (activeRoomId) => {
+          if (
+            await restoreStoredSession(window.location.origin, activeRoomId)
+          ) {
+            return;
+          }
           setJoinTarget({
             baseUrl: window.location.origin,
             roomId: activeRoomId,
-          }),
-        )
+          });
+        })
         .catch(() => undefined);
     }
     const stopPlayerExit = adapter.onPlayerExitRequested(async () => {
@@ -145,50 +224,49 @@ export function App() {
     };
   }, []);
 
-  const saveSession = (created: RoomSessionResponse, isHost: boolean) => {
-    browserReconnectSessionStore().save({
-      protocolVersion: created.protocolVersion,
-      roomId: created.roomId,
-      playerId: created.playerId,
-      token: created.token,
-      joinUrl: created.joinUrl,
-    });
-    if (!window.texasHoldemDesktop) {
-      rememberBrowserRoomInUrl(created.roomId);
+  useEffect(() => {
+    if (runtime?.kind !== 'desktop' || !hostService) {
+      setRunningRoomRecord(null);
+      setRunningRoomRecoveryError(null);
+      return;
     }
-    setSession(created);
-    setJoinTarget(null);
-    void adapter.setWindowRoomContext({ inRoom: true, isHost });
-  };
+    let disposed = false;
+    void adapter
+      .listRoomRecords(false)
+      .then((records) => {
+        if (disposed) return;
+        setRunningRoomRecord(
+          records.find((record) => record.status === 'running') ?? null,
+        );
+      })
+      .catch(() => {
+        if (!disposed) setRunningRoomRecord(null);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [adapter, hostService, runtime?.kind]);
 
-  const selectHost = async (address: string) => {
+  const selectHost = async (address: string): Promise<boolean> => {
     setJoinError(null);
     try {
       const url = new URL(address);
       const roomId =
         url.searchParams.get('room') ??
         (await new RoomSessionClient(url.origin).currentRoomId());
-      const stored = browserReconnectSessionStore().load(roomId);
-      if (stored) {
-        const joinUrl = new URL(url.origin);
-        joinUrl.searchParams.set('room', roomId);
-        saveSession(roomSessionFromStored(stored, joinUrl.toString()), false);
-        return;
-      }
+      if (await restoreStoredSession(url.origin, roomId)) return false;
       setJoinTarget({ baseUrl: url.origin, roomId });
+      return true;
     } catch (reason) {
       setJoinError(
         networkErrorMessage(reason instanceof Error ? reason.message : null),
       );
+      return false;
     }
   };
 
-  const join = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const join = async (nickname: string) => {
     if (!joinTarget) return;
-    const nickname = String(
-      new FormData(event.currentTarget).get('nickname') ?? '',
-    ).trim();
     if (!nickname) {
       setJoinError('请输入昵称');
       return;
@@ -204,12 +282,15 @@ export function App() {
       setJoinError(
         message === 'Room is not accepting new players'
           ? '对局已经开始：只有原玩家可使用本机保存的身份恢复，不能以新昵称加入。'
-          : networkErrorMessage(message),
+          : message?.startsWith('Nickname already exists:')
+            ? '该昵称已被房间中的原玩家保留，请在原设备恢复或使用其他昵称。'
+            : networkErrorMessage(message),
       );
     }
   };
 
   const refreshRooms = async () => {
+    setHomeDataPage('discovery');
     setRefreshingRooms(true);
     try {
       const discovered = await adapter.scanLanRooms({
@@ -231,18 +312,40 @@ export function App() {
     }
   };
 
-  const openCreateRoom = () => {
+  const openCreateRoom = (hostServiceStopped = false) => {
+    setHomeDataPage(null);
     setManagingRecords(false);
+    if (hostServiceStopped) setHostService(null);
     setDesktopSetupMode('create');
   };
 
   const openRecordManager = () => {
-    if (hostService) {
-      setDesktopSetupMode(null);
-      setManagingRecords(true);
-      return;
+    setHomeDataPage(null);
+    void adapter
+      .openRoomRecordManager()
+      .then(() => {
+        setDesktopSetupMode(null);
+        setManagingRecords(true);
+      })
+      .catch(() => setJoinError('读取对局记录失败，请重试。'));
+  };
+
+  const recoverRunningRoom = async () => {
+    if (!runningRoomRecord || recoveringRunningRoom) return;
+    try {
+      setRecoveringRunningRoom(true);
+      setRunningRoomRecoveryError(null);
+      const recovered = await adapter.recoverRoomRecord({
+        roomId: runningRoomRecord.roomId,
+      });
+      saveSession(recovered, true);
+    } catch (reason) {
+      setRunningRoomRecoveryError(
+        reason instanceof Error ? reason.message : '恢复对局失败，请重试。',
+      );
+    } finally {
+      setRecoveringRunningRoom(false);
     }
-    setDesktopSetupMode('records');
   };
 
   const desktopPanelOpen = desktopSetupMode !== null || managingRecords;
@@ -259,20 +362,26 @@ export function App() {
         onCommandPortChange={(port) => {
           roomCommand.current = port;
         }}
-        onExited={() => {
-          browserReconnectSessionStore().clear(session.roomId);
+        onExited={(reason) => {
+          if (reason === 'closed' || reason === 'removed') {
+            browserReconnectSessionStore().clear(session.roomId);
+            forgetBrowserRoomInUrl(session.roomId);
+          }
+          if (reason === 'removed') {
+            setJoinError('你已被房主移出房间，无法重新加入本场对局。');
+          }
           setSession(null);
           void adapter.setWindowRoomContext({ inRoom: false, isHost: false });
         }}
+        {...(runtime?.kind === 'desktop'
+          ? { onHostRoomClosed: () => adapter.stopHostService() }
+          : {})}
       />
     );
   }
 
   return (
-    <PageShell
-      title="Texas Hold'em"
-      subtitle="面向朋友局域网对战的桌面房主与多端玩家框架"
-    >
+    <PageShell title="Texas Hold'em" subtitle="私人局域网德州牌桌">
       {runtime?.kind === 'desktop' && managingRecords ? (
         <RoomRecordManager
           runtime={adapter}
@@ -284,19 +393,33 @@ export function App() {
           }}
         />
       ) : null}
-      {!desktopPanelOpen ? (
+      {!desktopPanelOpen && !homeDataPage ? (
         <ConnectionHome
           runtimeKind={runtime?.kind ?? 'browser'}
+          initialAddress={inviteAddressFromLocation()}
           onCreateRoom={openCreateRoom}
           onManageRecords={openRecordManager}
           onRefreshRooms={() => void refreshRooms()}
-          onJoinAddress={(address) => void selectHost(address)}
+          {...(runtime?.kind === 'desktop'
+            ? { onOpenDiagnostics: () => setHomeDataPage('diagnostics') }
+            : {})}
+          joinReady={joinTarget !== null}
+          joinError={joinError}
+          runningRoomRecord={runningRoomRecord}
+          recoveringRunningRoom={recoveringRunningRoom}
+          runningRoomRecoveryError={runningRoomRecoveryError}
+          onRecoverRunningRoom={() => void recoverRunningRoom()}
+          onProbeAddress={selectHost}
+          onResetProbe={() => {
+            setJoinError(null);
+            setJoinTarget(null);
+          }}
+          onJoin={(nickname) => void join(nickname)}
         />
       ) : null}
       {runtime?.kind === 'desktop' && desktopSetupMode ? (
         <DesktopRoomSetup
           runtime={adapter}
-          mode={desktopSetupMode}
           existingService={hostService}
           onClose={() => setDesktopSetupMode(null)}
           onHosted={async (service, room) => {
@@ -308,15 +431,27 @@ export function App() {
             setHostService(configured);
             return configured;
           }}
-          onManageRecords={async (service) => {
-            setHostService(service);
-            setDesktopSetupMode(null);
-            setManagingRecords(true);
-          }}
+          onRecovered={(recovered) => saveSession(recovered, true)}
         />
       ) : null}
-      {runtime?.kind === 'desktop' && !desktopPanelOpen ? (
-        <>
+      {runtime?.kind === 'desktop' && homeDataPage === 'discovery' ? (
+        <section className="home-data-page" aria-label="附近牌桌">
+          <div className="home-data-page__toolbar">
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => setHomeDataPage(null)}
+            >
+              返回大厅
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => void refreshRooms()}
+            >
+              刷新
+            </button>
+          </div>
           <RoomDiscoveryList
             rooms={rooms}
             refreshing={refreshingRooms}
@@ -325,22 +460,23 @@ export function App() {
               void selectHost(`http://${room.hostAddress}:${room.httpPort}`)
             }
           />
+        </section>
+      ) : null}
+      {runtime?.kind === 'desktop' && homeDataPage === 'diagnostics' ? (
+        <section className="home-data-page" aria-label="网络诊断">
+          <div className="home-data-page__toolbar">
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => setHomeDataPage(null)}
+            >
+              返回大厅
+            </button>
+          </div>
           <NetworkDiagnostics runtime={adapter} hostService={hostService} />
-        </>
+        </section>
       ) : null}
-      {joinTarget ? (
-        <form className="nickname-join" onSubmit={(event) => void join(event)}>
-          <h2>加入房间</h2>
-          <label>
-            玩家昵称
-            <input name="nickname" defaultValue="Bob" autoComplete="nickname" />
-          </label>
-          <button className="button button--primary" type="submit">
-            确认加入
-          </button>
-        </form>
-      ) : null}
-      {joinError ? (
+      {joinError && (desktopPanelOpen || homeDataPage) ? (
         <p className="form-error" role="alert">
           {joinError}
         </p>

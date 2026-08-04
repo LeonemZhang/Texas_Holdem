@@ -65,7 +65,7 @@ describe('E2E08 discovery failure and direct IP fallback', () => {
       }),
     ).resolves.toMatchObject({
       status: 'incompatible',
-      error: 'Health response uses an incompatible protocol',
+      error: '房间健康检查协议不兼容',
     });
 
     await expect(

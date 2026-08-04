@@ -30,11 +30,12 @@ describe('manual join address and health validation', () => {
   });
 
   it('rejects invalid hosts and non-HTTP schemes', () => {
+    expect(() => parseManualJoinAddress('')).toThrow('请输入房主 IP 地址');
     expect(() => parseManualJoinAddress('not an ip')).toThrow(
-      'valid IP or URL',
+      '房主地址不是有效的 IP 或 URL',
     );
     expect(() => parseManualJoinAddress('ftp://10.126.126.1')).toThrow(
-      'Only HTTP and HTTPS',
+      '房间地址仅支持 HTTP 或 HTTPS',
     );
   });
 
