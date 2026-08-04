@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 
 export type TableSeatStatus =
   | 'waiting'
@@ -60,21 +60,44 @@ const actionLabels = {
 function positionFor(index: number, count: number): CSSProperties {
   const angle = (Math.PI / 2 + (index * Math.PI * 2) / count) % (Math.PI * 2);
   return {
-    left: `${50 + Math.cos(angle) * 45}%`,
-    top: `${50 + Math.sin(angle) * 43}%`,
+    left: `${50 + Math.cos(angle) * 41}%`,
+    top: `${50 + Math.sin(angle) * 34}%`,
   };
 }
 
 export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
-  const sorted = [...players].sort((left, right) => {
-    if (left.playerId === ownPlayerId) return -1;
-    if (right.playerId === ownPlayerId) return 1;
-    return left.seatIndex - right.seatIndex;
-  });
+  const listRef = useRef<HTMLOListElement>(null);
+  const stablePlayers = useMemo(
+    () =>
+      [...players].sort((left, right) => {
+        if (left.playerId === ownPlayerId) return -1;
+        if (right.playerId === ownPlayerId) return 1;
+        return left.seatIndex - right.seatIndex;
+      }),
+    [ownPlayerId, players],
+  );
+  const currentActor = stablePlayers.find((player) => player.isCurrentActor);
+  const orderedPlayers = currentActor
+    ? [
+        currentActor,
+        ...stablePlayers.filter(
+          (player) => player.playerId !== currentActor.playerId,
+        ),
+      ]
+    : stablePlayers;
+  const stablePosition = new Map(
+    stablePlayers.map((player, index) => [player.playerId, index]),
+  );
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollLeft = 0;
+    list.scrollTo?.({ left: 0, behavior: 'smooth' });
+  }, [currentActor?.playerId]);
   const layout =
-    sorted.length === 2
+    stablePlayers.length === 2
       ? 'heads-up'
-      : sorted.length === 3
+      : stablePlayers.length === 3
         ? 'three-handed'
         : 'multi-handed';
 
@@ -82,9 +105,25 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
     <ol
       className="table-seats"
       data-layout={layout}
-      aria-label={`${sorted.length} 人座位布局`}
+      data-player-count={stablePlayers.length}
+      ref={listRef}
+      aria-label={`${stablePlayers.length} 人座位布局`}
     >
-      {sorted.map((player, index) => {
+      {currentActor?.playerId === ownPlayerId ? (
+        <li
+          className="table-seat table-seat--acting table-seat--mobile-acting-summary"
+          aria-hidden="true"
+          data-player-id={`${currentActor.playerId}-mobile-acting-summary`}
+        >
+          <span className="table-seat__name">{currentActor.nickname}</span>
+          <span className="table-seat__mobile-acting-order">
+            行动中 · 顺位 {currentActor.actionOrder ?? '未定'}
+          </span>
+          <strong>{currentActor.chips.toLocaleString('zh-CN')}</strong>
+          <small>{statusLabels[currentActor.status]}</small>
+        </li>
+      ) : null}
+      {orderedPlayers.map((player) => {
         const stateClasses = [
           'table-seat',
           `table-seat--${player.status}`,
@@ -100,13 +139,21 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
             className={stateClasses}
             data-player-id={player.playerId}
             key={player.playerId}
-            style={positionFor(index, sorted.length)}
+            style={positionFor(
+              stablePosition.get(player.playerId) ?? 0,
+              stablePlayers.length,
+            )}
             aria-current={player.isCurrentActor ? 'true' : undefined}
           >
             <span className="table-seat__name">{player.nickname}</span>
             {player.actionOrder ? (
               <span className="table-seat__action-order">
-                行动顺位 {player.actionOrder}
+                <span className="table-seat__action-order--desktop">
+                  行动顺位 {player.actionOrder}
+                </span>
+                <span className="table-seat__action-order--mobile">
+                  顺位 {player.actionOrder}
+                </span>
               </span>
             ) : null}
             {player.isDealer || player.isSmallBlind || player.isBigBlind ? (
@@ -117,7 +164,12 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
               </span>
             ) : null}
             {player.isCurrentActor ? (
-              <span className="table-seat__acting-indicator">行动中</span>
+              <>
+                <span className="table-seat__acting-indicator">行动中</span>
+                <span className="table-seat__mobile-acting-order">
+                  行动中 · 顺位 {player.actionOrder ?? '未定'}
+                </span>
+              </>
             ) : null}
             {player.lastAction ? (
               <span className="table-seat__last-action">

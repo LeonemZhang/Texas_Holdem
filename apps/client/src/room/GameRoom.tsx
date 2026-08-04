@@ -100,6 +100,8 @@ export interface GameRoomProps {
   ) => void;
 }
 
+type ActiveUtilityPanel = 'host' | 'chip-exchange' | 'statistics' | null;
+
 function defaultConnection(session: RoomSessionResponse): ConnectionAdapter {
   const url = new URL(session.joinUrl);
   return new SocketIoConnectionAdapter(url.origin, session.socketPath);
@@ -120,6 +122,8 @@ export function GameRoom({
   const [error, setError] = useState<string | null>(null);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
   const [statisticsCollapsed, setStatisticsCollapsed] = useState(false);
+  const [activeUtilityPanel, setActiveUtilityPanel] =
+    useState<ActiveUtilityPanel>(null);
   const [sending, setSending] = useState(false);
   const [potChipFlights, setPotChipFlights] = useState<
     readonly PotChipFlight[]
@@ -128,7 +132,20 @@ export function GameRoom({
   const stoppedHostRoomId = useRef<string | null>(null);
   const removedExitNotified = useRef(false);
   const onExitedRef = useRef(onExited);
+  const lastUtilityTrigger = useRef<HTMLButtonElement | null>(null);
   const soundEffects = useMemo(() => new PokerSoundEffects(), []);
+
+  const openUtilityPanel = useCallback(
+    (panel: Exclude<ActiveUtilityPanel, null>, trigger: HTMLButtonElement) => {
+      lastUtilityTrigger.current = trigger;
+      setActiveUtilityPanel(panel);
+    },
+    [],
+  );
+  const closeUtilityPanel = useCallback(() => {
+    setActiveUtilityPanel(null);
+    lastUtilityTrigger.current?.focus();
+  }, []);
 
   useEffect(() => {
     onExitedRef.current = onExited;
@@ -138,6 +155,28 @@ export function GameRoom({
     soundEffects.enableOnFirstInteraction();
     return () => soundEffects.dispose();
   }, [soundEffects]);
+
+  const hasIncomingChipRequest =
+    snapshot?.chipRequests.some(
+      (request) =>
+        request.status === 'pending' &&
+        request.requesterId !== session.playerId &&
+        (request.targetPlayerId === null ||
+          request.targetPlayerId === session.playerId),
+    ) ?? false;
+
+  useEffect(() => {
+    if (hasIncomingChipRequest) setActiveUtilityPanel('chip-exchange');
+  }, [hasIncomingChipRequest]);
+
+  useEffect(() => {
+    if (activeUtilityPanel === null) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeUtilityPanel();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeUtilityPanel, closeUtilityPanel]);
 
   useEffect(() => {
     const stopSnapshot = connection.onSnapshot((next) => {
@@ -527,37 +566,35 @@ export function GameRoom({
         }
         status={
           <div className="poker-table-page__utility-actions">
-            <ChipExchangePanel
-              presentation="drawer"
-              phase={snapshot.room.phase}
-              currentPlayerId={session.playerId}
-              players={snapshot.room.players.filter(
-                ({ status }) =>
-                  !['left', 'removed', 'eliminated'].includes(status),
-              )}
-              records={chipRequests}
-              onAction={sendChipIntent}
-            />
-            <HostControls
-              presentation="drawer"
-              isHost={own?.isHost ?? false}
-              hostPlayerId={
-                snapshot.room.players.find(({ isHost }) => isHost)?.playerId ??
-                ''
-              }
-              phase={snapshot.room.phase}
-              players={snapshot.room.players.filter(
-                ({ status }) => !['left', 'removed'].includes(status),
-              )}
-              onCommand={sendHostControl}
-            />
             <button
               className="button button--secondary"
               type="button"
-              onClick={() => {
-                setStatisticsCollapsed(false);
-                setStatisticsOpen(true);
-              }}
+              aria-expanded={activeUtilityPanel === 'chip-exchange'}
+              onClick={(event) =>
+                openUtilityPanel('chip-exchange', event.currentTarget)
+              }
+            >
+              筹码交换
+            </button>
+            {own?.isHost ? (
+              <button
+                className="button button--secondary"
+                type="button"
+                aria-expanded={activeUtilityPanel === 'host'}
+                onClick={(event) =>
+                  openUtilityPanel('host', event.currentTarget)
+                }
+              >
+                房主管理
+              </button>
+            ) : null}
+            <button
+              className="button button--secondary"
+              type="button"
+              aria-expanded={activeUtilityPanel === 'statistics'}
+              onClick={(event) =>
+                openUtilityPanel('statistics', event.currentTarget)
+              }
             >
               查看统计
             </button>
@@ -661,6 +698,51 @@ export function GameRoom({
             onFlightEnd={dismissPotChipFlight}
           />
         }
+        utilityPanel={
+          activeUtilityPanel === 'chip-exchange' ? (
+            <ChipExchangePanel
+              presentation="drawer"
+              open
+              onOpenChange={(open) => {
+                if (!open) closeUtilityPanel();
+              }}
+              phase={snapshot.room.phase}
+              currentPlayerId={session.playerId}
+              players={snapshot.room.players.filter(
+                ({ status }) =>
+                  !['left', 'removed', 'eliminated'].includes(status),
+              )}
+              records={chipRequests}
+              onAction={sendChipIntent}
+            />
+          ) : activeUtilityPanel === 'host' ? (
+            <HostControls
+              presentation="drawer"
+              open
+              onOpenChange={(open) => {
+                if (!open) closeUtilityPanel();
+              }}
+              isHost={own?.isHost ?? false}
+              hostPlayerId={
+                snapshot.room.players.find(({ isHost }) => isHost)?.playerId ??
+                ''
+              }
+              phase={snapshot.room.phase}
+              players={snapshot.room.players.filter(
+                ({ status }) => !['left', 'removed'].includes(status),
+              )}
+              onCommand={sendHostControl}
+            />
+          ) : activeUtilityPanel === 'statistics' ? (
+            <StatisticsPanel
+              open
+              players={statistics}
+              titles={snapshot.statistics.titles}
+              onCollapse={closeUtilityPanel}
+              onClose={closeUtilityPanel}
+            />
+          ) : null
+        }
         controls={
           snapshot.handReady ? null : (
             <BettingControls
@@ -673,18 +755,6 @@ export function GameRoom({
             />
           )
         }
-      />
-      <StatisticsPanel
-        open={statisticsOpen}
-        players={statistics}
-        titles={snapshot.statistics.titles}
-        collapsed={statisticsCollapsed}
-        onCollapse={() => setStatisticsCollapsed(true)}
-        onExpand={() => setStatisticsCollapsed(false)}
-        onClose={() => {
-          setStatisticsCollapsed(false);
-          setStatisticsOpen(false);
-        }}
       />
     </div>
   );

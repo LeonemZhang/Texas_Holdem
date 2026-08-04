@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HandReadyOverlay, sortBestFiveCards } from './HandReadyOverlay.js';
 
 describe('HandReadyOverlay', () => {
+  afterEach(() => vi.unstubAllGlobals());
   it('shows ready and sitting-out actions alongside the preparation information', () => {
     const onChoose = vi.fn();
     render(
@@ -207,8 +208,97 @@ describe('HandReadyOverlay', () => {
       2,
     );
     expect(screen.queryByRole('button', { name: '知道了' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: '收起结算详情' }),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByLabelText('本手公共牌')
+        .querySelector('.hand-ready-card__card-label'),
+    ).toHaveTextContent('公共牌');
     rerender(<HandReadyOverlay {...props} complete />);
     expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
+  });
+
+  it('collapses settlement from its mobile detail button and restores it', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
+    const settlement = {
+      handId: 'hand-1',
+      reason: 'showdown' as const,
+      communityCards: ['2c', 'Td', 'Jh', 'Qs', 'Ac'],
+      players: [
+        {
+          playerId: 'alice',
+          nickname: 'Alice',
+          netChange: 20,
+          holeCards: ['As', 'Kd'],
+          bestFiveCards: ['As', 'Kd', 'Qs', 'Jh', 'Td'],
+          handType: '顺子',
+        },
+      ],
+    };
+    const props = {
+      deadlineMs: 30_000,
+      nowMs: 7_000,
+      ownChoice: 'pending' as const,
+      pendingRequests: [],
+      complete: false,
+      ownChips: 100,
+      onChoose: vi.fn(),
+    };
+    const { rerender } = render(
+      <HandReadyOverlay {...props} settlement={settlement} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
+    expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '就绪' })).toBeNull();
+    const expand = screen.getByRole('button', {
+      name: '结算详情 · 23s',
+    });
+    expect(expand.closest('.hand-ready-overlay')).toHaveClass(
+      'hand-ready-overlay--collapsed',
+    );
+    fireEvent.click(expand);
+    expect(
+      screen.getByRole('alertdialog', { name: '本手结算' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
+    rerender(
+      <HandReadyOverlay
+        {...props}
+        settlement={{ ...settlement, handId: 'hand-2' }}
+      />,
+    );
+    expect(
+      screen.getByRole('alertdialog', { name: '本手结算' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps settlement expanded when the collapse action is invoked on desktop', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+    render(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={7_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+        settlement={{
+          handId: 'hand-desktop',
+          reason: 'uncontested',
+          players: [{ playerId: 'alice', nickname: 'Alice', netChange: 20 }],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
+    expect(
+      screen.getByRole('alertdialog', { name: '本手结算' }),
+    ).toBeInTheDocument();
   });
 
   it('shows only the already public community cards for an early settlement', () => {

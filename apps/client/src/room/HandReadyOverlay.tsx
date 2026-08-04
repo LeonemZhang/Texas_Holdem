@@ -148,13 +148,41 @@ export function HandReadyOverlay({
   settlement = null,
 }: HandReadyOverlayProps) {
   const currentTime = useCurrentTime(nowMs);
+  const [settlementCollapsed, setSettlementCollapsed] = useState(false);
   const settlementCommunityCards = settlement?.communityCards ?? [];
   const secondsLeft = Math.max(
     0,
     Math.ceil((deadlineMs - currentTime) / 1_000),
   );
 
+  useEffect(() => {
+    setSettlementCollapsed(false);
+  }, [settlement?.handId]);
+
+  const collapseSettlement = () => {
+    const compactViewport =
+      window.matchMedia?.('(max-width: 599px)').matches ?? false;
+    if (compactViewport) setSettlementCollapsed(true);
+  };
+
   if (complete) return null;
+
+  if (settlement && settlementCollapsed) {
+    return (
+      <section
+        className="hand-ready-overlay hand-ready-overlay--collapsed"
+        aria-label="发牌前准备"
+      >
+        <button
+          className="hand-ready-card__settlement-expand"
+          type="button"
+          onClick={() => setSettlementCollapsed(false)}
+        >
+          结算详情 · {secondsLeft}s
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section className="hand-ready-overlay" aria-label="发牌前准备">
@@ -232,6 +260,14 @@ export function HandReadyOverlay({
             role="alertdialog"
             aria-label="本手结算"
           >
+            <button
+              className="hand-ready-card__settlement-collapse"
+              type="button"
+              aria-label="收起结算详情"
+              onClick={collapseSettlement}
+            >
+              <span aria-hidden="true">⌃</span>
+            </button>
             <strong>
               本手结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
             </strong>
@@ -245,7 +281,7 @@ export function HandReadyOverlay({
                   aria-label="本手公共牌"
                 >
                   <span className="hand-ready-card__card-label">公共牌</span>
-                  <div>
+                  <div className="hand-ready-card__card-row">
                     {settlementCommunityCards.map((card, index) => (
                       <PlayingCard
                         code={card}

@@ -9,6 +9,25 @@ const players = [
 ];
 
 describe('ChipExchangePanel', () => {
+  it('supports a room-controlled drawer state', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <ChipExchangePanel
+        phase="playing"
+        currentPlayerId="alice"
+        players={players}
+        records={[]}
+        presentation="drawer"
+        open
+        onOpenChange={onOpenChange}
+        onAction={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭筹码交换' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('keeps the exchange interactions collapsed until requested', () => {
     render(
       <ChipExchangePanel

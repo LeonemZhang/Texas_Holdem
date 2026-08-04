@@ -14,13 +14,18 @@ describe('PokerTableLayout', () => {
         actionTimer={<span>轮到 Alice · 18s</span>}
         controls={<button>过牌</button>}
         status={<span>轮到 Alice</span>}
+        utilityPanel={<section>筹码交换内容</section>}
       />,
     );
 
     expect(screen.getByRole('heading', { name: '朋友局' })).toBeInTheDocument();
-    expect(screen.getByLabelText('牌局进度')).toHaveTextContent(
+    const gameStatus = screen.getByLabelText('牌局进度');
+    expect(gameStatus).toHaveTextContent('第 8 手 · 翻牌前 · 当前行动：Alice');
+    expect(gameStatus).toHaveAttribute(
+      'title',
       '第 8 手 · 翻牌前 · 当前行动：Alice',
     );
+    expect(gameStatus.closest('.poker-table__felt')).toBeInTheDocument();
     expect(
       within(screen.getByLabelText('玩家座位')).getByText('Alice 的座位'),
     ).toBeInTheDocument();
@@ -28,6 +33,12 @@ describe('PokerTableLayout', () => {
       within(screen.getByLabelText('公共牌')).getByText('翻牌'),
     ).toBeInTheDocument();
     expect(screen.getByText('轮到 Alice · 18s')).toBeInTheDocument();
+    expect(screen.getByLabelText('牌桌工具面板')).toHaveTextContent(
+      '筹码交换内容',
+    );
+    expect(document.querySelector('.poker-table-page')).toHaveClass(
+      'poker-table-page--utility-open',
+    );
     expect(
       within(screen.getByLabelText('行动操作区')).getByRole('button', {
         name: '过牌',
@@ -46,6 +57,9 @@ describe('PokerTableLayout', () => {
       />,
     );
     expect(container.querySelector('.poker-table-page')).toBeInTheDocument();
+    expect(
+      container.querySelector('.poker-table-page__workspace'),
+    ).toBeInTheDocument();
     expect(container.querySelector('.poker-table__felt')).toBeInTheDocument();
     expect(container.querySelector('.poker-table-controls')).toBeNull();
   });

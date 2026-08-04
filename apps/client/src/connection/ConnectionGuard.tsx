@@ -21,6 +21,7 @@ export function ConnectionGuard({
   clearReconnectSession,
 }: ConnectionGuardProps) {
   const [confirmingExit, setConfirmingExit] = useState(false);
+  const [exitActionExpanded, setExitActionExpanded] = useState(false);
   const recovering =
     state.status === 'recovering' || state.status === 'connecting';
   const error = networkErrorMessage(
@@ -30,6 +31,17 @@ export function ConnectionGuard({
     clearReconnectSession();
     onExitRoom();
     setConfirmingExit(false);
+    setExitActionExpanded(false);
+  };
+  const requestExit = () => {
+    const compactViewport =
+      window.matchMedia?.('(max-width: 599px)').matches ?? false;
+    if (compactViewport && !exitActionExpanded) {
+      setExitActionExpanded(true);
+      return;
+    }
+    setExitActionExpanded(false);
+    setConfirmingExit(true);
   };
 
   return (
@@ -64,8 +76,19 @@ export function ConnectionGuard({
 
       <footer className="connection-guard__footer">
         <span>直接关闭网页只会掉线，可用原身份恢复。</span>
-        <button type="button" onClick={() => setConfirmingExit(true)}>
-          退出房间
+        <button
+          className={`connection-guard__exit-action${exitActionExpanded ? ' connection-guard__exit-action--expanded' : ''}`}
+          type="button"
+          aria-label="退出房间"
+          aria-expanded={exitActionExpanded}
+          onClick={requestExit}
+        >
+          <span className="connection-guard__exit-label connection-guard__exit-label--compact">
+            ×
+          </span>
+          <span className="connection-guard__exit-label connection-guard__exit-label--expanded">
+            退出房间
+          </span>
         </button>
       </footer>
 
@@ -80,7 +103,13 @@ export function ConnectionGuard({
           <button type="button" onClick={exitRoom}>
             确认退出
           </button>
-          <button type="button" onClick={() => setConfirmingExit(false)}>
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmingExit(false);
+              setExitActionExpanded(false);
+            }}
+          >
             取消
           </button>
         </div>

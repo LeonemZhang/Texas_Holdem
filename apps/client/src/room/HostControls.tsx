@@ -17,6 +17,8 @@ export interface HostControlsProps {
   readonly phase: 'lobby' | 'playing' | 'hand-ready' | 'paused' | 'closed';
   readonly players: readonly HostControlPlayer[];
   readonly presentation?: 'inline' | 'drawer';
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
   readonly onCommand: (intent: HostControlIntent) => void;
 }
 
@@ -26,9 +28,11 @@ export function HostControls({
   phase,
   players,
   presentation = 'inline',
+  open: controlledOpen,
+  onOpenChange,
   onCommand,
 }: HostControlsProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [dangerousIntent, setDangerousIntent] =
     useState<HostControlIntent | null>(null);
   if (!isHost) return null;
@@ -46,6 +50,11 @@ export function HostControls({
       : null;
   const canRemovePlayer = phase === 'lobby' || phase === 'hand-ready';
   const drawer = presentation === 'drawer';
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
 
   return (
     <section
@@ -64,7 +73,7 @@ export function HostControls({
           type="button"
           aria-expanded={open}
           aria-controls="host-controls-content"
-          onClick={() => setOpen((current) => !current)}
+          onClick={() => setOpen(!open)}
         >
           {open
             ? drawer

@@ -1,9 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConnectionGuard } from './ConnectionGuard.js';
 
 describe('ConnectionGuard', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('locks duplicate game operations while recovering', () => {
     render(
       <ConnectionGuard
@@ -56,5 +58,27 @@ describe('ConnectionGuard', () => {
     fireEvent.click(screen.getByRole('button', { name: '确认退出' }));
     expect(clearReconnectSession).toHaveBeenCalledOnce();
     expect(onExitRoom).toHaveBeenCalledOnce();
+  });
+
+  it('expands the compact exit action before showing mobile confirmation', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
+    render(
+      <ConnectionGuard
+        state={{ status: 'connected' }}
+        onRetry={vi.fn()}
+        onExitRoom={vi.fn()}
+        clearReconnectSession={vi.fn()}
+      >
+        <span>牌桌</span>
+      </ConnectionGuard>,
+    );
+
+    const exitAction = screen.getByRole('button', { name: '退出房间' });
+    expect(exitAction).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(exitAction);
+    expect(exitAction).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    fireEvent.click(exitAction);
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
   });
 });

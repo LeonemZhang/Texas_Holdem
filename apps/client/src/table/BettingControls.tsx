@@ -30,10 +30,16 @@ export function BettingControls({
   const maximum = legalActions?.maximumRaiseTo ?? minimum;
   const maximumIncrement = Math.max(0, maximum - minimum);
   const [raiseIncrement, setRaiseIncrement] = useState(0);
+  const [raiseOpen, setRaiseOpen] = useState(false);
   const effectiveRaiseTo = minimum + Math.min(maximumIncrement, raiseIncrement);
   const locked = disabled || legalActions === null;
   const canRaise = !locked && minimum > 0 && maximum >= minimum;
   const quickChipValues = [1, 2, 5, 10, 20, 50, 100] as const;
+  const submitRaise = () => {
+    if (!canRaise) return;
+    onAction({ type: 'game.raise-to', amount: effectiveRaiseTo });
+    setRaiseOpen(false);
+  };
 
   useEffect(() => {
     setRaiseIncrement((current) =>
@@ -59,14 +65,22 @@ export function BettingControls({
           过牌
         </button>
         <button
+          className="betting-controls__call"
           type="button"
+          aria-label={
+            legalActions?.callAmount !== null
+              ? `跟注 ${legalActions?.callAmount ?? 0}`
+              : '跟注'
+          }
           disabled={locked || legalActions?.callAmount === null}
           onClick={() => onAction({ type: 'game.call' })}
         >
-          跟注
-          {legalActions?.callAmount !== null
-            ? ` ${legalActions?.callAmount ?? 0}`
-            : ''}
+          <span>跟注</span>
+          {legalActions?.callAmount !== null ? (
+            <span className="betting-controls__call-amount">
+              {legalActions?.callAmount ?? 0}
+            </span>
+          ) : null}
         </button>
         <button
           type="button"
@@ -77,7 +91,42 @@ export function BettingControls({
         </button>
       </div>
 
-      <div className="raise-control">
+      <div className="betting-controls__raise-actions">
+        <button
+          className="betting-controls__raise-toggle"
+          type="button"
+          aria-expanded={raiseOpen}
+          aria-controls="raise-control-sheet"
+          disabled={!canRaise}
+          onClick={() => setRaiseOpen((current) => !current)}
+        >
+          {raiseOpen ? '收起加注' : `调整加注 ${effectiveRaiseTo}`}
+        </button>
+        <button
+          className="betting-controls__raise-submit"
+          type="button"
+          disabled={!canRaise}
+          onClick={submitRaise}
+        >
+          确认加注 {effectiveRaiseTo}
+        </button>
+      </div>
+
+      <div
+        id="raise-control-sheet"
+        className={`raise-control${raiseOpen ? ' raise-control--open' : ''}`}
+      >
+        <header className="raise-control__sheet-header">
+          <strong>加注设置</strong>
+          <button
+            type="button"
+            aria-label="关闭加注设置"
+            disabled={!raiseOpen}
+            onClick={() => setRaiseOpen(false)}
+          >
+            关闭
+          </button>
+        </header>
         <label htmlFor="raise-increment">加注增量</label>
         <input
           id="raise-increment"
@@ -97,7 +146,10 @@ export function BettingControls({
           <span>本手累计 {handContribution}</span>
           <span>本轮最高 {currentRoundBet}</span>
         </div>
-        <div className="raise-control__quick-chips" aria-label="加筹码快捷选项">
+        <div
+          className="raise-control__quick-chips raise-control__quick-chips--positive"
+          aria-label="加筹码快捷选项"
+        >
           {quickChipValues.map((value) => (
             <button
               className={`poker-chip poker-chip--${value}`}
@@ -120,13 +172,16 @@ export function BettingControls({
                 })
               }
             >
-              <span className="poker-chip__value" aria-hidden="true">
-                {value}
+              <span className="poker-chip__disc" aria-hidden="true">
+                <span className="poker-chip__value">{value}</span>
               </span>
             </button>
           ))}
         </div>
-        <div className="raise-control__quick-chips" aria-label="减筹码快捷选项">
+        <div
+          className="raise-control__quick-chips raise-control__quick-chips--negative"
+          aria-label="减筹码快捷选项"
+        >
           {quickChipValues.map((value) => (
             <button
               className={`poker-chip poker-chip--${value}`}
@@ -138,8 +193,8 @@ export function BettingControls({
                 setRaiseIncrement((current) => Math.max(0, current - value))
               }
             >
-              <span className="poker-chip__value" aria-hidden="true">
-                −{value}
+              <span className="poker-chip__disc" aria-hidden="true">
+                <span className="poker-chip__value">−{value}</span>
               </span>
             </button>
           ))}
@@ -156,9 +211,7 @@ export function BettingControls({
           className="raise-control__confirm"
           type="button"
           disabled={!canRaise}
-          onClick={() =>
-            onAction({ type: 'game.raise-to', amount: effectiveRaiseTo })
-          }
+          onClick={submitRaise}
         >
           确认加注
         </button>

@@ -59,6 +59,44 @@ describe('TableSeats', () => {
     );
   });
 
+  it('puts an opponent actor first in the mobile visual queue without moving desktop seats', () => {
+    const initialPlayers = makePlayers(4);
+    const { container, rerender } = render(
+      <TableSeats players={initialPlayers} ownPlayerId="p0" />,
+    );
+    const initialPosition = container
+      .querySelector('[data-player-id="p2"]')
+      ?.getAttribute('style');
+    const seats = screen.getByRole('list', { name: '4 人座位布局' });
+    seats.scrollLeft = 120;
+    const opponentActing = initialPlayers.map((player) => ({
+      ...player,
+      isCurrentActor: player.playerId === 'p3',
+    }));
+
+    rerender(<TableSeats players={opponentActing} ownPlayerId="p0" />);
+
+    expect(seats.firstElementChild).toHaveAttribute('data-player-id', 'p3');
+    expect(seats.scrollLeft).toBe(0);
+    expect(
+      container.querySelector('[data-player-id="p2"]')?.getAttribute('style'),
+    ).toBe(initialPosition);
+  });
+
+  it('adds exactly one hidden, non-interactive own-player acting summary', () => {
+    const { container } = render(
+      <TableSeats players={makePlayers(4)} ownPlayerId="p0" />,
+    );
+
+    const summaries = container.querySelectorAll(
+      '.table-seat--mobile-acting-summary',
+    );
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toHaveAttribute('aria-hidden', 'true');
+    expect(summaries[0]?.querySelector('button')).toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(4);
+  });
+
   it('keeps a permanently removed player on their seat as exited', () => {
     const { container } = render(
       <TableSeats
@@ -115,6 +153,29 @@ describe('TableSeats', () => {
     );
     expect(screen.getByText('行动顺位 1')).toBeInTheDocument();
     expect(screen.getByText('行动顺位 2')).toBeInTheDocument();
+  });
+
+  it('renders one combined mobile action label for the current actor', () => {
+    const { container } = render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[
+          { ...makePlayers(2)[0]!, isCurrentActor: false, actionOrder: 2 },
+          { ...makePlayers(2)[1]!, isCurrentActor: true, actionOrder: 1 },
+        ]}
+      />,
+    );
+
+    const actingSeat = container.querySelector('[data-player-id="p1"]');
+    expect(
+      actingSeat?.querySelectorAll('.table-seat__mobile-acting-order'),
+    ).toHaveLength(1);
+    expect(
+      actingSeat?.querySelector('.table-seat__mobile-acting-order'),
+    ).toHaveTextContent('行动中 · 顺位 1');
+    expect(
+      actingSeat?.querySelector('.table-seat__action-order--mobile'),
+    ).toHaveTextContent('顺位 1');
   });
 
   it('shows settlement results without displaying hole cards on player seats', () => {

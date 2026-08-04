@@ -10,6 +10,7 @@ export interface PokerTableLayoutProps {
   readonly chipFlights?: ReactNode;
   readonly controls?: ReactNode;
   readonly status?: ReactNode;
+  readonly utilityPanel?: ReactNode;
 }
 
 export function PokerTableLayout({
@@ -22,9 +23,12 @@ export function PokerTableLayout({
   chipFlights,
   controls,
   status,
+  utilityPanel,
 }: PokerTableLayoutProps) {
   return (
-    <main className="poker-table-page">
+    <main
+      className={`poker-table-page${utilityPanel ? ' poker-table-page--utility-open' : ''}`}
+    >
       <header className="poker-table-page__header">
         <h1 className="poker-table-page__room-name">{roomName}</h1>
         {status ? (
@@ -32,24 +36,40 @@ export function PokerTableLayout({
         ) : null}
       </header>
 
-      <section className="poker-table" aria-label="德州牌桌">
-        <div className="poker-table__seats" aria-label="玩家座位">
-          {seats}
-        </div>
-        <div className="poker-table__felt">
-          <div className="poker-table__game-status" aria-label="牌局进度">
-            {handLabel}
+      <div className="poker-table-page__workspace">
+        <section className="poker-table" aria-label="德州牌桌">
+          <div className="poker-table__seats" aria-label="玩家座位">
+            {seats}
           </div>
-          {actionTimer}
-          <div className="poker-table__cards" aria-label="公共牌">
-            {communityCards}
+          <div className="poker-table__felt">
+            <div className="poker-table__game-bar">
+              <div
+                className="poker-table__game-status"
+                aria-label="牌局进度"
+                title={handLabel}
+              >
+                {handLabel}
+              </div>
+              {actionTimer}
+            </div>
+            <div className="poker-table__cards" aria-label="公共牌">
+              {communityCards}
+            </div>
           </div>
-        </div>
-        {tableOverlay ? (
-          <div className="poker-table__overlay">{tableOverlay}</div>
+          {tableOverlay ? (
+            <div className="poker-table__overlay">{tableOverlay}</div>
+          ) : null}
+          {chipFlights}
+        </section>
+        {utilityPanel ? (
+          <aside
+            className="poker-table-page__utility-panel"
+            aria-label="牌桌工具面板"
+          >
+            {utilityPanel}
+          </aside>
         ) : null}
-        {chipFlights}
-      </section>
+      </div>
 
       {controls ? (
         <section className="poker-table-controls" aria-label="行动操作区">

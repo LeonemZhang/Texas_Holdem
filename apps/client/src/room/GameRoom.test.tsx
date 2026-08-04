@@ -776,12 +776,20 @@ describe('GameRoom', () => {
     expect(
       screen.getByRole('heading', { name: '牌局战报' }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: '筹码交换' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('#1 Bob')).toBeInTheDocument();
     expect(
       screen.getByText('+1', { selector: '.statistics-positive' }),
     ).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('1 / 0 / 0 / 0 / 0')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(
+      screen.queryByRole('heading', { name: '牌局战报' }),
+    ).not.toBeInTheDocument();
+    expect(statisticsButton).toHaveFocus();
     expect(window.innerWidth).toBe(360);
   });
 

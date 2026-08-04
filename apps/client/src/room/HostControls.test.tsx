@@ -9,6 +9,25 @@ const players = [
 ];
 
 describe('HostControls', () => {
+  it('supports a room-controlled drawer state', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <HostControls
+        isHost
+        hostPlayerId="host"
+        phase="playing"
+        players={players}
+        presentation="drawer"
+        open
+        onOpenChange={onOpenChange}
+        onCommand={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭房主管理' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('does not expose management actions to ordinary players', () => {
     const { container } = render(
       <HostControls

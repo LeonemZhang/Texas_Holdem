@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 export interface ChipExchangePlayer {
   readonly playerId: string;
@@ -35,6 +35,8 @@ export interface ChipExchangePanelProps {
   readonly players: readonly ChipExchangePlayer[];
   readonly records: readonly ChipExchangeRecord[];
   readonly presentation?: 'inline' | 'drawer';
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
   readonly onAction: (intent: ChipExchangeIntent) => void;
 }
 
@@ -51,9 +53,11 @@ export function ChipExchangePanel({
   players,
   records,
   presentation = 'inline',
+  open: controlledOpen,
+  onOpenChange,
   onAction,
 }: ChipExchangePanelProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<ChipExchangeIntent | null>(
     null,
   );
@@ -64,6 +68,14 @@ export function ChipExchangePanel({
   );
   const available = phase === 'hand-ready';
   const drawer = presentation === 'drawer';
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (controlledOpen === undefined) setInternalOpen(next);
+      onOpenChange?.(next);
+    },
+    [controlledOpen, onOpenChange],
+  );
   const requestTarget = players.find(
     (player) => player.playerId === requestTargetId,
   );
@@ -90,7 +102,7 @@ export function ChipExchangePanel({
   );
   useEffect(() => {
     if (incomingPendingRequest) setOpen(true);
-  }, [incomingPendingRequest]);
+  }, [incomingPendingRequest, setOpen]);
 
   const prepareRequest = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -155,7 +167,7 @@ export function ChipExchangePanel({
             type="button"
             aria-expanded={open}
             aria-controls="chip-exchange-content"
-            onClick={() => setOpen((current) => !current)}
+            onClick={() => setOpen(!open)}
           >
             {open
               ? drawer
