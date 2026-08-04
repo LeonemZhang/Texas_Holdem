@@ -473,6 +473,25 @@ body:has(.poker-table-page) .game-room-shell {
   color: #a7f3d0;
 }
 
+.room-form__advanced {
+  margin: 0 0 1rem;
+  border: 1px solid rgb(251 191 36 / 24%);
+  border-radius: 0.8rem;
+  background: rgb(69 26 3 / 13%);
+}
+
+.room-form__advanced summary {
+  padding: 0.7rem 0.85rem;
+  color: #fde68a;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.room-form__advanced .room-form__grid {
+  margin: 0;
+  padding: 0 0.85rem 0.85rem;
+}
+
 .lobby__count,
 .lobby-player__badges span,
 .lobby-player__badges em {

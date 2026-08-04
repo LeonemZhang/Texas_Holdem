@@ -82,7 +82,7 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
             type="number"
             min="1"
             step="1"
-            defaultValue="1000"
+            defaultValue="100"
           />
         </label>
         <label>
@@ -107,59 +107,64 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
             readOnly
           />
         </label>
-        <label>
-          单次行动秒数
-          <input
-            name="actionTimeoutSeconds"
-            type="number"
-            min="1"
-            step="1"
-            defaultValue="30"
-          />
-        </label>
-        <label>
-          每手准备秒数
-          <input
-            name="handReadyTimeoutSeconds"
-            type="number"
-            min="1"
-            step="1"
-            defaultValue="30"
-          />
-        </label>
-        <fieldset className="room-form__growth">
-          <legend>按手数增长盲注</legend>
-          <label className="room-form__checkbox">
-            <input name="blindGrowthEnabled" type="checkbox" defaultChecked />
-            启用增长
-          </label>
+      </div>
+      <details className="room-form__advanced">
+        <summary>高级规则：行动时间、盲注增长与零筹码规则</summary>
+        <div className="room-form__grid">
           <label>
-            每多少手
+            单次行动秒数
             <input
-              name="blindGrowthIntervalHands"
+              name="actionTimeoutSeconds"
               type="number"
               min="1"
               step="1"
-              defaultValue="10"
+              defaultValue="30"
             />
           </label>
           <label>
-            增长倍率
-            <select name="blindGrowthMultiplier" defaultValue="2">
-              <option value="1.5">× 1.5</option>
-              <option value="2">× 2</option>
-              <option value="3">× 3</option>
+            每手准备秒数
+            <input
+              name="handReadyTimeoutSeconds"
+              type="number"
+              min="1"
+              step="1"
+              defaultValue="30"
+            />
+          </label>
+          <fieldset className="room-form__growth">
+            <legend>按手数增长盲注</legend>
+            <label className="room-form__checkbox">
+              <input name="blindGrowthEnabled" type="checkbox" />
+              启用增长
+            </label>
+            <label>
+              每多少手
+              <input
+                name="blindGrowthIntervalHands"
+                type="number"
+                min="1"
+                step="1"
+                defaultValue="10"
+              />
+            </label>
+            <label>
+              增长倍率
+              <select name="blindGrowthMultiplier" defaultValue="2">
+                <option value="1.5">× 1.5</option>
+                <option value="2">× 2</option>
+                <option value="3">× 3</option>
+              </select>
+            </label>
+          </fieldset>
+          <label>
+            筹码耗尽时
+            <select name="zeroChipPolicy" defaultValue="request-chips">
+              <option value="request-chips">请求其他玩家给予筹码</option>
+              <option value="eliminate">直接出局</option>
             </select>
           </label>
-        </fieldset>
-        <label>
-          筹码耗尽时
-          <select name="zeroChipPolicy" defaultValue="request-chips">
-            <option value="request-chips">请求其他玩家给予筹码</option>
-            <option value="eliminate">直接出局</option>
-          </select>
-        </label>
-      </div>
+        </div>
+      </details>
       {error ? (
         <p className="form-error" role="alert">
           {error}

@@ -16,7 +16,7 @@ describe('CreateRoomForm', () => {
     expect(bigBlind).toHaveValue('10');
   });
 
-  it('submits settings with hand-count growth and request-chips default', () => {
+  it('submits 100 initial chips with blind growth disabled by default', () => {
     const onCreate = vi.fn();
     render(<CreateRoomForm onCreate={onCreate} />);
     fireEvent.click(screen.getByRole('button', { name: '创建房间' }));
@@ -24,9 +24,9 @@ describe('CreateRoomForm', () => {
       hostNickname: 'Alice',
       settings: expect.objectContaining({
         maxPlayers: 10,
-        initialChips: 1000,
+        initialChips: 100,
         smallBlind: 1,
-        blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+        blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
         zeroChipPolicy: 'request-chips',
       }),
     });
