@@ -106,9 +106,18 @@ export function BettingControls({
               aria-label={`增加 ${value} 筹码`}
               disabled={!canRaise || effectiveRaiseTo >= maximum}
               onClick={() =>
-                setRaiseIncrement((current) =>
-                  Math.min(maximumIncrement, Math.max(0, current) + value),
-                )
+                setRaiseIncrement((current) => {
+                  const currentRaiseTo = Math.min(
+                    maximum,
+                    minimum + Math.max(0, current),
+                  );
+                  const nextRaiseTo =
+                    currentRaiseTo < value ? value : currentRaiseTo + value;
+                  return Math.min(
+                    maximumIncrement,
+                    Math.max(0, nextRaiseTo - minimum),
+                  );
+                })
               }
             >
               <span className="poker-chip__value" aria-hidden="true">

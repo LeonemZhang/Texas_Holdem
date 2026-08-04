@@ -59,6 +59,25 @@ describe('BettingControls', () => {
     });
   });
 
+  it('sets a quick chip as the raise target before adding later chips', () => {
+    const onAction = vi.fn();
+    render(<BettingControls legalActions={legalActions} onAction={onAction} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '增加 100 筹码' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
+    expect(onAction).toHaveBeenLastCalledWith({
+      type: 'game.raise-to',
+      amount: 100,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '增加 100 筹码' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
+    expect(onAction).toHaveBeenLastCalledWith({
+      type: 'game.raise-to',
+      amount: 200,
+    });
+  });
+
   it('starts the raise slider at zero increment and can clear the selected chips', () => {
     const onAction = vi.fn();
     render(<BettingControls legalActions={legalActions} onAction={onAction} />);
