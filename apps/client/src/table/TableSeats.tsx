@@ -29,7 +29,6 @@ export interface TableSeatPlayer {
     readonly netChange: number;
     readonly handType?: string;
   };
-  readonly onShowHoleCards?: () => void;
 }
 
 export interface TableSeatsProps {
@@ -129,7 +128,6 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
           `table-seat--${player.status}`,
           `table-seat--color-${player.seatIndex % 6}`,
           player.isCurrentActor ? 'table-seat--acting' : '',
-          player.onShowHoleCards ? 'table-seat--can-show-hole-cards' : '',
           player.playerId === ownPlayerId ? 'table-seat--own' : '',
         ]
           .filter(Boolean)
@@ -175,15 +173,6 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
               <span className="table-seat__last-action">
                 {actionLabels[player.lastAction]}
               </span>
-            ) : null}
-            {player.onShowHoleCards ? (
-              <button
-                className="table-seat__show-hole-cards"
-                type="button"
-                onClick={player.onShowHoleCards}
-              >
-                摊牌
-              </button>
             ) : null}
             <strong>{player.chips.toLocaleString('zh-CN')}</strong>
             <small>{statusLabels[player.status]}</small>

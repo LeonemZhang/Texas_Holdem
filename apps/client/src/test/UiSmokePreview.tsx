@@ -215,6 +215,7 @@ function TablePreview({ page }: { readonly page: string }) {
               complete={false}
               ownChips={2_000}
               onChoose={noop}
+              onShowHoleCards={noop}
               settlement={
                 page === 'settlement'
                   ? {
@@ -231,6 +232,7 @@ function TablePreview({ page }: { readonly page: string }) {
                       players: fullTablePlayers.map((player, index) => ({
                         playerId: player.playerId,
                         nickname: player.nickname,
+                        chips: player.chips,
                         netChange:
                           index === 0 ? 780 : -Math.max(20, index * 20),
                         ...(index < 3

@@ -199,27 +199,6 @@ describe('TableSeats', () => {
     expect(screen.getByText('一对')).toBeInTheDocument();
     expect(screen.getByText('+140')).toBeInTheDocument();
     expect(screen.getByText('-140')).toBeInTheDocument();
-  });
-
-  it('keeps the folded player’s show-hole-cards action prominent', () => {
-    render(
-      <TableSeats
-        ownPlayerId="p0"
-        players={[
-          {
-            ...makePlayers(2)[0]!,
-            status: 'folded',
-            onShowHoleCards: () => {},
-          },
-          makePlayers(2)[1]!,
-        ]}
-      />,
-    );
-
-    const button = screen.getByRole('button', { name: '摊牌' });
-    expect(button).toHaveClass('table-seat__show-hole-cards');
-    expect(button.closest('.table-seat')).toHaveClass(
-      'table-seat--can-show-hole-cards',
-    );
+    expect(screen.queryByRole('button', { name: '摊牌' })).toBeNull();
   });
 });

@@ -528,6 +528,7 @@ export function GameRoom({
           return {
             playerId: player.playerId,
             nickname: player.nickname,
+            chips: player.chips,
             netChange: gameSettlement.netChanges[player.playerId] ?? 0,
             ...(handType ? { handType } : {}),
             ...(holeCards ? { holeCards } : {}),
@@ -539,6 +540,15 @@ export function GameRoom({
         }),
       }
     : null;
+  const canShowOwnHoleCards = Boolean(
+    snapshot.handReady &&
+    gameSettlement &&
+    game.ownHoleCards &&
+    !gameSettlement.voluntaryRevealedHoleCards[session.playerId] &&
+    !gameSettlement.showdownResults.some(
+      (result) => result.playerId === session.playerId,
+    ),
+  );
   const actionActor = game?.currentActorId
     ? snapshot.room.players.find(
         ({ playerId }) => playerId === game.currentActorId,
@@ -617,19 +627,6 @@ export function GameRoom({
                     };
                   })()
                 : {}),
-              ...(player.playerId === session.playerId &&
-              snapshot.handReady &&
-              gameSettlement &&
-              game.ownHoleCards &&
-              !gameSettlement.voluntaryRevealedHoleCards[player.playerId] &&
-              !gameSettlement.showdownResults.some(
-                (result) => result.playerId === player.playerId,
-              )
-                ? {
-                    onShowHoleCards: () =>
-                      void send({ type: 'game.show-hole-cards' }),
-                  }
-                : {}),
               isCurrentActor:
                 snapshot.room.phase !== 'paused' &&
                 game?.currentActorId === player.playerId,
@@ -681,6 +678,12 @@ export function GameRoom({
               onChoose={(choice) =>
                 void send({ type: 'hand-ready.set-choice', choice })
               }
+              {...(canShowOwnHoleCards
+                ? {
+                    onShowHoleCards: () =>
+                      void send({ type: 'game.show-hole-cards' }),
+                  }
+                : {})}
               requestToReview={incomingChipRequestView}
               onApproveRequest={(requestId) =>
                 sendChipIntent({ type: 'approve', requestId })

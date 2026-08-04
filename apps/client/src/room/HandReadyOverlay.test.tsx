@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HandReadyOverlay, sortBestFiveCards } from './HandReadyOverlay.js';
@@ -154,6 +154,7 @@ describe('HandReadyOverlay', () => {
       pendingRequests: [],
       ownChips: 100,
       onChoose: vi.fn(),
+      onShowHoleCards: vi.fn(),
       settlement: {
         handId: 'hand-1',
         reason: 'showdown' as const,
@@ -167,6 +168,7 @@ describe('HandReadyOverlay', () => {
           {
             playerId: 'alice',
             nickname: 'Alice',
+            chips: 1_240,
             netChange: 240,
             holeCards: ['As', 'Kd'],
             bestFiveCards: ['As', 'Ad', 'Ac', 'Ks', 'Qd'],
@@ -175,6 +177,7 @@ describe('HandReadyOverlay', () => {
           {
             playerId: 'bob',
             nickname: 'Bob',
+            chips: 760,
             netChange: -240,
           },
         ],
@@ -185,9 +188,23 @@ describe('HandReadyOverlay', () => {
     );
     expect(
       screen.getByRole('alertdialog', { name: '本手结算' }),
-    ).toHaveTextContent(/Alice\s*赢得 240 筹码/);
+    ).toBeInTheDocument();
+    expect(screen.getByText('Alice').parentElement).toHaveTextContent(
+      'Alice· 1,240 筹码赢得 240 筹码',
+    );
+    expect(screen.getByText('Bob').parentElement).toHaveTextContent(
+      'Bob· 760 筹码输掉 240 筹码',
+    );
+    const actions = screen.getByRole('group', { name: '准备操作' });
+    expect(
+      within(actions)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['就绪', '摊牌', '暂不参与']);
+    fireEvent.click(within(actions).getByRole('button', { name: '摊牌' }));
+    expect(props.onShowHoleCards).toHaveBeenCalledOnce();
     expect(screen.getByLabelText('本手结算玩家牌型')).toHaveTextContent(
-      /Bob\s*输掉 240 筹码\s*底牌\s*未摊牌/,
+      'Bob· 760 筹码输掉 240 筹码底牌未摊牌',
     );
     expect(screen.getByLabelText('Alice 的底牌')).toHaveTextContent('底牌A♠K♦');
     expect(screen.getByLabelText('本手公共牌')).toHaveTextContent(
@@ -216,6 +233,21 @@ describe('HandReadyOverlay', () => {
         .getByLabelText('本手公共牌')
         .querySelector('.hand-ready-card__card-label'),
     ).toHaveTextContent('公共牌');
+    rerender(
+      <HandReadyOverlay
+        {...props}
+        complete={false}
+        settlement={{
+          ...props.settlement,
+          players: props.settlement.players.map((player) =>
+            player.playerId === 'alice' ? { ...player, chips: 1_250 } : player,
+          ),
+        }}
+      />,
+    );
+    expect(screen.getByText('Alice').parentElement).toHaveTextContent(
+      'Alice· 1,250 筹码赢得 240 筹码',
+    );
     rerender(<HandReadyOverlay {...props} complete />);
     expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
   });
@@ -230,6 +262,7 @@ describe('HandReadyOverlay', () => {
         {
           playerId: 'alice',
           nickname: 'Alice',
+          chips: 120,
           netChange: 20,
           holeCards: ['As', 'Kd'],
           bestFiveCards: ['As', 'Kd', 'Qs', 'Jh', 'Td'],
@@ -290,7 +323,14 @@ describe('HandReadyOverlay', () => {
         settlement={{
           handId: 'hand-desktop',
           reason: 'uncontested',
-          players: [{ playerId: 'alice', nickname: 'Alice', netChange: 20 }],
+          players: [
+            {
+              playerId: 'alice',
+              nickname: 'Alice',
+              chips: 120,
+              netChange: 20,
+            },
+          ],
         }}
       />,
     );
@@ -316,8 +356,18 @@ describe('HandReadyOverlay', () => {
           reason: 'uncontested',
           communityCards: ['As', 'Kd', 'Qh', 'Jc'],
           players: [
-            { playerId: 'alice', nickname: 'Alice', netChange: 40 },
-            { playerId: 'bob', nickname: 'Bob', netChange: -40 },
+            {
+              playerId: 'alice',
+              nickname: 'Alice',
+              chips: 140,
+              netChange: 40,
+            },
+            {
+              playerId: 'bob',
+              nickname: 'Bob',
+              chips: 60,
+              netChange: -40,
+            },
           ],
         }}
       />,
@@ -410,6 +460,7 @@ describe('HandReadyOverlay', () => {
             {
               playerId: 'bob',
               nickname: 'Bob',
+              chips: 80,
               netChange: -20,
               voluntarilyRevealedHoleCards: ['2c', '3d'],
             },

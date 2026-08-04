@@ -747,7 +747,16 @@ describe('GameRoom', () => {
     expect(
       within(settlementPlayers).getAllByLabelText(/Bob 的第 .* 张底牌，未公开/),
     ).toHaveLength(2);
-    fireEvent.click(await screen.findByRole('button', { name: '摊牌' }));
+    expect(
+      within(settlementPlayers).getByText('Alice').parentElement,
+    ).toHaveTextContent('Alice· 100 筹码赢得 20 筹码');
+    expect(
+      within(settlementPlayers).getByText('Bob').parentElement,
+    ).toHaveTextContent('Bob· 100 筹码输掉 20 筹码');
+    const showdownButton = await screen.findByRole('button', { name: '摊牌' });
+    expect(showdownButton.closest('.hand-ready-card__actions')).not.toBeNull();
+    expect(showdownButton.closest('.table-seat')).toBeNull();
+    fireEvent.click(showdownButton);
     await waitFor(() =>
       expect(sendCommand).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -791,6 +800,34 @@ describe('GameRoom', () => {
     ).not.toBeInTheDocument();
     expect(statisticsButton).toHaveFocus();
     expect(window.innerWidth).toBe(360);
+
+    act(() =>
+      consumeSnapshot({
+        ...handReadySnapshot,
+        sequence: 6,
+        stateVersion: 6,
+        room: {
+          ...handReadySnapshot.room,
+          players: handReadySnapshot.room.players.map((player) =>
+            player.playerId === 'bob' ? { ...player, chips: 1_250 } : player,
+          ),
+        },
+        game: {
+          ...handReadySnapshot.game!,
+          settlement: {
+            ...handReadySnapshot.game!.settlement!,
+            voluntaryRevealedHoleCards: { bob: ['2c', '3d'] },
+          },
+        },
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: '摊牌' })).toBeNull(),
+    );
+    expect(
+      within(screen.getByLabelText('本手结算玩家牌型')).getByText('Bob')
+        .parentElement,
+    ).toHaveTextContent('Bob· 1,250 筹码输掉 20 筹码');
   });
 
   it('shows the server action countdown on the table felt', async () => {

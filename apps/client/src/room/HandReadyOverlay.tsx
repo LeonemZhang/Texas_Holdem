@@ -18,6 +18,7 @@ export interface HandReadyOverlayProps {
   readonly ownChips: number;
   readonly nowMs?: number;
   readonly onChoose: (choice: 'ready' | 'sitting-out') => void;
+  readonly onShowHoleCards?: () => void;
   readonly requestToReview?: HandReadyRequestView | null;
   readonly onApproveRequest?: (requestId: string) => void;
   readonly onRejectRequest?: (requestId: string) => void;
@@ -30,6 +31,7 @@ export interface HandReadyOverlayProps {
     readonly players: readonly {
       readonly playerId: string;
       readonly nickname: string;
+      readonly chips: number;
       readonly netChange: number;
       readonly holeCards?: readonly string[];
       readonly bestFiveCards?: readonly string[];
@@ -142,6 +144,7 @@ export function HandReadyOverlay({
   ownChips,
   nowMs,
   onChoose,
+  onShowHoleCards,
   requestToReview = null,
   onApproveRequest,
   onRejectRequest,
@@ -198,30 +201,45 @@ export function HandReadyOverlay({
           >
             {secondsLeft > 0 ? `${secondsLeft}s` : '等待重就绪'}
           </strong>
-          <button
-            className="button button--primary"
-            type="button"
-            disabled={
-              ownChoice === 'ready' ||
-              ownChips <= 0 ||
-              pendingRequests.length > 0
-            }
-            onClick={() => onChoose('ready')}
+          <div
+            className="hand-ready-card__actions"
+            role="group"
+            aria-label="准备操作"
           >
-            {ownChoice === 'ready'
-              ? '已就绪'
-              : ownChoice === 'sitting-out'
-                ? '加入下一手'
-                : '就绪'}
-          </button>
-          <button
-            className="button button--secondary"
-            type="button"
-            disabled={ownChoice === 'sitting-out'}
-            onClick={() => onChoose('sitting-out')}
-          >
-            暂不参与
-          </button>
+            <button
+              className="button button--primary"
+              type="button"
+              disabled={
+                ownChoice === 'ready' ||
+                ownChips <= 0 ||
+                pendingRequests.length > 0
+              }
+              onClick={() => onChoose('ready')}
+            >
+              {ownChoice === 'ready'
+                ? '已就绪'
+                : ownChoice === 'sitting-out'
+                  ? '加入下一手'
+                  : '就绪'}
+            </button>
+            {settlement && onShowHoleCards ? (
+              <button
+                className="button hand-ready-card__show-hole-cards"
+                type="button"
+                onClick={onShowHoleCards}
+              >
+                摊牌
+              </button>
+            ) : null}
+            <button
+              className="button button--secondary"
+              type="button"
+              disabled={ownChoice === 'sitting-out'}
+              onClick={() => onChoose('sitting-out')}
+            >
+              暂不参与
+            </button>
+          </div>
         </header>
 
         {requestToReview ? (
@@ -316,6 +334,9 @@ export function HandReadyOverlay({
                 <li key={player.playerId}>
                   <div className="hand-ready-card__showdown-summary">
                     <strong>{player.nickname}</strong>
+                    <span className="hand-ready-card__player-chips">
+                      · {player.chips.toLocaleString('zh-CN')} 筹码
+                    </span>
                     <span
                       className={
                         player.netChange > 0
