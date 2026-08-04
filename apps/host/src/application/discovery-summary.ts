@@ -17,7 +17,7 @@ export function currentDiscoverySummary(
     roomName: room.settings.roomName,
     hostNickname: host?.nickname ?? 'Host',
     playerCount: room.players.filter(
-      ({ status }) => !['left', 'eliminated'].includes(status),
+      ({ status }) => !['left', 'removed', 'eliminated'].includes(status),
     ).length,
     maxPlayers: room.settings.maxPlayers,
     smallBlind: room.settings.smallBlind,

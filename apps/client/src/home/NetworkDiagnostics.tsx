@@ -34,8 +34,7 @@ export function NetworkDiagnostics({
   }, [runtime]);
 
   return (
-    <details className="network-diagnostics">
-      <summary>网络诊断</summary>
+    <section className="network-diagnostics">
       <div className="network-diagnostics__content">
         <header>
           <div>
@@ -80,6 +79,6 @@ export function NetworkDiagnostics({
           IP 直连。
         </p>
       </div>
-    </details>
+    </section>
   );
 }

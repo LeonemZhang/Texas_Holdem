@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { NetworkDiagnostics } from './NetworkDiagnostics.js';
@@ -11,6 +11,7 @@ function adapter(): RuntimeAdapter {
       appVersion: '0.0.0',
       platform: 'win32',
     }),
+    openRoomRecordManager: async () => undefined,
     listNetworkInterfaces: vi.fn(async () => [
       {
         name: 'Virtual LAN',
@@ -32,6 +33,7 @@ function adapter(): RuntimeAdapter {
     recoverRoomRecord: async () => {
       throw new Error('unavailable');
     },
+    closeRunningRoomRecord: async () => undefined,
     archiveRoomRecord: async () => undefined,
     restoreRoomRecord: async () => undefined,
     deleteRoomRecord: async () => undefined,
@@ -56,7 +58,6 @@ describe('NetworkDiagnostics', () => {
         }}
       />,
     );
-    fireEvent.click(screen.getByText('网络诊断'));
     expect(await screen.findByText('Virtual LAN')).toBeInTheDocument();
     expect(screen.getByText('10.126.126.1')).toBeInTheDocument();
     expect(screen.getByText('32100 / TCP')).toBeInTheDocument();
