@@ -4,6 +4,7 @@ import {
   BettingCommandSchema,
   PROTOCOL_VERSION,
   type CommandResponse,
+  type ChipActivity,
   type CreateRoomSessionRequest,
   type JoinRoomSessionRequest,
   type PlayerSnapshot,
@@ -35,6 +36,7 @@ import { projectPlayerSnapshot } from './snapshot-projector.js';
 import type { HandSummaryEvent } from '@texas-holdem/poker-core';
 import type { RoomRecoveryState } from './persistence-ports.js';
 import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
+import type { ChipRequestBook } from '../domain/chip-requests.js';
 
 export interface RoomSessionBootstrapService {
   currentRoomId(): string | null;
@@ -86,6 +88,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
   );
   readonly #sequences = new Map<string, number>();
   readonly #completedHands = new Map<string, number>();
+  readonly #chipActivity = new Map<string, readonly ChipActivity[]>();
   readonly #results = new Map<string, CommandResponse>();
   readonly #handReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #actionTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -141,6 +144,10 @@ export class GameRuntime implements RoomSessionBootstrapService {
       typeof input.roomId === 'string'
         ? this.rooms.get(input.roomId)
         : null;
+    const previousRequests =
+      previousRoom === null
+        ? null
+        : this.#roomHandler.getChipRequests(previousRoom.roomId);
     const response = this.#dispatcher.dispatch(input);
     if (response.status !== 'accepted') return response;
     const command = input as ClientCommand;
@@ -154,12 +161,18 @@ export class GameRuntime implements RoomSessionBootstrapService {
         (this.#completedHands.get(command.roomId) ?? 0) + 1,
       );
     }
+    const sequence = (this.#sequences.get(command.roomId) ?? 0) + 1;
+    this.syncChipActivity(
+      command,
+      previousRequests,
+      this.#roomHandler.getChipRequests(command.roomId),
+      sequence,
+    );
     this.startNextHandIfReady(command.roomId, false);
     const playingRoom = this.rooms.get(command.roomId);
     if (playingRoom) this.#gameHandler.resolveAutomatic(playingRoom);
     this.scheduleHandReadyTimeout(command.roomId);
     this.scheduleActionTimeout(command.roomId);
-    const sequence = (this.#sequences.get(command.roomId) ?? 0) + 1;
     this.#sequences.set(command.roomId, sequence);
     const sequenced = Object.freeze({
       ...response,
@@ -223,6 +236,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       throw new RangeError('Cannot restore over an active runtime');
     }
     this.#roomHandler.restoreState(state);
+    this.#chipActivity.set(state.room.roomId, state.chipActivity);
     this.#sequences.set(state.room.roomId, sequence);
     if (this.#statisticsStore) {
       this.#completedHands.set(
@@ -274,6 +288,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       hand: this.#roomHandler.getCurrentHand(roomId),
       handReady: this.#roomHandler.getHandReady(roomId),
       chipRequests: this.#roomHandler.getChipRequests(roomId),
+      chipActivity: this.#chipActivity.get(roomId) ?? Object.freeze([]),
       sequence: this.#sequences.get(roomId) ?? 0,
       reconnectTokens: Object.freeze(
         Object.fromEntries(this.#reconnectTokens.get(roomId) ?? []),
@@ -446,6 +461,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       actionDeadlineMs,
       handReady: this.#roomHandler.getHandReady(roomId),
       chipRequests: this.#roomHandler.getChipRequests(roomId),
+      chipActivity: this.#chipActivity.get(roomId) ?? Object.freeze([]),
       completedHands: this.#completedHands.get(roomId) ?? 0,
       statistics: room.players.map((player) => ({
         playerId: player.playerId,
@@ -491,6 +507,80 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return betting.success
       ? this.#gameHandler.handle(betting.data, room)
       : this.#roomHandler.handle(command, room);
+  }
+
+  private syncChipActivity(
+    command: ClientCommand,
+    previousRequests: ChipRequestBook | null,
+    nextRequests: ChipRequestBook | null,
+    sequence: number,
+  ): void {
+    const occurredAtMs = Date.now();
+    const previous = this.#chipActivity.get(command.roomId) ?? [];
+    const next: ChipActivity[] = [...previous];
+    for (const request of nextRequests?.requests ?? []) {
+      const index = next.findIndex(
+        (record) =>
+          record.kind === 'request' && record.requestId === request.requestId,
+      );
+      const previousRequest = previousRequests?.requests.find(
+        ({ requestId }) => requestId === request.requestId,
+      );
+      if (index < 0) {
+        next.push({
+          kind: 'request' as const,
+          requestId: request.requestId,
+          requesterId: request.requesterId,
+          targetPlayerId: request.targetPlayerId,
+          amount: request.amount,
+          status: request.status,
+          rejectedByPlayerIds: [...request.rejectedByPlayerIds],
+          completedByPlayerId:
+            command.type === 'chips.approve' &&
+            command.requestId === request.requestId
+              ? command.playerId
+              : null,
+          createdSequence: sequence,
+          updatedSequence: sequence,
+          createdAtMs: occurredAtMs,
+          updatedAtMs: occurredAtMs,
+        });
+        continue;
+      }
+      const record = next[index];
+      if (
+        record?.kind !== 'request' ||
+        (previousRequest?.status === request.status &&
+          previousRequest.rejectedByPlayerIds.length ===
+            request.rejectedByPlayerIds.length)
+      ) {
+        continue;
+      }
+      next[index] = {
+        ...record,
+        status: request.status,
+        rejectedByPlayerIds: [...request.rejectedByPlayerIds],
+        completedByPlayerId:
+          command.type === 'chips.approve' &&
+          command.requestId === request.requestId
+            ? command.playerId
+            : record.completedByPlayerId,
+        updatedSequence: sequence,
+        updatedAtMs: occurredAtMs,
+      };
+    }
+    if (command.type === 'chips.give') {
+      next.push({
+        kind: 'direct-transfer' as const,
+        transferId: command.transferId,
+        fromPlayerId: command.playerId,
+        toPlayerId: command.receiverPlayerId,
+        amount: command.amount,
+        completedSequence: sequence,
+        completedAtMs: occurredAtMs,
+      });
+    }
+    this.#chipActivity.set(command.roomId, Object.freeze(next));
   }
 
   private recordSummary(summary: HandSummaryEvent): void {

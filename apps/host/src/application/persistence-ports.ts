@@ -1,5 +1,9 @@
 import type { StartedHandState } from '@texas-holdem/poker-core';
-import type { CommandResponse, DomainEvent } from '@texas-holdem/protocol';
+import type {
+  ChipActivity,
+  CommandResponse,
+  DomainEvent,
+} from '@texas-holdem/protocol';
 
 import type { ChipRequestBook } from '../domain/chip-requests.js';
 import type { HandReadyState } from '../domain/hand-ready.js';
@@ -10,6 +14,7 @@ export interface RoomRecoveryState {
   readonly hand: StartedHandState | null;
   readonly handReady: HandReadyState | null;
   readonly chipRequests: ChipRequestBook | null;
+  readonly chipActivity: readonly ChipActivity[];
 }
 
 export interface StoredRoomSnapshot {

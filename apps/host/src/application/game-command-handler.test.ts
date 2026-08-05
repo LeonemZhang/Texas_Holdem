@@ -7,7 +7,7 @@ import { RoomCommandHandler } from './room-command-handler.js';
 import { InMemoryRoomRegistry } from './room-registry.js';
 
 const identity = {
-  protocolVersion: '1' as const,
+  protocolVersion: '3' as const,
   commandId: 'command-1',
   roomId: 'room-1',
   playerId: 'host',

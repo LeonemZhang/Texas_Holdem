@@ -69,6 +69,7 @@ export class SqliteGameRuntimeStore {
         hand: runtime.hand,
         handReady: runtime.handReady,
         chipRequests: runtime.chipRequests,
+        chipActivity: runtime.chipActivity,
       },
     });
     const registry: ReconnectRegistry = Object.freeze({

@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { gunzipSync, gzipSync } from 'node:zlib';
 
+import { ChipActivitySchema } from '@texas-holdem/protocol';
+
 import type {
   RoomRecoveryState,
   SnapshotStorePort,
@@ -66,7 +68,9 @@ function parseRecoveryState(
     parsed.room.version !== row.state_version ||
     !('hand' in parsed) ||
     !('handReady' in parsed) ||
-    !('chipRequests' in parsed)
+    !('chipRequests' in parsed) ||
+    !Array.isArray(parsed.chipActivity) ||
+    !ChipActivitySchema.array().safeParse(parsed.chipActivity).success
   ) {
     throw new SnapshotRecoveryError(
       'Snapshot identity or state shape is invalid',

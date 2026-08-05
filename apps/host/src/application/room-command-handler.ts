@@ -28,6 +28,7 @@ import {
 import { joinRoom } from '../domain/join-room.js';
 import { resumeLeftPlayer } from '../domain/reconnect.js';
 import { setLobbyReady } from '../domain/lobby-ready.js';
+import { reseatPlayer, shuffleLobbySeats } from '../domain/seat-management.js';
 import { leaveRoom, removePlayer } from '../domain/player-status.js';
 import { createRoom, freezeRoom, type RoomState } from '../domain/room.js';
 import {
@@ -306,6 +307,19 @@ export class RoomCommandHandler {
         return this.accepted(
           setLobbyReady(room, command.playerId, command.ready),
         );
+      case 'room.reseat-player':
+        return this.accepted(
+          reseatPlayer(
+            room,
+            command.playerId,
+            command.targetPlayerId,
+            command.seatIndex,
+          ),
+        );
+      case 'room.shuffle-seats':
+        return this.accepted(
+          shuffleLobbySeats(room, command.playerId, this.randomSource),
+        );
       case 'room.start-first-hand': {
         const started = startFirstHand(
           room,
@@ -409,8 +423,7 @@ export class RoomCommandHandler {
           createChipRequest(room, context.ready, context.requests, {
             requestId: command.requestId,
             requesterId: command.playerId,
-            targetPlayerId:
-              command.audience === 'targeted' ? command.targetPlayerId : null,
+            targetPlayerId: command.targetPlayerId,
             amount: command.amount,
             ...(command.note === undefined ? {} : { note: command.note }),
           }),
@@ -429,12 +442,7 @@ export class RoomCommandHandler {
         const requests = this.requireChipRequests(room.roomId);
         this.#chipRequests.set(
           room.roomId,
-          rejectChipRequest(
-            room,
-            requests,
-            command.requestId,
-            command.playerId,
-          ),
+          rejectChipRequest(requests, command.requestId, command.playerId),
         );
         return this.accepted(incrementVersion(room));
       }

@@ -119,7 +119,7 @@ describe('E2E04 hand readiness and chip requests', () => {
       {
         requestId: 'request-1',
         requesterId: 'bob',
-        targetPlayerId: null,
+        targetPlayerId: 'host',
         amount: 25,
       },
     );

@@ -33,10 +33,9 @@ export function joinRoom(
       .filter(({ status }) => !['left', 'removed'].includes(status))
       .map(({ seatIndex }) => seatIndex),
   );
-  const seatIndex = Array.from(
-    { length: room.settings.maxPlayers },
-    (_, index) => index,
-  ).find((index) => !occupied.has(index));
+  const seatIndex = Array.from({ length: 10 }, (_, index) => index).find(
+    (index) => !occupied.has(index),
+  );
   if (seatIndex === undefined) throw new RangeError('Room has no free seat');
 
   return freezeRoom({

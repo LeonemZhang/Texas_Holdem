@@ -135,7 +135,7 @@ describe('host SQLite schema', () => {
     }
   });
 
-  it('enforces foreign keys and room-scoped seat, nickname and sequence uniqueness', async () => {
+  it('enforces foreign keys and room-scoped nickname and sequence uniqueness', async () => {
     const database = await migratedDatabase();
     try {
       insertRoom(database);
@@ -150,9 +150,17 @@ describe('host SQLite schema', () => {
       ).toThrow();
       expect(() =>
         insertPlayer.run('room-1', 'bob', 'Bob', 0, 100, 'waiting', 0),
-      ).toThrow();
+      ).not.toThrow();
       expect(() =>
-        insertPlayer.run('missing-room', 'bob', 'Bob', 1, 100, 'waiting', 0),
+        insertPlayer.run(
+          'missing-room',
+          'carol',
+          'Carol',
+          1,
+          100,
+          'waiting',
+          0,
+        ),
       ).toThrow();
 
       const insertEvent = database.prepare(`

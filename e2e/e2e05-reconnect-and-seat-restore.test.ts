@@ -99,6 +99,8 @@ function snapshot(
     },
     game: null,
     handReady: null,
+    chipRequests: [],
+    chipActivity: [],
     statistics: { players: [], titles: [] },
   };
 }

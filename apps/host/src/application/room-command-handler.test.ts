@@ -6,7 +6,7 @@ import { RoomCommandHandler } from './room-command-handler.js';
 
 const random = { next: () => 0.5 };
 const identity = {
-  protocolVersion: '1' as const,
+  protocolVersion: '3' as const,
   commandId: 'command-1',
   roomId: 'room-1',
   playerId: 'host',
@@ -195,7 +195,6 @@ describe('RoomCommandHandler', () => {
         playerId: 'bob',
         type: 'chips.request',
         requestId: 'request-1',
-        audience: 'targeted',
         targetPlayerId: 'host',
         amount: 20,
       },

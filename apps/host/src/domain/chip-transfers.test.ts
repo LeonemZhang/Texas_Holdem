@@ -64,7 +64,7 @@ describe('chip transfers', () => {
     expect(room.players.map(({ chips }) => chips)).toEqual(before);
   });
 
-  it('lets only the first successful approval complete a whole-table request', () => {
+  it('lets the targeted player complete a request', () => {
     const { room, handReady } = context();
     let requests = createChipRequest(
       room,
@@ -73,7 +73,7 @@ describe('chip transfers', () => {
       {
         requestId: 'r1',
         requesterId: 'bob',
-        targetPlayerId: null,
+        targetPlayerId: 'host',
         amount: 20,
       },
     );

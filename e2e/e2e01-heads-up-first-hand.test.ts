@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BettingCommand } from '@texas-holdem/protocol';
+import {
+  PROTOCOL_VERSION,
+  type BettingCommand,
+} from '../packages/protocol/src/index.js';
 
 import { CommandDispatcher } from '../apps/host/src/application/command-dispatcher.js';
 import { GameCommandHandler } from '../apps/host/src/application/game-command-handler.js';
@@ -30,7 +33,7 @@ describe('LUNA-E2E01 heads-up first hand', () => {
     );
     const submit = (command: Record<string, unknown>) => {
       const response = dispatcher.dispatch({
-        protocolVersion: '1',
+        protocolVersion: PROTOCOL_VERSION,
         ...command,
       });
       expect(response.status).toBe('accepted');

@@ -50,11 +50,12 @@ const recoveredState: RoomRecoveryState = {
   hand: null,
   handReady: null,
   chipRequests: null,
+  chipActivity: [],
 };
 
 function request(): CreateRoomRecordRequest {
   return {
-    protocolVersion: '1',
+    protocolVersion: '3',
     requestId: 'request-1',
     type: 'room-record.create',
     hostNickname: 'Alice',
@@ -73,7 +74,7 @@ function request(): CreateRoomRecordRequest {
 
 function context(activeRoomId: string | null = null) {
   const roomSession: RoomSessionResponse = {
-    protocolVersion: '1',
+    protocolVersion: '3',
     roomId: 'new-room',
     playerId: 'host',
     token: 'host-token',

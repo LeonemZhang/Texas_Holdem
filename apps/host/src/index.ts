@@ -140,7 +140,7 @@ function managementFailure(
 ): RoomRecordManagementResponse {
   const message = error instanceof Error ? error.message : 'Management failed';
   return {
-    protocolVersion: '1',
+    protocolVersion: '3',
     requestId,
     status: 'rejected',
     error: {
@@ -155,7 +155,7 @@ parentPort?.on('message', ({ data }) => {
   if (!parsed.success) return;
   if (!roomRecordManagement) {
     parentPort.postMessage({
-      protocolVersion: '1',
+      protocolVersion: '3',
       requestId: parsed.data.requestId,
       status: 'rejected',
       error: {
@@ -219,7 +219,7 @@ parentPort?.on('message', ({ data }) => {
         break;
     }
     parentPort.postMessage({
-      protocolVersion: '1',
+      protocolVersion: '3',
       requestId: parsed.data.requestId,
       status: 'accepted',
       result,

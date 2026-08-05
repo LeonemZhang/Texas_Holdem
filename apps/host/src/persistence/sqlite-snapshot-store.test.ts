@@ -5,7 +5,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createRoom } from '../domain/room.js';
-import type { StoredRoomSnapshot } from '../application/persistence-ports.js';
+import type {
+  RoomRecoveryState,
+  StoredRoomSnapshot,
+} from '../application/persistence-ports.js';
 import { HOST_MIGRATIONS } from './migrations.js';
 import { openSqliteDatabase, runSqliteMigrations } from './sqlite-database.js';
 import {
@@ -62,7 +65,13 @@ function snapshot(sequence = 0): StoredRoomSnapshot {
     sequence,
     stateVersion: room.version,
     createdAtMs: sequence + 1,
-    state: { room, hand: null, handReady: null, chipRequests: null },
+    state: {
+      room,
+      hand: null,
+      handReady: null,
+      chipRequests: null,
+      chipActivity: [],
+    },
   };
 }
 
@@ -105,6 +114,38 @@ describe('SqliteSnapshotStore', () => {
       current.database
         .prepare('UPDATE snapshots SET payload = ? WHERE room_id = ?')
         .run(Buffer.from('corrupted'), 'room-1');
+      expect(() => current.store.latest('room-1')).toThrowError(
+        expect.objectContaining<Partial<SnapshotRecoveryError>>({
+          name: 'SnapshotRecoveryError',
+          code: 'SNAPSHOT_CORRUPTED',
+        }),
+      );
+    } finally {
+      current.database.close();
+    }
+  });
+
+  it('rejects legacy chip history without authoritative timestamps', async () => {
+    const current = await context();
+    try {
+      const legacy = snapshot();
+      current.store.save({
+        ...legacy,
+        state: {
+          ...legacy.state,
+          chipActivity: [
+            {
+              kind: 'direct-transfer',
+              transferId: 'legacy-transfer',
+              fromPlayerId: 'host',
+              toPlayerId: 'bob',
+              amount: 10,
+              completedSequence: 1,
+            },
+          ],
+        } as unknown as RoomRecoveryState,
+      });
+
       expect(() => current.store.latest('room-1')).toThrowError(
         expect.objectContaining<Partial<SnapshotRecoveryError>>({
           name: 'SnapshotRecoveryError',

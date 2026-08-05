@@ -60,6 +60,13 @@ export const RemovePlayerCommandSchema = z.object({
   type: z.literal('room.remove-player'),
   targetPlayerId: IdSchema,
 });
+export const ReseatPlayerCommandSchema = z.object({
+  ...CommandIdentityShape,
+  type: z.literal('room.reseat-player'),
+  targetPlayerId: IdSchema,
+  seatIndex: z.number().int().min(0).max(9),
+});
+export const ShuffleSeatsCommandSchema = simpleCommand('room.shuffle-seats');
 
 export const RoomCommandSchema = z.discriminatedUnion('type', [
   CreateRoomCommandSchema,
@@ -69,6 +76,8 @@ export const RoomCommandSchema = z.discriminatedUnion('type', [
   PauseRoomCommandSchema,
   ResumeRoomCommandSchema,
   RemovePlayerCommandSchema,
+  ReseatPlayerCommandSchema,
+  ShuffleSeatsCommandSchema,
   ExitRoomCommandSchema,
   CloseRoomCommandSchema,
 ]);
@@ -78,4 +87,6 @@ export type CreateRoomCommand = z.infer<typeof CreateRoomCommandSchema>;
 export type JoinRoomCommand = z.infer<typeof JoinRoomCommandSchema>;
 export type SetLobbyReadyCommand = z.infer<typeof SetLobbyReadyCommandSchema>;
 export type StartFirstHandCommand = z.infer<typeof StartFirstHandCommandSchema>;
+export type ReseatPlayerCommand = z.infer<typeof ReseatPlayerCommandSchema>;
+export type ShuffleSeatsCommand = z.infer<typeof ShuffleSeatsCommandSchema>;
 export type RoomCommand = z.infer<typeof RoomCommandSchema>;

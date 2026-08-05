@@ -8,6 +8,7 @@ export const AmountSchema = z.number().int().nonnegative().safe();
 export const PositiveAmountSchema = z.number().int().positive().safe();
 export const SequenceSchema = z.number().int().nonnegative().safe();
 export const StateVersionSchema = z.number().int().nonnegative().safe();
+export const TimestampMsSchema = z.number().int().nonnegative().safe();
 
 export const CommandIdentitySchema = z.object({
   protocolVersion: ProtocolVersionSchema,
@@ -41,6 +42,7 @@ export type ProtocolId = z.infer<typeof IdSchema>;
 export type Amount = z.infer<typeof AmountSchema>;
 export type Sequence = z.infer<typeof SequenceSchema>;
 export type StateVersion = z.infer<typeof StateVersionSchema>;
+export type TimestampMs = z.infer<typeof TimestampMsSchema>;
 export type CommandIdentity = z.infer<typeof CommandIdentitySchema>;
 export type ProtocolErrorCode = z.infer<typeof ProtocolErrorCodeSchema>;
 export type ErrorEnvelope = z.infer<typeof ErrorEnvelopeSchema>;

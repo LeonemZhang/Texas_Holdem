@@ -12,12 +12,11 @@ const identity = {
 };
 
 describe('HandReadyCommandSchema', () => {
-  it('distinguishes targeted and whole-table chip requests', () => {
+  it('requires a specific player for chip requests', () => {
     expect(
       HandReadyCommandSchema.safeParse({
         ...identity,
         type: 'chips.request',
-        audience: 'targeted',
         requestId: 'request-1',
         targetPlayerId: 'player-2',
         amount: 20,
@@ -31,26 +30,12 @@ describe('HandReadyCommandSchema', () => {
         requestId: 'request-2',
         amount: 20,
       }).success,
-    ).toBe(true);
-  });
-
-  it('rejects mutually contradictory audience fields', () => {
-    expect(
-      HandReadyCommandSchema.safeParse({
-        ...identity,
-        type: 'chips.request',
-        audience: 'table',
-        requestId: 'request-1',
-        targetPlayerId: 'player-2',
-        amount: 20,
-      }).success,
     ).toBe(false);
     expect(
       HandReadyCommandSchema.safeParse({
         ...identity,
         type: 'chips.request',
-        audience: 'targeted',
-        requestId: 'request-1',
+        requestId: 'request-3',
         amount: 20,
       }).success,
     ).toBe(false);

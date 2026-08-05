@@ -19,6 +19,13 @@ describe('RoomCommandSchema', () => {
     { ...identity, type: 'room.pause' },
     { ...identity, type: 'room.resume' },
     { ...identity, type: 'room.remove-player', targetPlayerId: 'player-2' },
+    {
+      ...identity,
+      type: 'room.reseat-player',
+      targetPlayerId: 'player-2',
+      seatIndex: 9,
+    },
+    { ...identity, type: 'room.shuffle-seats' },
     { ...identity, type: 'room.exit' },
     { ...identity, type: 'room.close' },
   ])('parses $type with command and optimistic identity', (command) => {

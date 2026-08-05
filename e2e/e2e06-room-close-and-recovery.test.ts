@@ -66,7 +66,13 @@ function saveSnapshot(path: string) {
     sequence: 1,
     stateVersion: room.version,
     createdAtMs: 1,
-    state: { room, hand: null, handReady: null, chipRequests: null },
+    state: {
+      room,
+      hand: null,
+      handReady: null,
+      chipRequests: null,
+      chipActivity: [],
+    },
   });
   return { database, room };
 }

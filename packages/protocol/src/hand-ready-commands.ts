@@ -14,34 +14,16 @@ export const SetHandReadyChoiceCommandSchema = z.object({
   choice: z.enum(['ready', 'sitting-out']),
 });
 
-const ChipRequestFields = {
-  ...identity,
-  requestId: IdSchema,
-  amount: PositiveAmountSchema,
-  note: z.string().trim().max(500).optional(),
-} as const;
-
-export const CreateTargetedChipRequestCommandSchema = z
+export const CreateChipRequestCommandSchema = z
   .object({
-    ...ChipRequestFields,
+    ...identity,
     type: z.literal('chips.request'),
-    audience: z.literal('targeted'),
+    requestId: IdSchema,
     targetPlayerId: IdSchema,
+    amount: PositiveAmountSchema,
+    note: z.string().trim().max(500).optional(),
   })
   .strict();
-
-export const CreateTableChipRequestCommandSchema = z
-  .object({
-    ...ChipRequestFields,
-    type: z.literal('chips.request'),
-    audience: z.literal('table'),
-  })
-  .strict();
-
-export const CreateChipRequestCommandSchema = z.discriminatedUnion('audience', [
-  CreateTargetedChipRequestCommandSchema,
-  CreateTableChipRequestCommandSchema,
-]);
 
 const requestDecision = <T extends string>(type: T) =>
   z.object({ ...identity, type: z.literal(type), requestId: IdSchema });

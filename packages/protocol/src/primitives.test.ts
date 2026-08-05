@@ -11,7 +11,7 @@ import {
 
 describe('protocol primitives', () => {
   it('rejects incompatible protocol versions and empty identifiers', () => {
-    expect(ProtocolVersionSchema.safeParse('2').success).toBe(false);
+    expect(ProtocolVersionSchema.safeParse('1').success).toBe(false);
     expect(IdSchema.safeParse('   ').success).toBe(false);
   });
 

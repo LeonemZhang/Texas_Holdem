@@ -38,7 +38,7 @@ function context() {
 }
 
 describe('chip requests', () => {
-  it('creates targeted and whole-table requests only during readiness', () => {
+  it('creates requests for a specific player only during readiness', () => {
     const { room, handReady } = context();
     let book = createChipRequestBook(handReady);
     book = createChipRequest(room, handReady, book, {
@@ -47,21 +47,8 @@ describe('chip requests', () => {
       targetPlayerId: 'host',
       amount: 20,
     });
-    book = createChipRequest(room, handReady, book, {
-      requestId: 'table',
-      requesterId: 'bob',
-      targetPlayerId: null,
-      amount: 30,
-      note: ' one rebuy ',
-    });
     expect(book.requests).toMatchObject([
       { requestId: 'targeted', targetPlayerId: 'host', status: 'pending' },
-      {
-        requestId: 'table',
-        targetPlayerId: null,
-        note: 'one rebuy',
-        status: 'pending',
-      },
     ]);
   });
 
@@ -85,7 +72,7 @@ describe('chip requests', () => {
     expect(book.requests[0]?.status).toBe('revoked');
   });
 
-  it('rejects a request that exceeds the selected donor or table balance', () => {
+  it('rejects a request that exceeds the selected donor balance', () => {
     const { room, handReady } = context();
     const book = createChipRequestBook(handReady);
 
@@ -97,17 +84,9 @@ describe('chip requests', () => {
         amount: 101,
       }),
     ).toThrow('Requested chips exceed the target available chips');
-    expect(() =>
-      createChipRequest(room, handReady, book, {
-        requestId: 'table-too-large',
-        requesterId: 'bob',
-        targetPlayerId: null,
-        amount: 101,
-      }),
-    ).toThrow('Requested chips exceed the target available chips');
   });
 
-  it('records individual all-table rejections until every donor rejects', () => {
+  it('records the targeted player rejection immediately', () => {
     const { room, handReady } = context();
     let book = createChipRequest(
       room,
@@ -116,16 +95,17 @@ describe('chip requests', () => {
       {
         requestId: 'r1',
         requesterId: 'bob',
-        targetPlayerId: null,
+        targetPlayerId: 'host',
         amount: 20,
       },
     );
-    book = rejectChipRequest(room, book, 'r1', 'host');
-    expect(book.requests[0]?.status).toBe('pending');
-    book = rejectChipRequest(room, book, 'r1', 'carol');
+    expect(() => rejectChipRequest(book, 'r1', 'carol')).toThrow(
+      'Only the targeted player',
+    );
+    book = rejectChipRequest(book, 'r1', 'host');
     expect(book.requests[0]).toMatchObject({
       status: 'rejected',
-      rejectedByPlayerIds: ['host', 'carol'],
+      rejectedByPlayerIds: ['host'],
     });
   });
 });

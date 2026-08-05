@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const PROTOCOL_VERSION = '1' as const;
+export const PROTOCOL_VERSION = '3' as const;
 
 export const SystemHelloRequestSchema = z.object({
   protocolVersion: z.string().min(1),

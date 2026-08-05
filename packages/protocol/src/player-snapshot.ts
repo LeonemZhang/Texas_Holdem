@@ -6,6 +6,7 @@ import {
   ProtocolVersionSchema,
   SequenceSchema,
   StateVersionSchema,
+  TimestampMsSchema,
 } from './primitives.js';
 
 const CardCodeSchema = z.string().regex(/^[2-9TJQKA][cdhs]$/);
@@ -49,6 +50,32 @@ export const PublicPlayerSchema = z.object({
   isHost: z.boolean(),
   lobbyReady: z.boolean(),
 });
+
+export const ChipActivitySchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('request'),
+    requestId: IdSchema,
+    requesterId: IdSchema,
+    targetPlayerId: IdSchema,
+    amount: AmountSchema,
+    status: z.enum(['pending', 'rejected', 'revoked', 'completed']),
+    rejectedByPlayerIds: z.array(IdSchema),
+    completedByPlayerId: IdSchema.nullable(),
+    createdSequence: SequenceSchema,
+    updatedSequence: SequenceSchema,
+    createdAtMs: TimestampMsSchema,
+    updatedAtMs: TimestampMsSchema,
+  }),
+  z.object({
+    kind: z.literal('direct-transfer'),
+    transferId: IdSchema,
+    fromPlayerId: IdSchema,
+    toPlayerId: IdSchema,
+    amount: AmountSchema,
+    completedSequence: SequenceSchema,
+    completedAtMs: TimestampMsSchema,
+  }),
+]);
 
 export const PlayerSnapshotSchema = z.object({
   protocolVersion: ProtocolVersionSchema,
@@ -132,24 +159,25 @@ export const PlayerSnapshotSchema = z.object({
         z.object({
           requestId: IdSchema,
           requesterId: IdSchema,
-          targetPlayerId: IdSchema.nullable(),
+          targetPlayerId: IdSchema,
           amount: AmountSchema,
-          status: z.enum(['pending', 'rejected', 'revoked', 'completed']),
+          status: z.literal('pending'),
+          rejectedByPlayerIds: z.array(IdSchema),
         }),
       ),
     })
     .nullable(),
-  chipRequests: z
-    .array(
-      z.object({
-        requestId: IdSchema,
-        requesterId: IdSchema,
-        targetPlayerId: IdSchema.nullable(),
-        amount: AmountSchema,
-        status: z.enum(['pending', 'rejected', 'revoked', 'completed']),
-      }),
-    )
-    .default([]),
+  chipRequests: z.array(
+    z.object({
+      requestId: IdSchema,
+      requesterId: IdSchema,
+      targetPlayerId: IdSchema,
+      amount: AmountSchema,
+      status: z.literal('pending'),
+      rejectedByPlayerIds: z.array(IdSchema),
+    }),
+  ),
+  chipActivity: z.array(ChipActivitySchema),
   statistics: z.object({
     players: z.array(
       z.object({
@@ -181,4 +209,5 @@ export const PlayerSnapshotSchema = z.object({
 });
 
 export type LegalActions = z.infer<typeof LegalActionsSchema>;
+export type ChipActivity = z.infer<typeof ChipActivitySchema>;
 export type PlayerSnapshot = z.infer<typeof PlayerSnapshotSchema>;

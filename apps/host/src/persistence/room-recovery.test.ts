@@ -68,7 +68,13 @@ async function context() {
     sequence: 1,
     stateVersion: 1,
     createdAtMs: 1,
-    state: { room, hand: null, handReady: null, chipRequests: null },
+    state: {
+      room,
+      hand: null,
+      handReady: null,
+      chipRequests: null,
+      chipActivity: [],
+    },
   });
   return {
     database,
@@ -100,6 +106,7 @@ describe('room recovery from snapshot and events', () => {
           hand: null,
           handReady: null,
           chipRequests: null,
+          chipActivity: [],
         },
         paused,
       );

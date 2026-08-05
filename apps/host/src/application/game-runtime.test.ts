@@ -59,6 +59,97 @@ function reachHandReady(runtime: GameRuntime, handReadyTimeoutSeconds = 30) {
 }
 
 describe('GameRuntime', () => {
+  it('keeps one public history record per chip action across recovery', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-05T10:00:00.000Z'));
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime);
+
+    vi.setSystemTime(new Date('2026-08-05T10:00:01.000Z'));
+    expect(
+      context.send(context.guest.playerId, {
+        type: 'chips.request',
+        requestId: 'request-rejected',
+        targetPlayerId: context.host.playerId,
+        amount: 10,
+      }),
+    ).toMatchObject({ status: 'accepted' });
+    vi.setSystemTime(new Date('2026-08-05T10:00:02.000Z'));
+    expect(
+      context.send(context.host.playerId, {
+        type: 'chips.reject',
+        requestId: 'request-rejected',
+      }),
+    ).toMatchObject({ status: 'accepted' });
+    vi.setSystemTime(new Date('2026-08-05T10:00:03.000Z'));
+    expect(
+      context.send(context.guest.playerId, {
+        type: 'chips.request',
+        requestId: 'request-completed',
+        targetPlayerId: context.host.playerId,
+        amount: 10,
+      }),
+    ).toMatchObject({ status: 'accepted' });
+    vi.setSystemTime(new Date('2026-08-05T10:00:04.000Z'));
+    expect(
+      context.send(context.host.playerId, {
+        type: 'chips.approve',
+        requestId: 'request-completed',
+        transferId: 'approved-transfer',
+      }),
+    ).toMatchObject({ status: 'accepted' });
+    vi.setSystemTime(new Date('2026-08-05T10:00:05.000Z'));
+    expect(
+      context.send(context.host.playerId, {
+        type: 'chips.give',
+        transferId: 'direct-transfer',
+        receiverPlayerId: context.guest.playerId,
+        amount: 5,
+      }),
+    ).toMatchObject({ status: 'accepted' });
+
+    const beforeRecovery = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!;
+    expect(beforeRecovery.chipRequests).toEqual([]);
+    expect(beforeRecovery.chipActivity).toHaveLength(3);
+    expect(beforeRecovery.chipActivity[0]).toMatchObject({
+      kind: 'direct-transfer',
+      transferId: 'direct-transfer',
+      fromPlayerId: context.host.playerId,
+      toPlayerId: context.guest.playerId,
+      amount: 5,
+      completedAtMs: new Date('2026-08-05T10:00:05.000Z').getTime(),
+    });
+    expect(beforeRecovery.chipActivity[1]).toMatchObject({
+      kind: 'request',
+      requestId: 'request-completed',
+      status: 'completed',
+      completedByPlayerId: context.host.playerId,
+      createdAtMs: new Date('2026-08-05T10:00:03.000Z').getTime(),
+      updatedAtMs: new Date('2026-08-05T10:00:04.000Z').getTime(),
+    });
+    expect(beforeRecovery.chipActivity[2]).toMatchObject({
+      kind: 'request',
+      requestId: 'request-rejected',
+      status: 'rejected',
+      rejectedByPlayerIds: [context.host.playerId],
+      createdAtMs: new Date('2026-08-05T10:00:01.000Z').getTime(),
+      updatedAtMs: new Date('2026-08-05T10:00:02.000Z').getTime(),
+    });
+
+    const exported = runtime.exportState(context.host.roomId)!;
+    const recovered = new GameRuntime();
+    recovered.restore(exported, exported.sequence);
+    expect(
+      recovered.snapshot(context.host.roomId, context.host.playerId)
+        ?.chipActivity,
+    ).toEqual(beforeRecovery.chipActivity);
+    recovered.dispose();
+    runtime.dispose();
+  });
+
   it('lets a non-showdown player publicly reveal only their own hole cards during settlement', () => {
     const runtime = new GameRuntime();
     const context = reachHandReady(runtime);
@@ -121,6 +212,85 @@ describe('GameRuntime', () => {
         .snapshot(host.roomId, host.playerId)
         ?.room.players.find(({ playerId }) => playerId === guest.playerId),
     ).toMatchObject({ lobbyReady: true });
+    runtime.dispose();
+  });
+
+  it('keeps lobby state through reseating and starts from the authoritative seat order', () => {
+    const runtime = new GameRuntime();
+    const host = runtime.create(
+      { hostNickname: 'Alice', settings },
+      'http://10.126.126.1:32100',
+    );
+    const bob = runtime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      'http://10.126.126.1:32100',
+    );
+    const carol = runtime.join(
+      host.roomId,
+      { nickname: 'Carol' },
+      'http://10.126.126.1:32100',
+    );
+    let commandNumber = 0;
+    const send = (playerId: string, command: Record<string, unknown>) =>
+      runtime.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: `seat-command-${++commandNumber}`,
+        roomId: host.roomId,
+        playerId,
+        expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+        ...command,
+      });
+
+    send(bob.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(host.playerId, {
+      type: 'room.reseat-player',
+      targetPlayerId: host.playerId,
+      seatIndex: 2,
+    });
+    send(host.playerId, {
+      type: 'room.reseat-player',
+      targetPlayerId: carol.playerId,
+      seatIndex: 1,
+    });
+    const reseated = runtime.snapshot(host.roomId, host.playerId)!;
+    expect(
+      reseated.room.players.map(({ playerId, seatIndex, lobbyReady }) => ({
+        playerId,
+        seatIndex,
+        lobbyReady,
+      })),
+    ).toEqual([
+      { playerId: host.playerId, seatIndex: 2, lobbyReady: true },
+      { playerId: bob.playerId, seatIndex: 0, lobbyReady: true },
+      { playerId: carol.playerId, seatIndex: 1, lobbyReady: false },
+    ]);
+    expect(
+      runtime.resume(
+        host.roomId,
+        { playerId: bob.playerId, token: bob.token },
+        'http://10.126.126.1:32100',
+      ),
+    ).toMatchObject({ playerId: bob.playerId });
+
+    send(carol.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(host.playerId, {
+      type: 'room.start-first-hand',
+      handId: 'reseated-hand',
+    });
+    const started = runtime.snapshot(host.roomId, host.playerId)!;
+    const clockwise = [...started.room.players].sort(
+      (left, right) => left.seatIndex - right.seatIndex,
+    );
+    const buttonIndex = clockwise.findIndex(
+      ({ playerId }) => playerId === started.game?.buttonPlayerId,
+    );
+    expect(started.game?.smallBlindPlayerId).toBe(
+      clockwise[(buttonIndex + 1) % clockwise.length]?.playerId,
+    );
+    expect(started.game?.bigBlindPlayerId).toBe(
+      clockwise[(buttonIndex + 2) % clockwise.length]?.playerId,
+    );
     runtime.dispose();
   });
 

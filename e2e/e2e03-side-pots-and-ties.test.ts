@@ -7,7 +7,10 @@ import {
   type HandRank,
   type Seat,
 } from '../packages/poker-core/src/index.js';
-import { PlayerSnapshotSchema } from '../packages/protocol/src/index.js';
+import {
+  PlayerSnapshotSchema,
+  PROTOCOL_VERSION,
+} from '../packages/protocol/src/index.js';
 
 describe('LUNA-E2E03 all-ins, side pots, ties, and odd chips', () => {
   it('keeps every side pot conserved while sending only total and street history to the UI', () => {
@@ -47,7 +50,7 @@ describe('LUNA-E2E03 all-ins, side pots, ties, and odd chips', () => {
       ),
     ).toBe(25);
     const snapshot = PlayerSnapshotSchema.parse({
-      protocolVersion: '1',
+      protocolVersion: PROTOCOL_VERSION,
       roomId: 'room-1',
       playerId: 'alice',
       sequence: 9,
@@ -83,6 +86,8 @@ describe('LUNA-E2E03 all-ins, side pots, ties, and odd chips', () => {
         legalActions: null,
       },
       handReady: null,
+      chipRequests: [],
+      chipActivity: [],
       statistics: { players: [], titles: [] },
     });
     expect(snapshot.game?.totalPot).toBe(25);

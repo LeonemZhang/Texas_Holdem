@@ -131,6 +131,7 @@ export function replayRecoveryEvent(
     hand,
     handReady,
     chipRequests: state.chipRequests,
+    chipActivity: state.chipActivity,
   });
 }
 

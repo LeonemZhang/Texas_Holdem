@@ -83,7 +83,7 @@ describe('startNextRoomHand', () => {
       {
         requestId: 'r1',
         requesterId: 'bob',
-        targetPlayerId: null,
+        targetPlayerId: 'host',
         amount: 10,
       },
     );

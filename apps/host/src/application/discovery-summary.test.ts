@@ -29,7 +29,7 @@ describe('currentDiscoverySummary', () => {
       phase: 'lobby',
     });
     runtime.dispatch({
-      protocolVersion: '1',
+      protocolVersion: '3',
       commandId: 'close-1',
       roomId: host.roomId,
       playerId: host.playerId,

@@ -108,6 +108,7 @@ describe('SqliteReconnectIdentityStore', () => {
         hand: null,
         handReady: null,
         chipRequests: null,
+        chipActivity: [],
       },
     });
     new SqliteReconnectIdentityStore(first, () => Buffer.alloc(16, 7)).save(

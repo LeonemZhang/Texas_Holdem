@@ -10,6 +10,7 @@ import {
 import {
   PlayerSnapshotSchema,
   PROTOCOL_VERSION,
+  type ChipActivity,
   type PlayerSnapshot,
 } from '@texas-holdem/protocol';
 
@@ -57,6 +58,7 @@ export interface SnapshotProjectionInput {
   readonly actionDeadlineMs?: number | null;
   readonly handReady?: HandReadyState | null;
   readonly chipRequests?: ChipRequestBook | null;
+  readonly chipActivity?: readonly ChipActivity[];
   readonly statistics?: readonly SnapshotPlayerStatistics[];
   readonly titles?: readonly TitleAward[];
 }
@@ -289,25 +291,52 @@ export function projectPlayerSnapshot(
           pendingRequests: (requests?.requests ?? [])
             .filter(({ status }) => status === 'pending')
             .map(
-              ({ requestId, requesterId, targetPlayerId, amount, status }) => ({
+              ({
                 requestId,
                 requesterId,
                 targetPlayerId,
                 amount,
                 status,
+                rejectedByPlayerIds,
+              }) => ({
+                requestId,
+                requesterId,
+                targetPlayerId,
+                amount,
+                status,
+                rejectedByPlayerIds,
               }),
             ),
         }
       : null,
     chipRequests: (requests?.requests ?? [])
       .filter(({ status }) => status === 'pending')
-      .map(({ requestId, requesterId, targetPlayerId, amount, status }) => ({
-        requestId,
-        requesterId,
-        targetPlayerId,
-        amount,
-        status,
-      })),
+      .map(
+        ({
+          requestId,
+          requesterId,
+          targetPlayerId,
+          amount,
+          status,
+          rejectedByPlayerIds,
+        }) => ({
+          requestId,
+          requesterId,
+          targetPlayerId,
+          amount,
+          status,
+          rejectedByPlayerIds,
+        }),
+      ),
+    chipActivity: [...(input.chipActivity ?? [])].sort(
+      (left, right) =>
+        (right.kind === 'request'
+          ? right.updatedSequence
+          : right.completedSequence) -
+        (left.kind === 'request'
+          ? left.updatedSequence
+          : left.completedSequence),
+    ),
     statistics: {
       players: statistics,
       titles: input.titles ?? [],

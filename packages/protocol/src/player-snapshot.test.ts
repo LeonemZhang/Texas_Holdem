@@ -64,6 +64,7 @@ const snapshot = {
   },
   handReady: null,
   chipRequests: [],
+  chipActivity: [],
   statistics: {
     players: [
       {
@@ -176,6 +177,43 @@ describe('PlayerSnapshotSchema', () => {
           ...snapshot.game,
           legalActions: { ...snapshot.game.legalActions, minimumRaiseTo: -1 },
         },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires authoritative chip activity in protocol v3 snapshots', () => {
+    const withoutActivity = { ...snapshot } as Partial<typeof snapshot>;
+    delete withoutActivity.chipActivity;
+    expect(PlayerSnapshotSchema.safeParse(withoutActivity).success).toBe(false);
+  });
+
+  it('requires authoritative millisecond timestamps for chip activity', () => {
+    const activity = {
+      kind: 'request' as const,
+      requestId: 'request-1',
+      requesterId: 'p2',
+      targetPlayerId: 'p1',
+      amount: 20,
+      status: 'pending' as const,
+      rejectedByPlayerIds: [],
+      completedByPlayerId: null,
+      createdSequence: 6,
+      updatedSequence: 6,
+      createdAtMs: 1_754_368_496_000,
+      updatedAtMs: 1_754_368_496_000,
+    };
+    expect(
+      PlayerSnapshotSchema.safeParse({
+        ...snapshot,
+        chipActivity: [activity],
+      }).success,
+    ).toBe(true);
+    const withoutUpdatedAt = { ...activity } as Partial<typeof activity>;
+    delete withoutUpdatedAt.updatedAtMs;
+    expect(
+      PlayerSnapshotSchema.safeParse({
+        ...snapshot,
+        chipActivity: [withoutUpdatedAt],
       }).success,
     ).toBe(false);
   });

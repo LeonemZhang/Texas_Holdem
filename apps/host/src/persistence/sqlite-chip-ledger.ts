@@ -16,7 +16,7 @@ import type { RoomState } from '../domain/room.js';
 interface ChipRequestRow {
   readonly request_id: string;
   readonly requester_id: string;
-  readonly target_player_id: string | null;
+  readonly target_player_id: string;
   readonly amount: number;
   readonly note: string | null;
   readonly status: ChipRequest['status'];

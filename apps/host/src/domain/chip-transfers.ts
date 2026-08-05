@@ -119,10 +119,7 @@ export function approveChipRequest(
   if (!request || request.status !== 'pending') {
     throw new RangeError(`Chip request is not pending: ${requestId}`);
   }
-  if (
-    request.targetPlayerId !== null &&
-    request.targetPlayerId !== approverPlayerId
-  ) {
+  if (request.targetPlayerId !== approverPlayerId) {
     throw new RangeError('Only the targeted player can approve this request');
   }
   if (

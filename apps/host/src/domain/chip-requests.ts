@@ -7,7 +7,7 @@ export type ChipRequestStatus =
 export interface ChipRequest {
   readonly requestId: string;
   readonly requesterId: string;
-  readonly targetPlayerId: string | null;
+  readonly targetPlayerId: string;
   readonly amount: number;
   readonly note: string | null;
   readonly status: ChipRequestStatus;
@@ -85,7 +85,7 @@ export function createChipRequest(
   input: {
     readonly requestId: string;
     readonly requesterId: string;
-    readonly targetPlayerId: string | null;
+    readonly targetPlayerId: string;
     readonly amount: number;
     readonly note?: string;
   },
@@ -121,7 +121,6 @@ export function createChipRequest(
     throw new RangeError('A player cannot request chips from themselves');
   }
   if (
-    input.targetPlayerId !== null &&
     !room.players.some(
       ({ playerId, status }) =>
         playerId === input.targetPlayerId &&
@@ -132,16 +131,9 @@ export function createChipRequest(
       `Target player is not seated: ${input.targetPlayerId}`,
     );
   }
-  const possibleDonors = room.players.filter(
-    ({ playerId, status }) =>
-      playerId !== input.requesterId &&
-      !['left', 'removed', 'eliminated'].includes(status),
-  );
   const maximumRequest =
-    input.targetPlayerId === null
-      ? Math.max(0, ...possibleDonors.map(({ chips }) => chips))
-      : (room.players.find(({ playerId }) => playerId === input.targetPlayerId)
-          ?.chips ?? 0);
+    room.players.find(({ playerId }) => playerId === input.targetPlayerId)
+      ?.chips ?? 0;
   if (input.amount > maximumRequest) {
     throw new RangeError('Requested chips exceed the target available chips');
   }
@@ -198,7 +190,6 @@ export function revokeChipRequestsForPlayer(
 }
 
 export function rejectChipRequest(
-  room: RoomState,
   book: ChipRequestBook,
   requestId: string,
   actorPlayerId: string,
@@ -207,30 +198,19 @@ export function rejectChipRequest(
   if (request.requesterId === actorPlayerId) {
     throw new RangeError('The requester cannot reject their own request');
   }
-  if (
-    request.targetPlayerId !== null &&
-    request.targetPlayerId !== actorPlayerId
-  ) {
+  if (request.targetPlayerId !== actorPlayerId) {
     throw new RangeError('Only the targeted player can reject this request');
   }
   const rejectedBy = [
     ...new Set([...request.rejectedByPlayerIds, actorPlayerId]),
   ];
-  const possibleDonors = room.players.filter(
-    ({ playerId, status }) =>
-      playerId !== request.requesterId &&
-      !['left', 'removed', 'eliminated'].includes(status),
-  );
-  const fullyRejected =
-    request.targetPlayerId !== null ||
-    possibleDonors.every(({ playerId }) => rejectedBy.includes(playerId));
   return freezeChipRequestBook({
     ...book,
     requests: book.requests.map((candidate) =>
       candidate.requestId === requestId
         ? {
             ...candidate,
-            status: fullyRejected ? 'rejected' : 'pending',
+            status: 'rejected' as const,
             rejectedByPlayerIds: rejectedBy,
           }
         : candidate,
