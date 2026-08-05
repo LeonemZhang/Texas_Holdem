@@ -1094,7 +1094,7 @@ body:has(.poker-table-page) .poker-table-controls {
   background: #0b2b23;
 }
 
-.table-seat--mobile-acting-summary {
+.table-seat--mobile-own-summary {
   display: none;
 }
 
@@ -3235,13 +3235,8 @@ body:has(.poker-table-page) .poker-table-controls {
     scroll-snap-align: start;
   }
 
-  .table-seat--acting:not(.table-seat--own) {
-    order: -1;
-  }
-
-  .table-seat--mobile-acting-summary {
+  .table-seat--mobile-own-summary {
     display: grid;
-    order: -2;
     pointer-events: none;
   }
 
@@ -3253,6 +3248,7 @@ body:has(.poker-table-page) .poker-table-controls {
     z-index: 3;
     width: 5.4rem;
     transform: translateX(-50%);
+    scroll-snap-align: none;
   }
 
   .table-seat__name,

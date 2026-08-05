@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { TableSeats, type TableSeatPlayer } from './TableSeats.js';
 
@@ -24,6 +24,20 @@ function makePlayers(count: number): TableSeatPlayer[] {
   }));
 }
 
+function mobileQueuePlayerIds(container: HTMLElement): string[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
+  ).map((element) => element.dataset.mobileQueuePlayerId!);
+}
+
+function setElementMetric(
+  element: Element,
+  property: 'clientWidth' | 'scrollWidth' | 'offsetLeft',
+  value: number,
+) {
+  Object.defineProperty(element, property, { configurable: true, value });
+}
+
 describe('TableSeats', () => {
   it.each([
     [2, 'heads-up'],
@@ -46,7 +60,7 @@ describe('TableSeats', () => {
     expect(container.querySelector('.table-seat--acting')).toHaveTextContent(
       '行动中',
     );
-    expect(screen.getByText('小盲')).toBeInTheDocument();
+    expect(screen.getAllByText('小盲')).toHaveLength(2);
     expect(screen.getByText('大盲')).toBeInTheDocument();
     expect(
       container.querySelector('.table-seat--disconnected'),
@@ -59,42 +73,179 @@ describe('TableSeats', () => {
     );
   });
 
-  it('puts an opponent actor first in the mobile visual queue without moving desktop seats', () => {
-    const initialPlayers = makePlayers(4);
+  it('keeps the round order while the actor advances without moving desktop seats', () => {
+    const initialPlayers = makePlayers(4).map((player, index) => ({
+      ...player,
+      actionOrder: [3, 1, 2, null][index],
+      isCurrentActor: player.playerId === 'p1',
+    }));
     const { container, rerender } = render(
-      <TableSeats players={initialPlayers} ownPlayerId="p0" />,
+      <TableSeats
+        actionRoundKey="hand-1:flop"
+        players={initialPlayers}
+        ownPlayerId="p0"
+      />,
     );
+    expect(mobileQueuePlayerIds(container)).toEqual(['p1', 'p2', 'p0', 'p3']);
     const initialPosition = container
       .querySelector('[data-player-id="p2"]')
       ?.getAttribute('style');
-    const seats = screen.getByRole('list', { name: '4 人座位布局' });
-    seats.scrollLeft = 120;
-    const opponentActing = initialPlayers.map((player) => ({
+    const nextActor = initialPlayers.map((player) => ({
       ...player,
-      isCurrentActor: player.playerId === 'p3',
+      isCurrentActor: player.playerId === 'p2',
     }));
 
-    rerender(<TableSeats players={opponentActing} ownPlayerId="p0" />);
+    rerender(
+      <TableSeats
+        actionRoundKey="hand-1:flop"
+        players={nextActor}
+        ownPlayerId="p0"
+      />,
+    );
 
-    expect(seats.firstElementChild).toHaveAttribute('data-player-id', 'p3');
-    expect(seats.scrollLeft).toBe(0);
+    expect(mobileQueuePlayerIds(container)).toEqual(['p1', 'p2', 'p0', 'p3']);
     expect(
       container.querySelector('[data-player-id="p2"]')?.getAttribute('style'),
     ).toBe(initialPosition);
   });
 
-  it('adds exactly one hidden, non-interactive own-player acting summary', () => {
-    const { container } = render(
-      <TableSeats players={makePlayers(4)} ownPlayerId="p0" />,
+  it('keeps exactly one hidden own-player summary in the mobile queue', () => {
+    const players = makePlayers(4).map((player) => ({
+      ...player,
+      isCurrentActor: player.playerId === 'p1',
+    }));
+    const { container, rerender } = render(
+      <TableSeats players={players} ownPlayerId="p0" />,
     );
 
     const summaries = container.querySelectorAll(
-      '.table-seat--mobile-acting-summary',
+      '.table-seat--mobile-own-summary',
     );
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toHaveAttribute('aria-hidden', 'true');
     expect(summaries[0]?.querySelector('button')).toBeNull();
+    expect(
+      within(summaries[0] as HTMLElement).getByText('小盲'),
+    ).toBeInTheDocument();
+    expect(
+      within(summaries[0] as HTMLElement).getByText('本轮下注 0'),
+    ).toBeInTheDocument();
+    expect(mobileQueuePlayerIds(container)).toHaveLength(4);
     expect(screen.getAllByRole('listitem')).toHaveLength(4);
+
+    rerender(
+      <TableSeats
+        players={players.map((player) => ({
+          ...player,
+          isCurrentActor: player.playerId === 'p0',
+        }))}
+        ownPlayerId="p0"
+      />,
+    );
+    expect(mobileQueuePlayerIds(container)).toHaveLength(4);
+    expect(
+      container.querySelectorAll('.table-seat--mobile-own-summary'),
+    ).toHaveLength(1);
+  });
+
+  it('reorders a new action round even when the actor stays the same', () => {
+    const initialPlayers = makePlayers(4).map((player, index) => ({
+      ...player,
+      actionOrder: [3, 1, 2, null][index],
+      isCurrentActor: player.playerId === 'p1',
+    }));
+    const { container, rerender } = render(
+      <TableSeats
+        actionRoundKey="hand-1:flop"
+        players={initialPlayers}
+        ownPlayerId="p0"
+      />,
+    );
+    const seats = screen.getByRole('list', { name: '4 人座位布局' });
+    const scrollTo = vi.fn();
+    Object.defineProperty(seats, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    rerender(
+      <TableSeats
+        actionRoundKey="hand-1:turn"
+        players={initialPlayers.map((player, index) => ({
+          ...player,
+          actionOrder: [2, 3, 1, null][index],
+        }))}
+        ownPlayerId="p0"
+      />,
+    );
+
+    expect(mobileQueuePlayerIds(container)).toEqual(['p2', 'p0', 'p1', 'p3']);
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {
+      name: 'left aligns while remaining cards overflow',
+      clientWidth: 120,
+      scrollWidth: 360,
+      actorOffset: 160,
+      expectedLeft: 160,
+    },
+    {
+      name: 'uses the natural maximum when remaining cards fit',
+      clientWidth: 200,
+      scrollWidth: 300,
+      actorOffset: 180,
+      expectedLeft: 100,
+    },
+    {
+      name: 'does not scroll when the full queue fits',
+      clientWidth: 320,
+      scrollWidth: 300,
+      actorOffset: 180,
+      expectedLeft: 0,
+    },
+  ])('$name', ({ clientWidth, scrollWidth, actorOffset, expectedLeft }) => {
+    const players = makePlayers(4).map((player, index) => ({
+      ...player,
+      actionOrder: index + 1,
+      isCurrentActor: player.playerId === 'p0',
+    }));
+    const { container, rerender } = render(
+      <TableSeats
+        actionRoundKey="hand-1:flop"
+        players={players}
+        ownPlayerId="p0"
+      />,
+    );
+    const seats = screen.getByRole('list', { name: '4 人座位布局' });
+    const actorCard = container.querySelector(
+      '[data-mobile-queue-player-id="p2"]',
+    )!;
+    const scrollTo = vi.fn();
+    setElementMetric(seats, 'clientWidth', clientWidth);
+    setElementMetric(seats, 'scrollWidth', scrollWidth);
+    setElementMetric(actorCard, 'offsetLeft', actorOffset);
+    Object.defineProperty(seats, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    rerender(
+      <TableSeats
+        actionRoundKey="hand-1:flop"
+        players={players.map((player) => ({
+          ...player,
+          isCurrentActor: player.playerId === 'p2',
+        }))}
+        ownPlayerId="p0"
+      />,
+    );
+
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      left: expectedLeft,
+      behavior: 'smooth',
+    });
   });
 
   it('keeps a permanently removed player on their seat as exited', () => {
@@ -124,7 +275,7 @@ describe('TableSeats', () => {
         ]}
       />,
     );
-    expect(screen.getByText('过牌')).toBeInTheDocument();
+    expect(screen.getAllByText('过牌')).toHaveLength(2);
   });
 
   it('shows every player’s current-street bet on the table', () => {
@@ -137,7 +288,7 @@ describe('TableSeats', () => {
         ]}
       />,
     );
-    expect(screen.getByText('本轮下注 20')).toBeInTheDocument();
+    expect(screen.getAllByText('本轮下注 20')).toHaveLength(2);
     expect(screen.getByText('本轮下注 60')).toBeInTheDocument();
   });
 
@@ -152,7 +303,7 @@ describe('TableSeats', () => {
       />,
     );
     expect(screen.getByText('行动顺位 1')).toBeInTheDocument();
-    expect(screen.getByText('行动顺位 2')).toBeInTheDocument();
+    expect(screen.getAllByText('行动顺位 2')).toHaveLength(2);
   });
 
   it('renders one combined mobile action label for the current actor', () => {
@@ -196,8 +347,8 @@ describe('TableSeats', () => {
     );
     expect(screen.queryByLabelText('玩家 1 的底牌')).toBeNull();
     expect(screen.queryByLabelText('玩家 2 的底牌')).toBeNull();
-    expect(screen.getByText('一对')).toBeInTheDocument();
-    expect(screen.getByText('+140')).toBeInTheDocument();
+    expect(screen.getAllByText('一对')).toHaveLength(2);
+    expect(screen.getAllByText('+140')).toHaveLength(2);
     expect(screen.getByText('-140')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '摊牌' })).toBeNull();
   });

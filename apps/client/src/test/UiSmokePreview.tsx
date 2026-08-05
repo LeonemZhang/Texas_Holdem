@@ -172,6 +172,7 @@ function TablePreview({ page }: { readonly page: string }) {
         status={<UtilityButtons />}
         seats={
           <TableSeats
+            actionRoundKey={handReady ? 'preview:settled' : 'preview:flop'}
             players={tablePlayers}
             ownPlayerId={tablePlayers[0]!.playerId}
           />

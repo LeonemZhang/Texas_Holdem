@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import {
+  Fragment,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+} from 'react';
 
 export type TableSeatStatus =
   | 'waiting'
@@ -34,6 +40,7 @@ export interface TableSeatPlayer {
 export interface TableSeatsProps {
   readonly players: readonly TableSeatPlayer[];
   readonly ownPlayerId: string;
+  readonly actionRoundKey?: string | null;
 }
 
 const statusLabels: Record<TableSeatStatus, string> = {
@@ -64,9 +71,73 @@ function positionFor(index: number, count: number): CSSProperties {
   };
 }
 
-export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
+function SeatContents({ player }: { readonly player: TableSeatPlayer }) {
+  return (
+    <>
+      <span className="table-seat__name">{player.nickname}</span>
+      {player.actionOrder ? (
+        <span className="table-seat__action-order">
+          <span className="table-seat__action-order--desktop">
+            行动顺位 {player.actionOrder}
+          </span>
+          <span className="table-seat__action-order--mobile">
+            顺位 {player.actionOrder}
+          </span>
+        </span>
+      ) : null}
+      {player.isDealer || player.isSmallBlind || player.isBigBlind ? (
+        <span className="table-seat__position-labels">
+          {player.isDealer ? <i>庄家</i> : null}
+          {player.isSmallBlind ? <i>小盲</i> : null}
+          {player.isBigBlind ? <i>大盲</i> : null}
+        </span>
+      ) : null}
+      {player.isCurrentActor ? (
+        <>
+          <span className="table-seat__acting-indicator">行动中</span>
+          <span className="table-seat__mobile-acting-order">
+            行动中 · 顺位 {player.actionOrder ?? '未定'}
+          </span>
+        </>
+      ) : null}
+      {player.lastAction ? (
+        <span className="table-seat__last-action">
+          {actionLabels[player.lastAction]}
+        </span>
+      ) : null}
+      <strong>{player.chips.toLocaleString('zh-CN')}</strong>
+      <small>{statusLabels[player.status]}</small>
+      {player.settlement ? (
+        <div className="table-seat__settlement" role="status">
+          {player.settlement.handType ? (
+            <span>{player.settlement.handType}</span>
+          ) : null}
+          <strong
+            className={
+              player.settlement.netChange >= 0
+                ? 'table-seat__settlement--positive'
+                : 'table-seat__settlement--negative'
+            }
+          >
+            {player.settlement.netChange >= 0 ? '+' : ''}
+            {player.settlement.netChange.toLocaleString('zh-CN')}
+          </strong>
+        </div>
+      ) : null}
+      <span className="table-seat__street-bet">
+        本轮下注 {player.streetCommitted?.toLocaleString('zh-CN') ?? 0}
+      </span>
+    </>
+  );
+}
+
+export function TableSeats({
+  players,
+  ownPlayerId,
+  actionRoundKey = null,
+}: TableSeatsProps) {
   const listRef = useRef<HTMLOListElement>(null);
-  const stablePlayers = useMemo(
+  const desktopPlayers = useMemo(
     () =>
       [...players].sort((left, right) => {
         if (left.playerId === ownPlayerId) return -1;
@@ -75,28 +146,45 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
       }),
     [ownPlayerId, players],
   );
-  const currentActor = stablePlayers.find((player) => player.isCurrentActor);
-  const orderedPlayers = currentActor
-    ? [
-        currentActor,
-        ...stablePlayers.filter(
-          (player) => player.playerId !== currentActor.playerId,
-        ),
-      ]
-    : stablePlayers;
-  const stablePosition = new Map(
-    stablePlayers.map((player, index) => [player.playerId, index]),
+  const orderedPlayers = useMemo(
+    () =>
+      [...players].sort((left, right) => {
+        if (left.actionOrder != null && right.actionOrder != null) {
+          return left.actionOrder - right.actionOrder;
+        }
+        if (left.actionOrder != null) return -1;
+        if (right.actionOrder != null) return 1;
+        return left.seatIndex - right.seatIndex;
+      }),
+    [players],
   );
-  useEffect(() => {
+  const currentActor = orderedPlayers.find((player) => player.isCurrentActor);
+  const stablePosition = new Map(
+    desktopPlayers.map((player, index) => [player.playerId, index]),
+  );
+  useLayoutEffect(() => {
     const list = listRef.current;
-    if (!list) return;
-    list.scrollLeft = 0;
-    list.scrollTo?.({ left: 0, behavior: 'smooth' });
-  }, [currentActor?.playerId]);
+    if (!list || !currentActor) return;
+    const actorCard = Array.from(
+      list.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
+    ).find(
+      (element) =>
+        element.dataset.mobileQueuePlayerId === currentActor.playerId,
+    );
+    if (!actorCard) return;
+
+    const maxScrollLeft = Math.max(0, list.scrollWidth - list.clientWidth);
+    const targetScrollLeft = Math.min(actorCard.offsetLeft, maxScrollLeft);
+    if (list.scrollTo) {
+      list.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+    } else {
+      list.scrollLeft = targetScrollLeft;
+    }
+  }, [actionRoundKey, currentActor?.playerId]);
   const layout =
-    stablePlayers.length === 2
+    desktopPlayers.length === 2
       ? 'heads-up'
-      : stablePlayers.length === 3
+      : desktopPlayers.length === 3
         ? 'three-handed'
         : 'multi-handed';
 
@@ -104,24 +192,10 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
     <ol
       className="table-seats"
       data-layout={layout}
-      data-player-count={stablePlayers.length}
+      data-player-count={desktopPlayers.length}
       ref={listRef}
-      aria-label={`${stablePlayers.length} 人座位布局`}
+      aria-label={`${desktopPlayers.length} 人座位布局`}
     >
-      {currentActor?.playerId === ownPlayerId ? (
-        <li
-          className="table-seat table-seat--acting table-seat--mobile-acting-summary"
-          aria-hidden="true"
-          data-player-id={`${currentActor.playerId}-mobile-acting-summary`}
-        >
-          <span className="table-seat__name">{currentActor.nickname}</span>
-          <span className="table-seat__mobile-acting-order">
-            行动中 · 顺位 {currentActor.actionOrder ?? '未定'}
-          </span>
-          <strong>{currentActor.chips.toLocaleString('zh-CN')}</strong>
-          <small>{statusLabels[currentActor.status]}</small>
-        </li>
-      ) : null}
       {orderedPlayers.map((player) => {
         const stateClasses = [
           'table-seat',
@@ -132,71 +206,41 @@ export function TableSeats({ players, ownPlayerId }: TableSeatsProps) {
         ]
           .filter(Boolean)
           .join(' ');
+        const mobileOwnSummaryClasses = [
+          'table-seat',
+          `table-seat--${player.status}`,
+          `table-seat--color-${player.seatIndex % 6}`,
+          player.isCurrentActor ? 'table-seat--acting' : '',
+          'table-seat--mobile-own-summary',
+        ]
+          .filter(Boolean)
+          .join(' ');
         return (
-          <li
-            className={stateClasses}
-            data-player-id={player.playerId}
-            key={player.playerId}
-            style={positionFor(
-              stablePosition.get(player.playerId) ?? 0,
-              stablePlayers.length,
-            )}
-            aria-current={player.isCurrentActor ? 'true' : undefined}
-          >
-            <span className="table-seat__name">{player.nickname}</span>
-            {player.actionOrder ? (
-              <span className="table-seat__action-order">
-                <span className="table-seat__action-order--desktop">
-                  行动顺位 {player.actionOrder}
-                </span>
-                <span className="table-seat__action-order--mobile">
-                  顺位 {player.actionOrder}
-                </span>
-              </span>
+          <Fragment key={player.playerId}>
+            {player.playerId === ownPlayerId ? (
+              <li
+                className={mobileOwnSummaryClasses}
+                aria-hidden="true"
+                data-mobile-queue-player-id={player.playerId}
+              >
+                <SeatContents player={player} />
+              </li>
             ) : null}
-            {player.isDealer || player.isSmallBlind || player.isBigBlind ? (
-              <span className="table-seat__position-labels">
-                {player.isDealer ? <i>庄家</i> : null}
-                {player.isSmallBlind ? <i>小盲</i> : null}
-                {player.isBigBlind ? <i>大盲</i> : null}
-              </span>
-            ) : null}
-            {player.isCurrentActor ? (
-              <>
-                <span className="table-seat__acting-indicator">行动中</span>
-                <span className="table-seat__mobile-acting-order">
-                  行动中 · 顺位 {player.actionOrder ?? '未定'}
-                </span>
-              </>
-            ) : null}
-            {player.lastAction ? (
-              <span className="table-seat__last-action">
-                {actionLabels[player.lastAction]}
-              </span>
-            ) : null}
-            <strong>{player.chips.toLocaleString('zh-CN')}</strong>
-            <small>{statusLabels[player.status]}</small>
-            {player.settlement ? (
-              <div className="table-seat__settlement" role="status">
-                {player.settlement.handType ? (
-                  <span>{player.settlement.handType}</span>
-                ) : null}
-                <strong
-                  className={
-                    player.settlement.netChange >= 0
-                      ? 'table-seat__settlement--positive'
-                      : 'table-seat__settlement--negative'
-                  }
-                >
-                  {player.settlement.netChange >= 0 ? '+' : ''}
-                  {player.settlement.netChange.toLocaleString('zh-CN')}
-                </strong>
-              </div>
-            ) : null}
-            <span className="table-seat__street-bet">
-              本轮下注 {player.streetCommitted?.toLocaleString('zh-CN') ?? 0}
-            </span>
-          </li>
+            <li
+              className={stateClasses}
+              data-player-id={player.playerId}
+              data-mobile-queue-player-id={
+                player.playerId === ownPlayerId ? undefined : player.playerId
+              }
+              style={positionFor(
+                stablePosition.get(player.playerId) ?? 0,
+                desktopPlayers.length,
+              )}
+              aria-current={player.isCurrentActor ? 'true' : undefined}
+            >
+              <SeatContents player={player} />
+            </li>
+          </Fragment>
         );
       })}
     </ol>

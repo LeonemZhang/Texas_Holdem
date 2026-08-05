@@ -612,6 +612,7 @@ export function GameRoom({
         }
         seats={
           <TableSeats
+            actionRoundKey={game ? `${game.handId}:${game.street}` : null}
             ownPlayerId={session.playerId}
             players={snapshot.room.players.map((player) => ({
               ...player,
