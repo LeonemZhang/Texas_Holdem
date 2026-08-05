@@ -54,6 +54,7 @@ const snapshot: PlayerSnapshot = {
   game: null,
   handReady: null,
   chipRequests: [],
+  chipActivity: [],
   statistics: { players: [], titles: [] },
 };
 
@@ -773,7 +774,7 @@ describe('GameRoom', () => {
         expect.objectContaining({
           expectedVersion: 5,
           type: 'chips.request',
-          audience: 'table',
+          targetPlayerId: 'host',
           amount: 100,
         }),
       ),

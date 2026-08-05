@@ -25,6 +25,10 @@ import {
 import { HandReadyOverlay } from './HandReadyOverlay.js';
 import { HostControls, type HostControlIntent } from './HostControls.js';
 import { LobbyWaitingRoom } from './LobbyWaitingRoom.js';
+import {
+  TableUtilityToolbar,
+  type TableUtilityPanel,
+} from './TableUtilityToolbar.js';
 import { createRandomId } from '../random-id.js';
 import {
   PokerSoundEffects,
@@ -100,7 +104,7 @@ export interface GameRoomProps {
   ) => void;
 }
 
-type ActiveUtilityPanel = 'host' | 'chip-exchange' | 'statistics' | null;
+type ActiveUtilityPanel = TableUtilityPanel | null;
 
 function defaultConnection(session: RoomSessionResponse): ConnectionAdapter {
   const url = new URL(session.joinUrl);
@@ -161,8 +165,8 @@ export function GameRoom({
       (request) =>
         request.status === 'pending' &&
         request.requesterId !== session.playerId &&
-        (request.targetPlayerId === null ||
-          request.targetPlayerId === session.playerId),
+        request.targetPlayerId === session.playerId &&
+        !request.rejectedByPlayerIds.includes(session.playerId),
     ) ?? false;
 
   useEffect(() => {
@@ -326,10 +330,7 @@ export function GameRoom({
         void send({
           type: 'chips.request',
           requestId: createRandomId(),
-          audience: intent.targetPlayerId ? 'targeted' : 'table',
-          ...(intent.targetPlayerId
-            ? { targetPlayerId: intent.targetPlayerId }
-            : {}),
+          targetPlayerId: intent.targetPlayerId,
           amount: intent.amount,
         });
         break;
@@ -376,8 +377,8 @@ export function GameRoom({
   const incomingChipRequest = chipRequests.find(
     (request) =>
       request.requesterId !== session.playerId &&
-      (request.targetPlayerId === null ||
-        request.targetPlayerId === session.playerId),
+      request.targetPlayerId === session.playerId &&
+      !request.rejectedByPlayerIds.includes(session.playerId),
   );
   const incomingChipRequestView = incomingChipRequest
     ? {
@@ -429,6 +430,14 @@ export function GameRoom({
             void send({ type: 'room.remove-player', targetPlayerId })
           }
           onCloseRoom={() => void send({ type: 'room.close' })}
+          onReseatPlayer={(targetPlayerId, seatIndex) =>
+            void send({
+              type: 'room.reseat-player',
+              targetPlayerId,
+              seatIndex,
+            })
+          }
+          onShuffleSeats={() => void send({ type: 'room.shuffle-seats' })}
         />
         {!own?.isHost ? (
           <button
@@ -486,10 +495,6 @@ export function GameRoom({
           collapsed={statisticsCollapsed}
           onCollapse={() => setStatisticsCollapsed(true)}
           onExpand={() => setStatisticsCollapsed(false)}
-          onClose={() => {
-            setStatisticsCollapsed(false);
-            setStatisticsOpen(false);
-          }}
         />
       </div>
     );
@@ -575,40 +580,21 @@ export function GameRoom({
               : '等待牌局开始'
         }
         status={
-          <div className="poker-table-page__utility-actions">
-            <button
-              className="button button--secondary"
-              type="button"
-              aria-expanded={activeUtilityPanel === 'chip-exchange'}
-              onClick={(event) =>
-                openUtilityPanel('chip-exchange', event.currentTarget)
-              }
-            >
-              筹码交换
-            </button>
-            {own?.isHost ? (
-              <button
-                className="button button--secondary"
-                type="button"
-                aria-expanded={activeUtilityPanel === 'host'}
-                onClick={(event) =>
-                  openUtilityPanel('host', event.currentTarget)
-                }
-              >
-                房主管理
-              </button>
-            ) : null}
-            <button
-              className="button button--secondary"
-              type="button"
-              aria-expanded={activeUtilityPanel === 'statistics'}
-              onClick={(event) =>
-                openUtilityPanel('statistics', event.currentTarget)
-              }
-            >
-              查看统计
-            </button>
-          </div>
+          <TableUtilityToolbar
+            activePanel={activeUtilityPanel}
+            isHost={own?.isHost ?? false}
+            onOpenPanel={openUtilityPanel}
+            exitRoomDisabled={sending}
+            onExitRoom={
+              own?.isHost
+                ? undefined
+                : () => {
+                    void send({ type: 'room.exit' }).then((accepted) => {
+                      if (accepted) onExited?.('left');
+                    });
+                  }
+            }
+          />
         }
         seats={
           <TableSeats
@@ -712,11 +698,8 @@ export function GameRoom({
               }}
               phase={snapshot.room.phase}
               currentPlayerId={session.playerId}
-              players={snapshot.room.players.filter(
-                ({ status }) =>
-                  !['left', 'removed', 'eliminated'].includes(status),
-              )}
-              records={chipRequests}
+              players={snapshot.room.players}
+              records={snapshot.chipActivity}
               onAction={sendChipIntent}
             />
           ) : activeUtilityPanel === 'host' ? (
@@ -743,7 +726,6 @@ export function GameRoom({
               players={statistics}
               titles={snapshot.statistics.titles}
               onCollapse={closeUtilityPanel}
-              onClose={closeUtilityPanel}
             />
           ) : null
         }

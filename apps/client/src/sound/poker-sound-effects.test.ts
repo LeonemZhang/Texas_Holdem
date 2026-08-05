@@ -37,6 +37,7 @@ function snapshot(overrides: Partial<PlayerSnapshot> = {}): PlayerSnapshot {
     },
     handReady: null,
     chipRequests: [],
+    chipActivity: [],
     statistics: {
       players: [
         {

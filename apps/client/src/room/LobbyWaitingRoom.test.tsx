@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LobbyWaitingRoom, type LobbyPlayerView } from './LobbyWaitingRoom.js';
@@ -122,5 +122,147 @@ describe('LobbyWaitingRoom', () => {
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '准备' }));
     expect(onSetReady).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps a fixed ten-seat map and preserves physical seat numbers', () => {
+    const nonCompactPlayers = players(true);
+    nonCompactPlayers[1] = { ...nonCompactPlayers[1]!, seatIndex: 6 };
+    render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={nonCompactPlayers}
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+      />,
+    );
+
+    const seatMap = screen.getByRole('list', { name: '房间座位' });
+    const seats = within(seatMap).getAllByRole('listitem');
+    expect(seats).toHaveLength(10);
+    expect(seats[0]).toHaveTextContent('座位 1Alice');
+    expect(seats[1]).toHaveTextContent('座位 2空座位');
+    expect(seats[6]).toHaveTextContent('座位 7Bob');
+  });
+
+  it('sends one authoritative seat exchange after a host drag completes', () => {
+    const onReseatPlayer = vi.fn();
+    render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={players(true)}
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+        onReseatPlayer={onReseatPlayer}
+        onShuffleSeats={vi.fn()}
+      />,
+    );
+
+    const source = screen.getByText('Alice').closest('li')!;
+    const target = screen.getByText('Bob').closest('li')!;
+    const dataTransfer = {
+      effectAllowed: '',
+      dropEffect: '',
+      setData: vi.fn(),
+      getData: vi.fn(() => 'host'),
+    };
+
+    expect(source).toHaveAttribute('draggable', 'true');
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    expect(onReseatPlayer).toHaveBeenCalledWith('host', 1);
+    expect(onReseatPlayer).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole('button', { name: '调整座位' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not offer empty physical seats as host drag targets', () => {
+    const onReseatPlayer = vi.fn();
+    render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={players(true)}
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+        onReseatPlayer={onReseatPlayer}
+      />,
+    );
+    const source = screen.getByText('Bob').closest('li')!;
+    const target = screen.getByText('座位 4').closest('li')!;
+    const dataTransfer = {
+      effectAllowed: '',
+      dropEffect: '',
+      setData: vi.fn(),
+      getData: vi.fn(() => 'bob'),
+    };
+
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    expect(target).not.toHaveClass('lobby-player--drop-target');
+    expect(onReseatPlayer).not.toHaveBeenCalled();
+  });
+
+  it('asks the host to shuffle before dragging a non-compact seat map', () => {
+    const nonCompactPlayers = players(true);
+    nonCompactPlayers[1] = { ...nonCompactPlayers[1]!, seatIndex: 3 };
+    render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={nonCompactPlayers}
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+        onReseatPlayer={vi.fn()}
+        onShuffleSeats={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('请先随机打乱以整理座位')).toBeInTheDocument();
+    expect(screen.getByText('Alice').closest('li')).not.toHaveAttribute(
+      'draggable',
+      'true',
+    );
+  });
+
+  it('delegates random seating and disables no-op single-player shuffles', () => {
+    const onShuffleSeats = vi.fn();
+    const { rerender } = render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={players(true)}
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+        onShuffleSeats={onShuffleSeats}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '随机打乱' }));
+    expect(onShuffleSeats).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: '随机打乱' }).parentElement,
+    ).toHaveClass('lobby__seat-action');
+    expect(
+      screen.getByRole('button', { name: '随机打乱' }).parentElement,
+    ).toHaveTextContent('随机打乱拖动玩家卡片交换座位');
+
+    rerender(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={[players(true)[0]!]}
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+        onShuffleSeats={onShuffleSeats}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '随机打乱' })).toBeDisabled();
   });
 });

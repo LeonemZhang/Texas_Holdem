@@ -1,17 +1,115 @@
+import { PageShell } from '@texas-holdem/ui';
+import { useState } from 'react';
+
+import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
+
 import { ConnectionGuard } from '../connection/ConnectionGuard';
+import { ConnectionHome } from '../home/ConnectionHome';
+import { NetworkDiagnostics } from '../home/NetworkDiagnostics';
+import {
+  RoomDiscoveryList,
+  type RoomDiscoveryListItem,
+} from '../home/RoomDiscoveryList';
 import { ChipExchangePanel } from '../room/ChipExchangePanel';
-import { CreateRoomForm } from '../room/CreateRoomForm';
+import { DesktopRoomSetup } from '../room/DesktopRoomSetup';
 import { HandReadyOverlay } from '../room/HandReadyOverlay';
 import { HostControls } from '../room/HostControls';
 import { LobbyWaitingRoom } from '../room/LobbyWaitingRoom';
+import { RoomRecordManager } from '../room/RoomRecordManager';
+import {
+  TableUtilityToolbar,
+  type TableUtilityPanel,
+} from '../room/TableUtilityToolbar';
 import { StatisticsPanel } from '../statistics/StatisticsPanel';
 import { ActionCountdown } from '../table/ActionCountdown';
 import { BettingControls } from '../table/BettingControls';
 import { CardsAndPots } from '../table/CardsAndPots';
 import { PokerTableLayout } from '../table/PokerTableLayout';
+import { PotChipFlights } from '../table/PotChipFlights';
 import { TableSeats } from '../table/TableSeats';
+import type { RuntimeAdapter } from '../runtime';
 
 const noop = () => undefined;
+const previewHostService = {
+  port: 32_100,
+  advertisedAddress: '10.126.126.1',
+  joinUrl: 'http://10.126.126.1:32100/?room=preview',
+  dataDirectory: 'preview-rooms',
+  networkName: '虚拟局域网',
+};
+const previewRuntime: RuntimeAdapter = {
+  getRuntimeInfo: async () => ({
+    kind: 'desktop',
+    appVersion: 'development-preview',
+    platform: 'win32',
+  }),
+  openRoomRecordManager: async () => undefined,
+  listNetworkInterfaces: async () => [
+    {
+      name: '虚拟局域网',
+      address: '10.126.126.1',
+      netmask: '255.255.255.0',
+      mac: '00:11:22:33:44:55',
+    },
+  ],
+  scanLanRooms: async () => [],
+  startHostService: async () => previewHostService,
+  getActiveHostService: async () => previewHostService,
+  stopHostService: async () => undefined,
+  listRoomRecords: async () => [
+    {
+      roomId: 'preview-room',
+      roomName: '周末牌局',
+      hostNickname: 'Alice',
+      status: 'recoverable',
+      createdAt: '2026-08-05T12:00:00.000Z',
+      lastActiveAt: '2026-08-05T12:34:56.000Z',
+      completedHands: 8,
+      playerCount: 3,
+      network: { name: '虚拟局域网', address: '10.126.126.1' },
+    },
+  ],
+  recoverRoomRecord: async () => ({
+    protocolVersion: PROTOCOL_VERSION,
+    roomId: 'preview-room',
+    playerId: 'alice',
+    token: 'preview-reconnect-token',
+    joinUrl: previewHostService.joinUrl,
+    socketPath: '/socket.io',
+  }),
+  closeRunningRoomRecord: async () => undefined,
+  archiveRoomRecord: async () => undefined,
+  restoreRoomRecord: async () => undefined,
+  deleteRoomRecord: async () => undefined,
+  onHostServiceExited: () => () => undefined,
+  setWindowRoomContext: async () => undefined,
+  onPlayerExitRequested: () => () => undefined,
+  onHostCloseRequested: () => () => undefined,
+};
+const previewRooms: readonly RoomDiscoveryListItem[] = [
+  {
+    room: {
+      magic: 'TEXAS_HOLDEM_LAN_V1',
+      protocolVersion: PROTOCOL_VERSION,
+      requestId: 'preview-scan',
+      type: 'room',
+      roomId: 'preview-room',
+      roomName: '周末牌局',
+      hostNickname: 'Alice',
+      hostAddress: '10.126.126.1',
+      httpPort: 32_100,
+      playerCount: 3,
+      maxPlayers: 10,
+      smallBlind: 1,
+      bigBlind: 2,
+      phase: 'lobby',
+    },
+    compatibility: 'compatible',
+    latencyMs: 12,
+    expired: false,
+    reconnectable: false,
+  },
+];
 const players = [
   {
     playerId: 'alice',
@@ -85,24 +183,63 @@ const titles = [
   { title: 'tight-player', playerIds: ['player-1'], value: 0.7 },
 ];
 
-function UtilityButtons() {
-  return (
-    <div className="poker-table-page__utility-actions">
-      <button className="button button--secondary" type="button">
-        筹码交换
-      </button>
-      <button className="button button--secondary" type="button">
-        房主管理
-      </button>
-      <button className="button button--secondary" type="button">
-        查看统计
-      </button>
-    </div>
-  );
+export const uiSmokePreviewPages = [
+  'overview',
+  'home-browser',
+  'home-desktop',
+  'room-discovery',
+  'network-diagnostics',
+  'desktop-setup',
+  'room-records',
+  'lobby',
+  'lobby-full',
+  'table',
+  'table-flights',
+  'table-ten',
+  'table-ten-own-action',
+  'ready',
+  'ready-waiting',
+  'settlement',
+  'settlement-waiting',
+  'table-chip',
+  'table-host',
+  'table-statistics',
+  'statistics',
+] as const;
+
+type UiSmokePreviewPage = (typeof uiSmokePreviewPages)[number];
+type TablePreviewPage = Extract<
+  UiSmokePreviewPage,
+  | 'table'
+  | 'table-flights'
+  | 'table-ten'
+  | 'table-ten-own-action'
+  | 'ready'
+  | 'ready-waiting'
+  | 'settlement'
+  | 'settlement-waiting'
+  | 'table-chip'
+  | 'table-host'
+  | 'table-statistics'
+>;
+
+function previewPanel(page: TablePreviewPage): TableUtilityPanel | null {
+  if (page === 'table-chip') return 'chip-exchange';
+  if (page === 'table-host') return 'host';
+  if (page === 'table-statistics') return 'statistics';
+  return null;
 }
 
-function TablePreview({ page }: { readonly page: string }) {
-  const handReady = page === 'ready' || page === 'settlement';
+function TablePreview({ page }: { readonly page: TablePreviewPage }) {
+  const [activeUtilityPanel, setActiveUtilityPanel] =
+    useState<TableUtilityPanel | null>(() => previewPanel(page));
+  const waitingReady =
+    page === 'ready-waiting' || page === 'settlement-waiting';
+  const handReady =
+    page === 'ready' ||
+    page === 'ready-waiting' ||
+    page === 'settlement' ||
+    page === 'settlement-waiting';
   const tenPlayers = page === 'table-ten' || page === 'table-ten-own-action';
   const tablePlayers = tenPlayers
     ? fullTablePlayers.map((player, index) => ({
@@ -117,51 +254,60 @@ function TablePreview({ page }: { readonly page: string }) {
       : tenPlayers
         ? '玩家 4'
         : 'Alice';
+  const isHost = page === 'table-host';
   const utilityPanel =
-    page === 'table-chip' ? (
+    activeUtilityPanel === 'chip-exchange' ? (
       <ChipExchangePanel
         presentation="drawer"
         open
+        onOpenChange={(open) => {
+          if (!open) setActiveUtilityPanel(null);
+        }}
         phase="hand-ready"
         currentPlayerId="alice"
         players={players}
         records={[
           {
+            kind: 'request',
             requestId: 'r1',
             requesterId: 'bob',
             targetPlayerId: 'alice',
             amount: 200,
             status: 'pending',
+            rejectedByPlayerIds: [],
+            completedByPlayerId: null,
+            createdSequence: 1,
+            updatedSequence: 1,
+            createdAtMs: new Date(2026, 7, 5, 12, 34, 56).getTime(),
+            updatedAtMs: new Date(2026, 7, 5, 12, 34, 56).getTime(),
           },
         ]}
         onAction={noop}
       />
-    ) : page === 'table-host' ? (
+    ) : activeUtilityPanel === 'host' ? (
       <HostControls
         presentation="drawer"
         open
+        onOpenChange={(open) => {
+          if (!open) setActiveUtilityPanel(null);
+        }}
         isHost
         hostPlayerId="alice"
         phase="hand-ready"
         players={players}
         onCommand={noop}
       />
-    ) : page === 'table-statistics' ? (
+    ) : activeUtilityPanel === 'statistics' ? (
       <StatisticsPanel
         open
         players={statistics}
         titles={titles}
-        onClose={noop}
+        onCollapse={() => setActiveUtilityPanel(null)}
       />
     ) : null;
 
   return (
-    <ConnectionGuard
-      state={{ status: 'connected' }}
-      onRetry={noop}
-      onExitRoom={noop}
-      clearReconnectSession={noop}
-    >
+    <ConnectionGuard state={{ status: 'connected' }} onRetry={noop}>
       <PokerTableLayout
         roomName="朋友局"
         handLabel={
@@ -169,7 +315,14 @@ function TablePreview({ page }: { readonly page: string }) {
             ? '第 8 手 · 结算与准备'
             : `第 8 手 · 翻牌 · 当前行动：${actorName}`
         }
-        status={<UtilityButtons />}
+        status={
+          <TableUtilityToolbar
+            activePanel={activeUtilityPanel}
+            isHost={isHost}
+            onOpenPanel={(panel) => setActiveUtilityPanel(panel)}
+            onExitRoom={isHost ? undefined : noop}
+          />
+        }
         seats={
           <TableSeats
             actionRoundKey={handReady ? 'preview:settled' : 'preview:flop'}
@@ -202,23 +355,27 @@ function TablePreview({ page }: { readonly page: string }) {
         tableOverlay={
           handReady ? (
             <HandReadyOverlay
-              deadlineMs={Date.now() + 30_000}
-              ownChoice="pending"
-              pendingRequests={[
-                {
-                  requestId: 'r1',
-                  requesterId: 'bob',
-                  requesterName: 'Bob',
-                  targetPlayerId: null,
-                  amount: 200,
-                },
-              ]}
+              deadlineMs={waitingReady ? Date.now() : Date.now() + 30_000}
+              ownChoice={waitingReady ? 'sitting-out' : 'pending'}
+              pendingRequests={
+                waitingReady
+                  ? []
+                  : [
+                      {
+                        requestId: 'r1',
+                        requesterId: 'bob',
+                        requesterName: 'Bob',
+                        targetPlayerId: 'alice',
+                        amount: 200,
+                      },
+                    ]
+              }
               complete={false}
               ownChips={2_000}
               onChoose={noop}
               onShowHoleCards={noop}
               settlement={
-                page === 'settlement'
+                page === 'settlement' || page === 'settlement-waiting'
                   ? {
                       handId: 'hand-8',
                       reason: 'showdown',
@@ -252,6 +409,14 @@ function TablePreview({ page }: { readonly page: string }) {
           ) : null
         }
         utilityPanel={utilityPanel}
+        chipFlights={
+          page === 'table-flights' ? (
+            <PotChipFlights
+              flights={[{ id: 'preview-flight', playerId: 'bob', amount: 40 }]}
+              onFlightEnd={noop}
+            />
+          ) : null
+        }
         controls={
           handReady ? null : (
             <BettingControls
@@ -275,7 +440,130 @@ function TablePreview({ page }: { readonly page: string }) {
   );
 }
 
+function isTablePreviewPage(page: string): page is TablePreviewPage {
+  return [
+    'table',
+    'table-flights',
+    'table-ten',
+    'table-ten-own-action',
+    'ready',
+    'ready-waiting',
+    'settlement',
+    'settlement-waiting',
+    'table-chip',
+    'table-host',
+    'table-statistics',
+  ].includes(page);
+}
+
 export function UiSmokePreview({ page }: { readonly page: string }) {
+  if (
+    page === 'overview' ||
+    page === 'home-browser' ||
+    page === 'home-desktop'
+  ) {
+    const desktop = page !== 'home-browser';
+    return (
+      <PageShell title="Texas Hold'em" subtitle="私人局域网德州牌桌">
+        <ConnectionHome
+          runtimeKind={desktop ? 'desktop' : 'browser'}
+          initialAddress="10.126.126.1:32100"
+          onCreateRoom={noop}
+          onManageRecords={noop}
+          onRefreshRooms={noop}
+          {...(desktop ? { onOpenDiagnostics: noop } : {})}
+          joinReady
+          runningRoomRecord={
+            desktop
+              ? {
+                  roomId: 'preview-room',
+                  roomName: '周末牌局',
+                  hostNickname: 'Alice',
+                  status: 'running',
+                  createdAt: '2026-08-05T12:00:00.000Z',
+                  lastActiveAt: '2026-08-05T12:34:56.000Z',
+                  completedHands: 8,
+                  playerCount: 3,
+                }
+              : null
+          }
+          onRecoverRunningRoom={noop}
+          onProbeAddress={async () => true}
+          onResetProbe={noop}
+          onJoin={noop}
+        />
+      </PageShell>
+    );
+  }
+
+  if (page === 'room-discovery') {
+    return (
+      <PageShell title="Texas Hold'em" subtitle="私人局域网德州牌桌">
+        <section className="home-data-page" aria-label="附近牌桌">
+          <div className="home-data-page__toolbar">
+            <button className="button button--secondary" type="button">
+              返回大厅
+            </button>
+            <button className="button button--secondary" type="button">
+              刷新
+            </button>
+          </div>
+          <RoomDiscoveryList
+            rooms={previewRooms}
+            refreshing={false}
+            onRefresh={noop}
+            onJoin={noop}
+          />
+        </section>
+      </PageShell>
+    );
+  }
+
+  if (page === 'network-diagnostics') {
+    return (
+      <PageShell title="Texas Hold'em" subtitle="私人局域网德州牌桌">
+        <section className="home-data-page" aria-label="网络诊断">
+          <div className="home-data-page__toolbar">
+            <button className="button button--secondary" type="button">
+              返回大厅
+            </button>
+          </div>
+          <NetworkDiagnostics
+            runtime={previewRuntime}
+            hostService={previewHostService}
+          />
+        </section>
+      </PageShell>
+    );
+  }
+
+  if (page === 'desktop-setup') {
+    return (
+      <PageShell title="Texas Hold'em" subtitle="私人局域网德州牌桌">
+        <DesktopRoomSetup
+          runtime={previewRuntime}
+          existingService={previewHostService}
+          onClose={noop}
+          onHosted={async (service) => service}
+          onRecovered={noop}
+        />
+      </PageShell>
+    );
+  }
+
+  if (page === 'room-records') {
+    return (
+      <PageShell title="Texas Hold'em" subtitle="私人局域网德州牌桌">
+        <RoomRecordManager
+          runtime={previewRuntime}
+          onCreateRoom={noop}
+          onClose={noop}
+          onRecovered={noop}
+        />
+      </PageShell>
+    );
+  }
+
   if (page === 'lobby' || page === 'lobby-full') {
     const lobbyPlayers = page === 'lobby-full' ? fullTablePlayers : players;
     return (
@@ -299,18 +587,7 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
     );
   }
 
-  if (
-    [
-      'table',
-      'table-ten',
-      'table-ten-own-action',
-      'ready',
-      'settlement',
-      'table-chip',
-      'table-host',
-      'table-statistics',
-    ].includes(page)
-  ) {
+  if (isTablePreviewPage(page)) {
     return <TablePreview page={page} />;
   }
 
@@ -320,28 +597,10 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
         open
         players={statistics}
         titles={titles}
-        onClose={noop}
+        onCollapse={noop}
       />
     );
   }
 
-  return (
-    <div className="ui-smoke-stack">
-      <CreateRoomForm onCreate={noop} />
-      <ChipExchangePanel
-        phase="hand-ready"
-        currentPlayerId="alice"
-        players={players}
-        records={[]}
-        onAction={noop}
-      />
-      <HostControls
-        isHost
-        hostPlayerId="alice"
-        phase="hand-ready"
-        players={players}
-        onCommand={noop}
-      />
-    </div>
-  );
+  return <UiSmokePreview page="overview" />;
 }

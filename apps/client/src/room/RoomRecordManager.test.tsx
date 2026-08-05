@@ -43,7 +43,7 @@ function runtime(): RuntimeAdapter {
       },
     ],
     recoverRoomRecord: async () => ({
-      protocolVersion: '1',
+      protocolVersion: '3',
       roomId: 'room-1',
       playerId: 'host',
       token: 'host-recovery-token-123456',
@@ -111,7 +111,7 @@ describe('RoomRecordManager', () => {
 
   it('opens a one-time network choice before recovering a legacy record', async () => {
     const recoverRoomRecord = vi.fn().mockResolvedValueOnce({
-      protocolVersion: '1' as const,
+      protocolVersion: '3' as const,
       roomId: 'room-1',
       playerId: 'host',
       token: 'host-recovery-token-123456',

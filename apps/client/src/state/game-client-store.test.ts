@@ -37,6 +37,7 @@ const snapshot = (sequence: number): PlayerSnapshot => ({
   game: null,
   handReady: null,
   chipRequests: [],
+  chipActivity: [],
   statistics: { players: [], titles: [] },
 });
 

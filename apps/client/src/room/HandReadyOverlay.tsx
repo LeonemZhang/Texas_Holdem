@@ -6,7 +6,7 @@ export interface HandReadyRequestView {
   readonly requestId: string;
   readonly requesterId: string;
   readonly requesterName: string;
-  readonly targetPlayerId: string | null;
+  readonly targetPlayerId: string;
   readonly amount: number;
 }
 
@@ -163,9 +163,7 @@ export function HandReadyOverlay({
   }, [settlement?.handId]);
 
   const collapseSettlement = () => {
-    const compactViewport =
-      window.matchMedia?.('(max-width: 599px)').matches ?? false;
-    if (compactViewport) setSettlementCollapsed(true);
+    setSettlementCollapsed(true);
   };
 
   if (complete) return null;
@@ -196,10 +194,10 @@ export function HandReadyOverlay({
             aria-label={
               secondsLeft > 0
                 ? `剩余 ${secondsLeft} 秒`
-                : '等待至少两名玩家重新就绪'
+                : '等待至少两名玩家就绪'
             }
           >
-            {secondsLeft > 0 ? `${secondsLeft}s` : '等待重就绪'}
+            {secondsLeft > 0 ? `${secondsLeft}s` : '等待就绪'}
           </strong>
           <div
             className="hand-ready-card__actions"
@@ -207,7 +205,11 @@ export function HandReadyOverlay({
             aria-label="准备操作"
           >
             <button
-              className="button button--primary"
+              className={`button button--primary hand-ready-card__choice-button${
+                ownChoice === 'sitting-out'
+                  ? ' hand-ready-card__choice-button--join'
+                  : ''
+              }`}
               type="button"
               disabled={
                 ownChoice === 'ready' ||
@@ -278,17 +280,19 @@ export function HandReadyOverlay({
             role="alertdialog"
             aria-label="本手结算"
           >
-            <button
-              className="hand-ready-card__settlement-collapse"
-              type="button"
-              aria-label="收起结算详情"
-              onClick={collapseSettlement}
-            >
-              <span aria-hidden="true">⌃</span>
-            </button>
-            <strong>
-              本手结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
-            </strong>
+            <div className="hand-ready-card__settlement-heading">
+              <strong>
+                本手结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
+              </strong>
+              <button
+                className="hand-ready-card__settlement-collapse"
+                type="button"
+                aria-label="收起结算详情"
+                onClick={collapseSettlement}
+              >
+                收起
+              </button>
+            </div>
             <section
               className="hand-ready-card__settlement-table-summary"
               aria-label="本手牌面与底池"

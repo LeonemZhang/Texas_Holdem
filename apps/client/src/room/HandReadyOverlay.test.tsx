@@ -37,7 +37,7 @@ describe('HandReadyOverlay', () => {
             requestId: 'r1',
             requesterId: 'bob',
             requesterName: 'Bob',
-            targetPlayerId: null,
+            targetPlayerId: 'alice',
             amount: 200,
           },
         ]}
@@ -107,8 +107,8 @@ describe('HandReadyOverlay', () => {
         onChoose={onChoose}
       />,
     );
-    expect(screen.getByLabelText('等待至少两名玩家重新就绪')).toHaveTextContent(
-      '等待重就绪',
+    expect(screen.getByLabelText('等待至少两名玩家就绪')).toHaveTextContent(
+      '等待就绪',
     );
     fireEvent.click(screen.getByRole('button', { name: '加入下一手' }));
     expect(onChoose).toHaveBeenCalledWith('ready');
@@ -309,8 +309,7 @@ describe('HandReadyOverlay', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps settlement expanded when the collapse action is invoked on desktop', () => {
-    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+  it('uses the same compact settlement entry after collapsing on desktop', () => {
     render(
       <HandReadyOverlay
         deadlineMs={30_000}
@@ -337,7 +336,10 @@ describe('HandReadyOverlay', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
     expect(
-      screen.getByRole('alertdialog', { name: '本手结算' }),
+      screen.queryByRole('alertdialog', { name: '本手结算' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '结算详情 · 23s' }),
     ).toBeInTheDocument();
   });
 

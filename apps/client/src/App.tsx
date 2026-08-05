@@ -363,7 +363,11 @@ export function App() {
           roomCommand.current = port;
         }}
         onExited={(reason) => {
-          if (reason === 'closed' || reason === 'removed') {
+          if (
+            reason === 'closed' ||
+            reason === 'removed' ||
+            reason === 'left'
+          ) {
             browserReconnectSessionStore().clear(session.roomId);
             forgetBrowserRoomInUrl(session.roomId);
           }

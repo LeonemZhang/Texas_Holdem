@@ -172,7 +172,7 @@ describe('DesktopRoomSetup', () => {
       );
     });
     const recoverRoomRecord = vi.fn(async () => ({
-      protocolVersion: '1' as const,
+      protocolVersion: '3' as const,
       roomId: 'running-room',
       playerId: 'host',
       token: 'host-token-123456',

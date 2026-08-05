@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import type { ConnectionState } from './connection.js';
 import { networkErrorMessage } from './error-message.js';
@@ -8,8 +8,6 @@ export interface ConnectionGuardProps {
   readonly synchronizationError?: string | null;
   readonly children: ReactNode;
   readonly onRetry: () => void;
-  readonly onExitRoom: () => void;
-  readonly clearReconnectSession: () => void;
 }
 
 export function ConnectionGuard({
@@ -17,33 +15,12 @@ export function ConnectionGuard({
   synchronizationError,
   children,
   onRetry,
-  onExitRoom,
-  clearReconnectSession,
 }: ConnectionGuardProps) {
-  const [confirmingExit, setConfirmingExit] = useState(false);
-  const [exitActionExpanded, setExitActionExpanded] = useState(false);
   const recovering =
     state.status === 'recovering' || state.status === 'connecting';
   const error = networkErrorMessage(
     state.status === 'failed' ? state.error : synchronizationError,
   );
-  const exitRoom = () => {
-    clearReconnectSession();
-    onExitRoom();
-    setConfirmingExit(false);
-    setExitActionExpanded(false);
-  };
-  const requestExit = () => {
-    const compactViewport =
-      window.matchMedia?.('(max-width: 599px)').matches ?? false;
-    if (compactViewport && !exitActionExpanded) {
-      setExitActionExpanded(true);
-      return;
-    }
-    setExitActionExpanded(false);
-    setConfirmingExit(true);
-  };
-
   return (
     <div className="connection-guard">
       {recovering ? (
@@ -73,47 +50,6 @@ export function ConnectionGuard({
       <fieldset className="connection-guard__content" disabled={recovering}>
         {children}
       </fieldset>
-
-      <footer className="connection-guard__footer">
-        <span>直接关闭网页只会掉线，可用原身份恢复。</span>
-        <button
-          className={`connection-guard__exit-action${exitActionExpanded ? ' connection-guard__exit-action--expanded' : ''}`}
-          type="button"
-          aria-label="退出房间"
-          aria-expanded={exitActionExpanded}
-          onClick={requestExit}
-        >
-          <span className="connection-guard__exit-label connection-guard__exit-label--compact">
-            ×
-          </span>
-          <span className="connection-guard__exit-label connection-guard__exit-label--expanded">
-            退出房间
-          </span>
-        </button>
-      </footer>
-
-      {confirmingExit ? (
-        <div
-          className="exit-confirmation"
-          role="alertdialog"
-          aria-label="确认退出房间"
-        >
-          <strong>确认主动退出房间？</strong>
-          <p>退出后将清除本机重连身份；关闭网页则不会清除。</p>
-          <button type="button" onClick={exitRoom}>
-            确认退出
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setConfirmingExit(false);
-              setExitActionExpanded(false);
-            }}
-          >
-            取消
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

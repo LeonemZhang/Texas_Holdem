@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { RoomSessionClient } from './room-session-client.js';
 
 const session = {
-  protocolVersion: '1' as const,
+  protocolVersion: '3' as const,
   roomId: 'room-1',
   playerId: 'player-1',
   token: 'reconnect-token-123456',

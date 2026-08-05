@@ -5,11 +5,26 @@ import { ChipExchangePanel } from './ChipExchangePanel.js';
 
 const players = [
   { playerId: 'alice', nickname: 'Alice', chips: 1_000 },
-  { playerId: 'bob', nickname: 'Bob', chips: 0 },
+  { playerId: 'bob', nickname: 'Bob', chips: 200 },
 ];
+const activityTimeMs = new Date(2026, 7, 5, 12, 34, 56).getTime();
+const pendingRecord = {
+  kind: 'request' as const,
+  requestId: 'r1',
+  requesterId: 'bob',
+  targetPlayerId: 'alice',
+  amount: 200,
+  status: 'pending' as const,
+  rejectedByPlayerIds: [],
+  completedByPlayerId: null,
+  createdSequence: 1,
+  updatedSequence: 1,
+  createdAtMs: activityTimeMs,
+  updatedAtMs: activityTimeMs,
+};
 
 describe('ChipExchangePanel', () => {
-  it('supports a room-controlled drawer state', () => {
+  it('uses the shared single collapse action', () => {
     const onOpenChange = vi.fn();
     render(
       <ChipExchangePanel
@@ -23,12 +38,11 @@ describe('ChipExchangePanel', () => {
         onAction={vi.fn()}
       />,
     );
-
-    fireEvent.click(screen.getByRole('button', { name: '关闭筹码交换' }));
+    fireEvent.click(screen.getByRole('button', { name: '收起' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('keeps the exchange interactions collapsed until requested', () => {
+  it('routes non-ready phases to records and exposes the exchange lock', () => {
     render(
       <ChipExchangePanel
         phase="playing"
@@ -38,26 +52,16 @@ describe('ChipExchangePanel', () => {
         onAction={vi.fn()}
       />,
     );
-    expect(
-      screen.queryByText(
-        '对局进行中不能新建请求或主动给予筹码；已收到的请求仍可批准、拒绝或撤销，批准后立即同步余额。',
-      ),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: '准备给予' }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '展开筹码交换' }));
-    expect(
-      screen.getByText(
-        '对局进行中不能新建请求或主动给予筹码；已收到的请求仍可批准、拒绝或撤销，批准后立即同步余额。',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: '准备给予' }),
-    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '筹码交换' }));
+    expect(screen.getByRole('tab', { name: '公开记录' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('tab', { name: '筹码交换' }));
+    expect(screen.getByText(/当前阶段不能新建请求/)).toBeInTheDocument();
   });
 
-  it('previews the resulting balance and requires a second confirmation', () => {
+  it('requires a selected player and confirms giving in a modal', () => {
     const onAction = vi.fn();
     render(
       <ChipExchangePanel
@@ -68,15 +72,16 @@ describe('ChipExchangePanel', () => {
         onAction={onAction}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '展开筹码交换' }));
-    fireEvent.change(screen.getByLabelText('给予玩家'), {
-      target: { value: 'bob' },
-    });
+    fireEvent.click(screen.getByRole('button', { name: '筹码交换' }));
+    expect(screen.queryByRole('option', { name: '任意玩家' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '准备给予' }));
+    expect(
+      screen.getByRole('alertdialog', { name: '确认筹码操作' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText('给予 Bob 100 筹码，余额将变为 900'),
     ).toBeInTheDocument();
-    expect(onAction).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '取消' })).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: '确认' }));
     expect(onAction).toHaveBeenCalledWith({
       type: 'give',
@@ -85,27 +90,43 @@ describe('ChipExchangePanel', () => {
     });
   });
 
-  it('shows pending public records with approve, reject and revoke actions', () => {
+  it('auto-opens incoming records and preserves terminal and direct history', () => {
     const onAction = vi.fn();
-    const record = {
-      requestId: 'r1',
-      requesterId: 'bob',
-      targetPlayerId: 'alice',
-      amount: 200,
-      status: 'pending' as const,
-    };
     const { rerender } = render(
       <ChipExchangePanel
         phase="hand-ready"
         currentPlayerId="alice"
         players={players}
-        records={[record]}
+        records={[
+          pendingRecord,
+          {
+            ...pendingRecord,
+            requestId: 'r2',
+            status: 'rejected',
+            updatedSequence: 2,
+            updatedAtMs: new Date(2026, 7, 5, 12, 35, 1).getTime(),
+          },
+          {
+            kind: 'direct-transfer',
+            transferId: 't1',
+            fromPlayerId: 'alice',
+            toPlayerId: 'bob',
+            amount: 50,
+            completedSequence: 3,
+            completedAtMs: new Date(2026, 7, 5, 12, 35, 7).getTime(),
+          },
+        ]}
         onAction={onAction}
       />,
     );
     expect(
-      screen.getByText(/Bob 向 Alice 请求 200 · 待处理/),
+      screen.getByText(/Bob 向 Alice 请求 200 · 已拒绝/),
     ).toBeInTheDocument();
+    expect(screen.getByText(/Alice 给予 Bob 50 · 已完成/)).toBeInTheDocument();
+    expect(screen.getByText('12:34:56')).toBeInTheDocument();
+    expect(screen.getByText('12:35:01')).toBeInTheDocument();
+    expect(screen.getByText('12:35:07')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '同意' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '拒绝' }));
     expect(onAction).toHaveBeenCalledWith({ type: 'reject', requestId: 'r1' });
 
@@ -114,13 +135,10 @@ describe('ChipExchangePanel', () => {
         phase="hand-ready"
         currentPlayerId="bob"
         players={players}
-        records={[record]}
+        records={[pendingRecord]}
         onAction={onAction}
       />,
     );
-    expect(
-      screen.getByRole('button', { name: '收起筹码交换' }),
-    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '撤销' }));
     expect(onAction).toHaveBeenCalledWith({ type: 'revoke', requestId: 'r1' });
   });

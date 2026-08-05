@@ -25,25 +25,24 @@ const player = (
 });
 
 describe('StatisticsPanel', () => {
-  it('ranks players by chips and displays full basic statistics', () => {
+  it('ranks players in the default statistics tab', () => {
     render(
       <StatisticsPanel
         open
         players={[player('a', 'Alice', 800), player('b', 'Bob', 1_200)]}
         titles={[]}
-        onClose={vi.fn()}
+        onCollapse={vi.fn()}
       />,
     );
-    const ranking = screen.getByRole('list', { name: '筹码排名' });
+    const ranking = screen.getByRole('tabpanel', { name: '牌局统计' });
     const rows = within(ranking).getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('#1 Bob');
     expect(rows[1]).toHaveTextContent('#2 Alice');
-    expect(rows[0]).toHaveTextContent('最大单手盈利');
     expect(rows[0]).toHaveTextContent('60% (5 次)');
     expect(rows[0]).toHaveTextContent('3 / 2 / 6 / 4 / 1');
   });
 
-  it('shows all title labels and keeps tied winners together', () => {
+  it('switches to all tied titles and supports keyboard tabs', () => {
     render(
       <StatisticsPanel
         open
@@ -51,59 +50,27 @@ describe('StatisticsPanel', () => {
         titles={[
           { title: 'all-in-king', playerIds: ['a', 'b'], value: 3 },
           { title: 'unlucky-player', playerIds: [], value: null },
-          { title: 'pot-harvester', playerIds: ['a'], value: 900 },
-          { title: 'double-up-master', playerIds: ['a'], value: 500 },
-          { title: 'bluff-king', playerIds: ['b'], value: 2 },
-          { title: 'river-killer', playerIds: ['b'], value: 1 },
-          { title: 'tight-player', playerIds: ['a'], value: 0.7 },
         ]}
-        onClose={vi.fn()}
+        onCollapse={vi.fn()}
       />,
+    );
+    const statisticsTab = screen.getByRole('tab', { name: '牌局统计' });
+    fireEvent.keyDown(statisticsTab, { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: '局内称号' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
     expect(screen.getByText('Alice、Bob')).toBeInTheDocument();
-    for (const title of [
-      'All-in 之王',
-      '倒霉蛋',
-      '底池收割机',
-      '翻倍大师',
-      '偷鸡王',
-      '河牌杀手',
-      '铁公鸡',
-    ]) {
-      expect(screen.getByText(title)).toBeInTheDocument();
-    }
+    expect(screen.getByText('All-in 之王')).toBeInTheDocument();
   });
 
-  it('acts as a closable drawer and stays absent while closed', () => {
-    const onClose = vi.fn();
-    const { rerender } = render(
-      <StatisticsPanel open players={[]} titles={[]} onClose={onClose} />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: '关闭统计' }));
-    expect(onClose).toHaveBeenCalledOnce();
-    rerender(
-      <StatisticsPanel
-        open={false}
-        players={[]}
-        titles={[]}
-        onClose={onClose}
-      />,
-    );
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
-  });
-
-  it('can collapse into a compact statistics tab and expand again', () => {
+  it('has one collapse action and can expand from its compact tab', () => {
     const onCollapse = vi.fn();
     const onExpand = vi.fn();
     const { rerender } = render(
-      <StatisticsPanel
-        open
-        players={[]}
-        titles={[]}
-        onClose={vi.fn()}
-        onCollapse={onCollapse}
-      />,
+      <StatisticsPanel open players={[]} titles={[]} onCollapse={onCollapse} />,
     );
+    expect(screen.queryByLabelText('关闭统计')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '收起' }));
     expect(onCollapse).toHaveBeenCalledOnce();
     rerender(
@@ -112,11 +79,23 @@ describe('StatisticsPanel', () => {
         collapsed
         players={[]}
         titles={[]}
-        onClose={vi.fn()}
+        onCollapse={onCollapse}
         onExpand={onExpand}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '统计' }));
     expect(onExpand).toHaveBeenCalledOnce();
+  });
+
+  it('stays absent while closed', () => {
+    render(
+      <StatisticsPanel
+        open={false}
+        players={[]}
+        titles={[]}
+        onCollapse={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   });
 });

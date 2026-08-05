@@ -24,7 +24,7 @@ describe('HostControls', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭房主管理' }));
+    fireEvent.click(screen.getByRole('button', { name: '收起' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
@@ -55,7 +55,7 @@ describe('HostControls', () => {
     expect(
       screen.queryByRole('button', { name: '暂停游戏' }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
+    fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
     fireEvent.click(screen.getByRole('button', { name: '暂停游戏' }));
     expect(onCommand).toHaveBeenCalledWith({ type: 'room.pause' });
     rerender(
@@ -82,7 +82,7 @@ describe('HostControls', () => {
         onCommand={onCommand}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
+    fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
     const gameControls = screen.getByRole('group', { name: '游戏控制' });
     expect(
       within(gameControls).getByRole('button', { name: '暂停游戏' }),
@@ -117,7 +117,7 @@ describe('HostControls', () => {
         onCommand={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '展开房主管理' }));
+    fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
     expect(screen.getByRole('button', { name: '踢出 Bob' })).toBeDisabled();
     expect(screen.getByText('每手结束后可移除')).toBeInTheDocument();
   });

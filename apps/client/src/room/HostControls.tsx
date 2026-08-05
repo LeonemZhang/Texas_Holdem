@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+import { ModalDialog } from './ModalDialog.js';
+import { UtilityPanelHeader } from './UtilityPanel.js';
+
 export type HostControlIntent =
   | { readonly type: 'room.pause' }
   | { readonly type: 'room.resume' }
@@ -61,29 +64,22 @@ export function HostControls({
       className={`host-controls${drawer ? ' host-controls--drawer' : ''}${drawer && open ? ' host-controls--open' : ''}${drawer && !open ? ' host-controls--closed' : ''}`}
       aria-labelledby="host-controls-title"
     >
-      <header className="host-controls__header">
-        {!drawer || open ? (
-          <div>
-            <p className="connection-home__kicker">仅房主可见</p>
-            <h2 id="host-controls-title">房主管理</h2>
-          </div>
-        ) : null}
+      {open ? (
+        <UtilityPanelHeader
+          kicker="仅房主可见"
+          title="房主管理"
+          titleId="host-controls-title"
+          onCollapse={() => setOpen(false)}
+        />
+      ) : (
         <button
-          className={drawer ? 'button button--secondary' : undefined}
+          className="button button--secondary"
           type="button"
-          aria-expanded={open}
-          aria-controls="host-controls-content"
-          onClick={() => setOpen(!open)}
+          onClick={() => setOpen(true)}
         >
-          {open
-            ? drawer
-              ? '关闭房主管理'
-              : '收起房主管理'
-            : drawer
-              ? '房主管理'
-              : '展开房主管理'}
+          房主管理
         </button>
-      </header>
+      )}
       {open ? (
         <div id="host-controls-content" className="host-controls__actions">
           <div
@@ -91,6 +87,7 @@ export function HostControls({
             role="group"
             aria-label="游戏控制"
           >
+            <h3>游戏控制</h3>
             {phase === 'paused' ? (
               <button
                 className="button button--secondary"
@@ -124,7 +121,7 @@ export function HostControls({
           >
             <header>
               <div>
-                <h3 id="host-controls-player-removal-title">踢出玩家</h3>
+                <h3 id="host-controls-player-removal-title">玩家管理</h3>
                 {!canRemovePlayer ? <p>每手结束后可移除</p> : null}
               </div>
             </header>
@@ -164,10 +161,15 @@ export function HostControls({
       ) : null}
 
       {open && dangerousIntent ? (
-        <div
-          className="host-confirmation"
+        <ModalDialog
+          title="确认房主管理操作"
           role="alertdialog"
-          aria-label="确认房主管理操作"
+          confirmAction={{
+            label: '确认执行',
+            className: 'button button--danger',
+            onClick: confirmDangerous,
+          }}
+          onCancel={() => setDangerousIntent(null)}
         >
           <strong>
             {dangerousIntent.type === 'room.close'
@@ -175,21 +177,7 @@ export function HostControls({
               : `确认将 ${targetName ?? '该玩家'} 移出房间？`}
           </strong>
           <p>此操作将通过服务端命令执行，不会由界面直接修改牌局。</p>
-          <button
-            className="button button--danger"
-            type="button"
-            onClick={confirmDangerous}
-          >
-            确认执行
-          </button>
-          <button
-            className="button button--secondary"
-            type="button"
-            onClick={() => setDangerousIntent(null)}
-          >
-            取消
-          </button>
-        </div>
+        </ModalDialog>
       ) : null}
     </section>
   );
