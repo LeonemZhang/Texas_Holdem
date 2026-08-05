@@ -30,6 +30,7 @@ import {
 } from './external-navigation';
 import { hideApplicationMenu } from './application-menu';
 import { recoverRoomRecordFromHost } from './room-record-recovery';
+import { applyApplicationBranding, resolveAppIconPath } from './app-branding';
 
 const developmentUrl = process.env.CLIENT_DEV_URL;
 let mainWindow: BrowserWindow | null = null;
@@ -160,7 +161,12 @@ function registerRuntimeHandler(hostController: HostProcessController) {
 
 async function createMainWindow() {
   const preloadPath = join(__dirname, '../preload/index.js');
-  const window = new BrowserWindow(createWindowOptions(preloadPath));
+  const iconPath = resolveAppIconPath({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    mainDirectory: __dirname,
+  });
+  const window = new BrowserWindow(createWindowOptions(preloadPath, iconPath));
   mainWindow = window;
   windowCloseCoordinator = new WindowCloseCoordinator({
     confirmPlayerExit: async () => {
@@ -226,6 +232,8 @@ async function createMainWindow() {
     );
   }
 }
+
+applyApplicationBranding(app);
 
 void app.whenReady().then(async () => {
   hideApplicationMenu(Menu);

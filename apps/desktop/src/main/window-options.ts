@@ -12,8 +12,11 @@ export function showWindowMaximized(window: MaximizableWindow): void {
 
 export function createWindowOptions(
   preloadPath: string,
+  iconPath: string,
 ): BrowserWindowConstructorOptions {
   return {
+    title: 'Texas Holdem',
+    icon: iconPath,
     width: 1280,
     height: 800,
     minWidth: 360,

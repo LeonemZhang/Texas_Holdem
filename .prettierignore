@@ -1,2 +1,5 @@
 pnpm-lock.yaml
 output/
+apps/client/public/
+apps/desktop/build/
+assets/branding/*.svg

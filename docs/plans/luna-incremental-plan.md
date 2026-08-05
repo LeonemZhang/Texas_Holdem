@@ -328,6 +328,7 @@
 | LUNA-DESK06 | DESK03,DESK05      | 完成 Windows 构建配置和网络诊断页             | 产物可启动；主窗口就绪后默认以当前显示器工作区内的普通最大化窗口显示，不固定或限制分辨率；显示网卡/IP/端口/防火墙提示；不要求代码签名或正式发布 |
 | LUNA-DESK07 | RC04,UI18,DESK02   | 接通本机对局记录管理 IPC 与房主服务控制通道   | 管理模式不监听 LAN 服务；preload 仅暴露已校验的目录和恢复网卡操作；不暴露 SQLite、通用 IPC 或 LAN 管理接口                                      |
 | LUNA-DESK08 | Terra,DESK06       | 限制桌面窗口导航与原生菜单                    | 仅信任本地渲染器；外部 HTTP(S) 只在系统浏览器打开；拒绝新窗口；默认不显示应用菜单                                                               |
+| LUNA-DESK09 | DESK06,DESK08,UI05 | 统一 Windows 与浏览器品牌身份                 | EXE、窗口、任务栏、任务管理器、快捷方式、安装/卸载入口和浏览器 favicon/Web App 使用统一名称与图标；构建检查派生资源且不出现 Electron 默认品牌   |
 
 阶段门禁：Electron renderer 继续保持 sandbox、context isolation 和 nodeIntegration=false。
 

@@ -1,0 +1,29 @@
+{
+  "name": "Texas Holdem",
+  "short_name": "Texas Holdem",
+  "description": "Local-first no-limit Texas Holdem for friends",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#071a16",
+  "theme_color": "#071a16",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./maskable-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

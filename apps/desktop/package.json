@@ -48,9 +48,15 @@
       {
         "from": "dist/host",
         "to": "host"
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
       }
     ],
     "win": {
+      "icon": "build/icon.ico",
+      "executableName": "Texas Holdem",
       "target": [
         {
           "target": "msi",
@@ -70,6 +76,9 @@
     "msi": {
       "oneClick": false,
       "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Texas Holdem",
       "upgradeCode": "{B419EE84-D582-4FA3-9F65-60D45105F7B8}"
     }
   }

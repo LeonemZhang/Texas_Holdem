@@ -3,8 +3,13 @@ import { createWindowOptions, showWindowMaximized } from './window-options';
 
 describe('Electron window security', () => {
   it('keeps the renderer sandboxed and isolated', () => {
-    const options = createWindowOptions('C:/app/preload.js');
+    const options = createWindowOptions(
+      'C:/app/preload.js',
+      'C:/app/resources/icon.ico',
+    );
 
+    expect(options.title).toBe('Texas Holdem');
+    expect(options.icon).toBe('C:/app/resources/icon.ico');
     expect(options.minWidth).toBe(360);
     expect(options.webPreferences).toMatchObject({
       contextIsolation: true,

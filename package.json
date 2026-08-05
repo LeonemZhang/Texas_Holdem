@@ -12,6 +12,8 @@
     "pnpm": "10.0.0"
   },
   "scripts": {
+    "brand:generate": "node scripts/brand-assets.mjs --write",
+    "brand:check": "node scripts/brand-assets.mjs --check",
     "predev": "pnpm --filter \"./packages/*\" build && pnpm --filter @texas-holdem/host build && pnpm --filter @texas-holdem/client build",
     "dev": "concurrently --kill-others-on-fail --names client,desktop --prefix-colors cyan,magenta \"pnpm --filter @texas-holdem/client dev\" \"pnpm --filter @texas-holdem/desktop dev\"",
     "format": "prettier --write .",
@@ -23,7 +25,7 @@
     "version:set": "node scripts/version.mjs --set",
     "pretest": "pnpm --filter \"./packages/*\" build",
     "test": "pnpm -r --if-present test",
-    "build": "pnpm -r --if-present build",
+    "build": "pnpm brand:check && pnpm -r --if-present build",
     "package:win": "pnpm version:check && pnpm build && pnpm --filter @texas-holdem/desktop package:win",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
@@ -33,7 +35,9 @@
     "concurrently": "10.0.4",
     "eslint": "10.8.0",
     "globals": "17.8.0",
+    "png-to-ico": "3.0.2",
     "prettier": "3.9.6",
+    "sharp": "0.35.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.65.0",
     "vitest": "4.1.10"
