@@ -1,6 +1,6 @@
 # Windows 打包与版本管理
 
-根目录 `package.json` 的 `version` 是源码版本的唯一权威值。当前为 `1.0.0`；桌面应用、房主服务和全部 workspace 清单必须与它一致，构建前会自动校验。
+根目录 `package.json` 的 `version` 是源码版本的唯一权威值；桌面应用、房主服务和全部 workspace 清单必须与它一致，构建前会自动校验。
 
 ## 发布 Windows 产物
 
@@ -20,7 +20,7 @@ MSI 使用固定的 UpgradeCode。发布更高版本号的 MSI 时，Windows Ins
 ## 升级源码版本
 
 ```powershell
-pnpm version:set 1.0.1
+pnpm version:set 1.0.0
 pnpm package:win
 ```
 
@@ -44,3 +44,23 @@ pnpm brand:check
 - 浏览器标签页、收藏夹、添加到主屏幕和 Web App manifest。
 
 MSI 的 UpgradeCode 必须保持不变。同版本 MSI 不作为已安装版本的升级包；版本不变时使用干净环境或先卸载后重装进行品牌验收。
+
+## 正式发布门禁
+
+最终候选提交必须在干净工作区运行：
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm test:e2e
+pnpm audit --prod
+pnpm package:win
+```
+
+发布前必须确认 MSI 可安装、启动和卸载，ZIP 可完整解压并启动，两个产物均可创建房间并完成最小浏览器联机牌局。便携版和安装版都必须包含 `LICENSE.txt` 与 `THIRD_PARTY_NOTICES.md`。
+
+正式 Release 只上传 MSI、ZIP 和 `SHA256SUMS.txt`。tag 使用 `v<版本>`，并且必须指向通过本地门禁和 GitHub Actions 的同一提交。先创建 Draft Release、上传并重新下载附件复核 SHA-256，确认无误后再发布。
