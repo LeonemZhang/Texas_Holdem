@@ -6,6 +6,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  screen,
   shell,
   utilityProcess,
 } from 'electron';
@@ -93,7 +94,7 @@ function registerRuntimeHandler(hostController: HostProcessController) {
       if (typeof includeArchived !== 'boolean')
         throw new Error('Invalid archive filter');
       const result = await hostController.manage({
-        protocolVersion: '1',
+        protocolVersion: '3',
         requestId: randomUUID(),
         type: 'room-record.list',
         includeArchived,
@@ -120,7 +121,7 @@ function registerRuntimeHandler(hostController: HostProcessController) {
       if (typeof roomId !== 'string' || !roomId.trim())
         throw new Error('Invalid room ID');
       await hostController.manage({
-        protocolVersion: '1',
+        protocolVersion: '3',
         requestId: randomUUID(),
         type: 'room-record.close-running',
         roomId,
@@ -137,7 +138,7 @@ function registerRuntimeHandler(hostController: HostProcessController) {
       if (typeof roomId !== 'string' || !roomId.trim())
         throw new Error('Invalid room ID');
       await hostController.manage({
-        protocolVersion: '1',
+        protocolVersion: '3',
         requestId: randomUUID(),
         type,
         roomId,
@@ -168,7 +169,10 @@ async function createMainWindow() {
     resourcesPath: process.resourcesPath,
     mainDirectory: __dirname,
   });
-  const window = new BrowserWindow(createWindowOptions(preloadPath, iconPath));
+  const workAreaSize = screen.getPrimaryDisplay().workAreaSize;
+  const window = new BrowserWindow(
+    createWindowOptions(preloadPath, iconPath, workAreaSize),
+  );
   mainWindow = window;
   windowCloseCoordinator = new WindowCloseCoordinator({
     confirmPlayerExit: async () => {

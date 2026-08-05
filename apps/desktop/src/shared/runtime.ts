@@ -53,7 +53,7 @@ export interface RoomRecordNetwork {
 }
 
 export interface RecoveredHostSession {
-  readonly protocolVersion: '1';
+  readonly protocolVersion: '3';
   readonly roomId: string;
   readonly playerId: string;
   readonly token: string;
@@ -124,7 +124,7 @@ export interface DesktopNetworkInterface {
 
 export interface DesktopDiscoveredRoom {
   readonly magic: 'TEXAS_HOLDEM_LAN_V1';
-  readonly protocolVersion: '1';
+  readonly protocolVersion: '3';
   readonly requestId: string;
   readonly type: 'room';
   readonly roomId: string;

@@ -13,7 +13,7 @@ interface HostManagementRequest extends Readonly<Record<string, unknown>> {
 }
 
 interface HostManagementResponse {
-  readonly protocolVersion: '1';
+  readonly protocolVersion: '3';
   readonly requestId: string;
   readonly status: 'accepted' | 'rejected';
   readonly result?: unknown;
@@ -31,7 +31,7 @@ function parseManagementResponse(
   if (
     typeof value !== 'object' ||
     value === null ||
-    (value as HostManagementResponse).protocolVersion !== '1' ||
+    (value as HostManagementResponse).protocolVersion !== '3' ||
     typeof (value as HostManagementResponse).requestId !== 'string' ||
     !['accepted', 'rejected'].includes((value as HostManagementResponse).status)
   ) {

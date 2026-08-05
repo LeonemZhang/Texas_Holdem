@@ -209,14 +209,14 @@ describe('HostProcessController', () => {
     await controller.start({ port: 32_103, advertisedAddress: '127.0.0.1' });
 
     const result = controller.manage({
-      protocolVersion: '1',
+      protocolVersion: '3',
       requestId: 'request-1',
       type: 'room-record.list',
       includeArchived: false,
     });
     expect(child.process.postMessage).toHaveBeenCalledOnce();
     child.send({
-      protocolVersion: '1',
+      protocolVersion: '3',
       requestId: 'request-1',
       status: 'accepted',
       result: [],

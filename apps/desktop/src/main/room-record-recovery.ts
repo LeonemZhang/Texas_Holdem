@@ -59,7 +59,7 @@ function sessionFromResult(result: unknown): RecoveredHostSession {
   if (
     typeof session !== 'object' ||
     session === null ||
-    session.protocolVersion !== '1' ||
+    session.protocolVersion !== '3' ||
     typeof session.roomId !== 'string' ||
     !session.roomId.trim() ||
     typeof session.playerId !== 'string' ||
@@ -72,7 +72,7 @@ function sessionFromResult(result: unknown): RecoveredHostSession {
     throw new Error('Invalid room recovery response');
   }
   return {
-    protocolVersion: '1',
+    protocolVersion: '3',
     roomId: session.roomId,
     playerId: session.playerId,
     token: session.token,
@@ -83,7 +83,7 @@ function sessionFromResult(result: unknown): RecoveredHostSession {
 
 function recoveryRequest(roomId: string, requestId: string): ManagementRequest {
   return {
-    protocolVersion: '1',
+    protocolVersion: '3',
     requestId,
     type: 'room-record.recover',
     roomId,
@@ -108,7 +108,7 @@ export async function recoverRoomRecordFromHost({
   }
 
   const recordResult = await controller.manage({
-    protocolVersion: '1',
+    protocolVersion: '3',
     requestId: createRequestId(),
     type: 'room-record.get',
     roomId: input.roomId,

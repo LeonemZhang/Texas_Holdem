@@ -26,7 +26,7 @@ const service: HostServiceInfo = {
 };
 
 const session = {
-  protocolVersion: '1' as const,
+  protocolVersion: '3' as const,
   roomId: 'room-1',
   playerId: 'host',
   token: 'host-recovery-token-123456',
@@ -71,7 +71,7 @@ describe('recoverRoomRecordFromHost', () => {
       networkName: network.name,
     });
     expect(host.manage).toHaveBeenLastCalledWith({
-      protocolVersion: '1',
+      protocolVersion: '3',
       requestId: 'request-id',
       type: 'room-record.recover',
       roomId: 'room-1',
