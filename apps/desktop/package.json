@@ -1,9 +1,10 @@
 {
   "name": "@texas-holdem/desktop",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "局域网德州扑克游戏",
   "author": "LeonemZhang",
   "private": true,
+  "license": "GPL-3.0-only",
   "type": "commonjs",
   "main": "dist/main/index.js",
   "scripts": {
@@ -52,6 +53,16 @@
       {
         "from": "build/icon.ico",
         "to": "icon.ico"
+      }
+    ],
+    "extraFiles": [
+      {
+        "from": "../../LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "../../THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
       }
     ],
     "win": {
