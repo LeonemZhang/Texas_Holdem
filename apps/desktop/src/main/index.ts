@@ -11,6 +11,7 @@ import {
 } from 'electron';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { configureApplicationUserData } from './application-data-path';
 import type { DesktopRuntimeInfo } from '../shared/runtime';
 import {
   ClipboardImageDataUrlSchema,
@@ -33,6 +34,7 @@ import { recoverRoomRecordFromHost } from './room-record-recovery';
 import { applyApplicationBranding, resolveAppIconPath } from './app-branding';
 
 const developmentUrl = process.env.CLIENT_DEV_URL;
+const applicationUserDataDirectory = configureApplicationUserData(app);
 let mainWindow: BrowserWindow | null = null;
 let windowCloseCoordinator: WindowCloseCoordinator | null = null;
 
@@ -241,7 +243,7 @@ void app.whenReady().then(async () => {
     ? join(process.resourcesPath, 'host/index.mjs')
     : join(__dirname, '../host/index.mjs');
   const hostController = new HostProcessController({
-    dataDirectory: join(app.getPath('userData'), 'rooms'),
+    dataDirectory: join(applicationUserDataDirectory, 'rooms'),
     staticDirectory: app.isPackaged
       ? join(process.resourcesPath, 'client')
       : join(__dirname, '../../../client/dist'),
