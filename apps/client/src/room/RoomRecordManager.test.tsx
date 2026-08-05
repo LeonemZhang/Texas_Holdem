@@ -215,7 +215,9 @@ describe('RoomRecordManager', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '创建新房间' }));
     fireEvent.click(
-      screen.getByRole('button', { name: '关闭上次对局并重新选择网卡' }),
+      await screen.findByRole('button', {
+        name: '关闭上次对局并重新选择网卡',
+      }),
     );
     await waitFor(() =>
       expect(closeRunningRoomRecord).toHaveBeenCalledWith('room-1'),
@@ -256,7 +258,9 @@ describe('RoomRecordManager', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '创建新房间' }));
     fireEvent.click(
-      screen.getByRole('button', { name: '关闭上次对局并重新选择网卡' }),
+      await screen.findByRole('button', {
+        name: '关闭上次对局并重新选择网卡',
+      }),
     );
 
     expect(
