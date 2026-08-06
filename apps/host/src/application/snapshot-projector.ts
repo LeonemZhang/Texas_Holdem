@@ -17,15 +17,15 @@ import {
 import type { ChipRequestBook } from '../domain/chip-requests.js';
 import type { HandReadyState } from '../domain/hand-ready.js';
 import type { RoomPlayer, RoomState } from '../domain/room.js';
-import type { TitleAward } from '../statistics/titles.js';
 
 export interface SnapshotPlayerStatistics {
   readonly playerId: string;
   readonly currentChips: number;
+  readonly netWinLoss: number;
   readonly participatedHands: number;
   readonly wonHands: number;
   readonly largestSingleHandProfit: number;
-  readonly largestWonPot: number;
+  readonly largestSingleHandLoss: number;
   readonly showdownCount: number;
   readonly showdownWinRate: number | null;
   readonly actions: {
@@ -35,6 +35,20 @@ export interface SnapshotPlayerStatistics {
     readonly raiseTo: number;
     readonly allIn: number;
   };
+}
+
+export interface SnapshotHandPeaks {
+  readonly global: {
+    readonly playerIds: readonly string[];
+    readonly handType: (typeof handTypeByCategory)[keyof typeof handTypeByCategory];
+    readonly bestFiveCards: readonly string[];
+  } | null;
+  readonly players: readonly {
+    readonly playerId: string;
+    readonly handType: (typeof handTypeByCategory)[keyof typeof handTypeByCategory];
+    readonly bestFiveCards: readonly string[];
+  }[];
+  readonly hasLegacyCoverageGap: boolean;
 }
 
 const handTypeByCategory = {
@@ -60,7 +74,12 @@ export interface SnapshotProjectionInput {
   readonly chipRequests?: ChipRequestBook | null;
   readonly chipActivity?: readonly ChipActivity[];
   readonly statistics?: readonly SnapshotPlayerStatistics[];
-  readonly titles?: readonly TitleAward[];
+  readonly titles?: readonly {
+    readonly title: string;
+    readonly playerIds: readonly string[];
+    readonly value: number | null;
+  }[];
+  readonly handPeaks?: SnapshotHandPeaks;
 }
 
 function handPlayer(
@@ -217,10 +236,11 @@ export function projectPlayerSnapshot(
     input.room.players.map((player) => ({
       playerId: player.playerId,
       currentChips: currentChips(player),
+      netWinLoss: 0,
       participatedHands: 0,
       wonHands: 0,
       largestSingleHandProfit: 0,
-      largestWonPot: 0,
+      largestSingleHandLoss: 0,
       showdownCount: 0,
       showdownWinRate: null,
       actions: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },
@@ -339,6 +359,11 @@ export function projectPlayerSnapshot(
     statistics: {
       players: statistics,
       titles: input.titles ?? [],
+      handPeaks: input.handPeaks ?? {
+        global: null,
+        players: [],
+        hasLegacyCoverageGap: false,
+      },
     },
   });
 }

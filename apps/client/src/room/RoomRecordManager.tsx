@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 
 import type { RoomRecordSummary, RuntimeAdapter } from '../runtime.js';
-import type { RoomSessionResponse } from '@texas-holdem/protocol';
+import type {
+  RoomRecordStatistics,
+  RoomSessionResponse,
+} from '@texas-holdem/protocol';
+import { StatisticsPanel } from '../statistics/StatisticsPanel.js';
 
 const statusLabels: Record<RoomRecordSummary['status'], string> = {
   running: '进行中',
@@ -35,6 +39,11 @@ export function RoomRecordManager({
   >([]);
   const [recoveryAddress, setRecoveryAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [statisticsTarget, setStatisticsTarget] =
+    useState<RoomRecordSummary | null>(null);
+  const [recordStatistics, setRecordStatistics] =
+    useState<RoomRecordStatistics | null>(null);
+  const [statisticsLoading, setStatisticsLoading] = useState(false);
 
   const refresh = async () => {
     try {
@@ -132,6 +141,24 @@ export function RoomRecordManager({
       await refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '删除对局记录失败');
+    }
+  };
+
+  const openStatistics = async (record: RoomRecordSummary) => {
+    try {
+      if (!runtime.getRoomRecordStatistics) {
+        throw new Error('桌面组件版本已更新，请完全退出并重新启动 Electron');
+      }
+      setError(null);
+      setStatisticsTarget(record);
+      setRecordStatistics(null);
+      setStatisticsLoading(true);
+      setRecordStatistics(await runtime.getRoomRecordStatistics(record.roomId));
+    } catch (reason) {
+      setStatisticsTarget(null);
+      setError(reason instanceof Error ? reason.message : '读取对局统计失败');
+    } finally {
+      setStatisticsLoading(false);
     }
   };
 
@@ -247,6 +274,13 @@ export function RoomRecordManager({
                   恢复对局
                 </button>
               ) : null}
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={() => void openStatistics(record)}
+              >
+                查看统计
+              </button>
               {record.status === 'archived' ? (
                 <>
                   <button
@@ -286,6 +320,39 @@ export function RoomRecordManager({
           </li>
         ))}
       </ul>
+      {statisticsTarget ? (
+        statisticsLoading || !recordStatistics ? (
+          <div className="modal-backdrop" role="presentation">
+            <section
+              className="modal-dialog"
+              role="dialog"
+              aria-label="正在读取对局统计"
+            >
+              <p>正在读取“{statisticsTarget.roomName}”的服务端统计…</p>
+            </section>
+          </div>
+        ) : (
+          <StatisticsPanel
+            open
+            presentation="modal"
+            players={recordStatistics.players}
+            titles={recordStatistics.titles}
+            handPeaks={recordStatistics.handPeaks}
+            summary={
+              <>
+                {statisticsTarget.roomName} ·{' '}
+                {statusLabels[statisticsTarget.status]} · 已完成{' '}
+                {statisticsTarget.completedHands} 手 · 最近活动{' '}
+                {new Date(statisticsTarget.lastActiveAt).toLocaleString()}
+              </>
+            }
+            onCollapse={() => {
+              setStatisticsTarget(null);
+              setRecordStatistics(null);
+            }}
+          />
+        )
+      ) : null}
       {deleteTarget ? (
         <div
           className="desktop-room-records__delete-confirmation"

@@ -12,12 +12,14 @@ export function UtilityPanelHeader({
   titleId,
   summary,
   onCollapse,
+  collapseLabel = '收起',
 }: {
   readonly kicker: string;
   readonly title: string;
   readonly titleId: string;
   readonly summary?: ReactNode;
   readonly onCollapse: () => void;
+  readonly collapseLabel?: string;
 }) {
   return (
     <header className="utility-panel-header">
@@ -33,7 +35,7 @@ export function UtilityPanelHeader({
         type="button"
         onClick={onCollapse}
       >
-        收起
+        {collapseLabel}
       </button>
     </header>
   );

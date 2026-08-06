@@ -8,6 +8,7 @@ import type {
 import type { ChipRequestBook } from '../domain/chip-requests.js';
 import type { HandReadyState } from '../domain/hand-ready.js';
 import type { RoomState } from '../domain/room.js';
+import type { StoredStatisticsFact } from './statistics-store.js';
 
 export interface RoomRecoveryState {
   readonly room: RoomState;
@@ -15,6 +16,8 @@ export interface RoomRecoveryState {
   readonly handReady: HandReadyState | null;
   readonly chipRequests: ChipRequestBook | null;
   readonly chipActivity: readonly ChipActivity[];
+  /** Action facts collected for the currently unfinished hand. */
+  readonly pendingStatisticsFacts?: readonly StoredStatisticsFact[];
 }
 
 export interface StoredRoomSnapshot {

@@ -22,6 +22,8 @@ import {
   type RoomRecordManagementResponse,
 } from '@texas-holdem/protocol';
 import { RoomRecordManagementService } from './application/room-record-management.js';
+import { rebuildStatistics } from './application/statistics-store.js';
+import { createStatisticsView } from './application/statistics-view.js';
 
 interface HostControlParentPort {
   on(
@@ -217,6 +219,47 @@ parentPort?.on('message', ({ data }) => {
       case 'room-record.get':
         result = { record: roomRecordManagement.getRecord(parsed.data.roomId) };
         break;
+      case 'room-record.statistics': {
+        roomRecordManagement.getRecord(parsed.data.roomId);
+        const live = runtime.statisticsForRoom(parsed.data.roomId);
+        if (live) {
+          result = { statistics: live };
+          break;
+        }
+        const state = runtimeStore?.loadLatestState(parsed.data.roomId);
+        if (!state || !statisticsStore) {
+          throw new RangeError('Room statistics are unavailable');
+        }
+        const initialChips = Object.fromEntries(
+          state.room.players.map((player) => [
+            player.playerId,
+            state.room.settings.initialChips,
+          ]),
+        );
+        const persistedFacts = statisticsStore.loadFacts(parsed.data.roomId);
+        result = {
+          statistics: createStatisticsView(
+            state.room,
+            rebuildStatistics(
+              {
+                saveSummary: () => undefined,
+                saveFacts: () => undefined,
+                loadSummaries: (roomId) =>
+                  statisticsStore.loadSummaries(roomId),
+                loadFacts: () => [
+                  ...persistedFacts,
+                  ...(state.pendingStatisticsFacts ?? []).map(
+                    ({ event }) => event,
+                  ),
+                ],
+              },
+              parsed.data.roomId,
+              initialChips,
+            ),
+          ),
+        };
+        break;
+      }
     }
     parentPort.postMessage({
       protocolVersion: '3',

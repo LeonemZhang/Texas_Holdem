@@ -30,7 +30,7 @@ function summary(
 }
 
 describe('reduceOutcomeStatistics', () => {
-  it('derives showdown rate, largest profit, and uncontested wins from summaries', () => {
+  it('derives showdown rate, largest profit/loss, and uncontested wins from summaries', () => {
     const result = reduceOutcomeStatistics(
       ['a', 'b'],
       [
@@ -44,6 +44,7 @@ describe('reduceOutcomeStatistics', () => {
       showdownWins: 1,
       showdownWinRate: 0.5,
       largestSingleHandProfit: 10,
+      largestSingleHandLoss: 20,
       uncontestedWins: 0,
     });
     expect(result.b).toMatchObject({
@@ -51,6 +52,7 @@ describe('reduceOutcomeStatistics', () => {
       showdownWins: 1,
       showdownWinRate: 0.5,
       largestSingleHandProfit: 20,
+      largestSingleHandLoss: 10,
       uncontestedWins: 1,
     });
   });

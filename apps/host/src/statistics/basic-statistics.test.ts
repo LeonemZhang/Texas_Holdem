@@ -44,24 +44,37 @@ describe('reduceBasicStatistics', () => {
     summary,
   ];
 
-  it('derives chips, hands, wins, actions, and largest pot from confirmed events', () => {
+  it('derives chips, hands, wins, and actions from confirmed events', () => {
     const result = reduceBasicStatistics({ a: 100, b: 100 }, events);
     expect(result.a).toMatchObject({
       currentChips: 90,
+      netWinLoss: -10,
       participatedHands: 1,
       wonHands: 0,
       actionCounts: { fold: 1 },
-      largestWonPot: 0,
       preflopFoldCount: 1,
     });
     expect(result.b).toMatchObject({
       currentChips: 110,
+      netWinLoss: 10,
       participatedHands: 1,
       wonHands: 1,
       actionCounts: { raiseTo: 1 },
-      largestWonPot: 30,
       totalWonPotChips: 30,
     });
+  });
+
+  it('keeps net win or loss limited to hand settlements', () => {
+    const result = reduceBasicStatistics({ a: 1_000, b: 1_000 }, [
+      {
+        ...summary,
+        netChanges: { a: -500, b: 500 },
+      },
+    ]);
+
+    // Chip requests and direct transfers are not BasicStatisticsEvent inputs.
+    expect(result.b!.netWinLoss).toBe(500);
+    expect(result.b!.currentChips).toBe(1_500);
   });
 
   it('replays the same event stream to exactly the same immutable result', () => {

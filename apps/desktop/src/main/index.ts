@@ -114,6 +114,25 @@ function registerRuntimeHandler(hostController: HostProcessController) {
       createRequestId: randomUUID,
     });
   });
+  ipcMain.handle('room-records:statistics', async (event, roomId: unknown) => {
+    assertTrusted(event.senderFrame?.url);
+    if (typeof roomId !== 'string' || !roomId.trim())
+      throw new Error('Invalid room ID');
+    const result = await hostController.manage({
+      protocolVersion: '3',
+      requestId: randomUUID(),
+      type: 'room-record.statistics',
+      roomId,
+    });
+    if (
+      typeof result !== 'object' ||
+      result === null ||
+      !('statistics' in result)
+    ) {
+      throw new Error('Invalid room statistics response');
+    }
+    return result.statistics;
+  });
   ipcMain.handle(
     'room-records:close-running',
     async (event, roomId: unknown) => {

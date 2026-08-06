@@ -25,10 +25,11 @@ export interface BasicPlayerStatistics {
   readonly playerId: string;
   readonly initialChips: number;
   readonly currentChips: number;
+  /** Sum of confirmed hand-settlement net changes; excludes chip exchanges. */
+  readonly netWinLoss: number;
   readonly participatedHands: number;
   readonly wonHands: number;
   readonly actionCounts: ActionCounts;
-  readonly largestWonPot: number;
   readonly totalWonPotChips: number;
   readonly preflopFoldCount: number;
 }
@@ -44,10 +45,10 @@ function emptyStats(
     playerId,
     initialChips,
     currentChips: initialChips,
+    netWinLoss: 0,
     participatedHands: 0,
     wonHands: 0,
     actionCounts: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },
-    largestWonPot: 0,
     totalWonPotChips: 0,
     preflopFoldCount: 0,
   };
@@ -105,18 +106,12 @@ export function reduceBasicStatistics(
       const player = stats[playerId];
       if (!player)
         throw new RangeError(`Statistics player not found: ${playerId}`);
-      const largestWonPot = event.pots
-        .filter(({ winnerIds }) => winnerIds.includes(playerId))
-        .reduce(
-          (largest, pot) => Math.max(largest, pot.amount),
-          player.largestWonPot,
-        );
       stats[playerId] = {
         ...player,
         currentChips: player.currentChips + (event.netChanges[playerId] ?? 0),
+        netWinLoss: player.netWinLoss + (event.netChanges[playerId] ?? 0),
         participatedHands: player.participatedHands + 1,
         wonHands: player.wonHands + (winners.has(playerId) ? 1 : 0),
-        largestWonPot,
         totalWonPotChips:
           player.totalWonPotChips + (event.payouts[playerId] ?? 0),
       };

@@ -54,6 +54,26 @@ function runtime(): RuntimeAdapter {
     archiveRoomRecord: async () => undefined,
     restoreRoomRecord: async () => undefined,
     deleteRoomRecord: async () => undefined,
+    getRoomRecordStatistics: async () => ({
+      players: [
+        {
+          playerId: 'host',
+          nickname: 'Alice',
+          initialChips: 1_000,
+          currentChips: 1_200,
+          netWinLoss: 200,
+          participatedHands: 7,
+          wonHands: 3,
+          largestSingleHandProfit: 250,
+          largestSingleHandLoss: 400,
+          showdownCount: 3,
+          showdownWinRate: 2 / 3,
+          actions: { fold: 1, check: 2, call: 3, raiseTo: 1, allIn: 0 },
+        },
+      ],
+      titles: [],
+      handPeaks: { global: null, players: [], hasLegacyCoverageGap: false },
+    }),
     onHostServiceExited: () => () => undefined,
     setWindowRoomContext: async () => undefined,
     onPlayerExitRequested: () => () => undefined,
@@ -79,6 +99,12 @@ describe('RoomRecordManager', () => {
     expect(await screen.findByText('周末牌局')).toBeInTheDocument();
     expect(screen.getByText('可恢复')).toBeInTheDocument();
     expect(screen.getByText(/3 人 · 已完成 7 手/)).toBeInTheDocument();
+    const recoverButton = screen.getByRole('button', { name: '恢复对局' });
+    const statisticsButton = screen.getByRole('button', { name: '查看统计' });
+    expect(
+      recoverButton.compareDocumentPosition(statisticsButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(
       screen.getByText(/联机网卡：Virtual LAN · 10.126.126.1/),
     ).toBeInTheDocument();
@@ -87,6 +113,22 @@ describe('RoomRecordManager', () => {
     fireEvent.click(screen.getByRole('button', { name: '返回首页' }));
     expect(onCreateRoom).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('opens the same statistics report in a modal from every record row', async () => {
+    render(
+      <RoomRecordManager
+        runtime={runtime()}
+        onCreateRoom={vi.fn()}
+        onClose={vi.fn()}
+        onRecovered={vi.fn()}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '查看统计' }));
+    expect(
+      await screen.findByRole('heading', { name: '牌局战报' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('周末牌局')).toBeInTheDocument();
   });
 
   it('opens the recovered host session instead of leaving the host in records', async () => {

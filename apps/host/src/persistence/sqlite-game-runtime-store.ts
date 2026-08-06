@@ -53,6 +53,11 @@ export class SqliteGameRuntimeStore {
     });
   }
 
+  loadLatestState(roomId: string): RoomRecoveryState | null {
+    const parsedRoomId = IdSchema.parse(roomId);
+    return this.#snapshots.latest(parsedRoomId)?.state ?? null;
+  }
+
   save(runtime: GameRuntimeStateExport, updatedAtMs: number): void {
     if (runtime.room.phase === 'closed') {
       this.#lifecycle.markNormallyClosed(runtime.room, updatedAtMs);

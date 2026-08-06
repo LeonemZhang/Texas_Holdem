@@ -497,6 +497,7 @@ export function GameRoom({
           open={statisticsOpen}
           players={statistics}
           titles={snapshot.statistics.titles}
+          handPeaks={snapshot.statistics.handPeaks ?? undefined}
           collapsed={statisticsCollapsed}
           onCollapse={() => setStatisticsCollapsed(true)}
           onExpand={() => setStatisticsCollapsed(false)}
@@ -727,6 +728,7 @@ export function GameRoom({
               open
               players={statistics}
               titles={snapshot.statistics.titles}
+              handPeaks={snapshot.statistics.handPeaks ?? undefined}
               onCollapse={closeUtilityPanel}
             />
           ) : null

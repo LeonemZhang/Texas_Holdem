@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { IdSchema } from './primitives.js';
 import { RoomSettingsSchema } from './room-commands.js';
 import { PROTOCOL_VERSION } from './system.js';
+import { HandTypeSchema } from './player-snapshot.js';
 
 export const RoomRecordStatusSchema = z.enum([
   'running',
@@ -75,6 +76,65 @@ export const GetRoomRecordRequestSchema = ManagementRequestSchema.extend({
   roomId: IdSchema,
 });
 
+export const GetRoomRecordStatisticsRequestSchema =
+  ManagementRequestSchema.extend({
+    type: z.literal('room-record.statistics'),
+    roomId: IdSchema,
+  });
+
+const StatisticsPlayerSchema = z.object({
+  playerId: IdSchema,
+  nickname: z.string().trim().min(1),
+  initialChips: z.number().int().nonnegative().safe(),
+  currentChips: z.number().int().nonnegative().safe(),
+  netWinLoss: z.number().int().safe(),
+  participatedHands: z.number().int().nonnegative().safe(),
+  wonHands: z.number().int().nonnegative().safe(),
+  largestSingleHandProfit: z.number().int().nonnegative().safe(),
+  largestSingleHandLoss: z.number().int().nonnegative().safe(),
+  showdownCount: z.number().int().nonnegative().safe(),
+  showdownWinRate: z.number().min(0).max(1).nullable(),
+  actions: z.object({
+    fold: z.number().int().nonnegative().safe(),
+    check: z.number().int().nonnegative().safe(),
+    call: z.number().int().nonnegative().safe(),
+    raiseTo: z.number().int().nonnegative().safe(),
+    allIn: z.number().int().nonnegative().safe(),
+  }),
+});
+
+export const RoomRecordStatisticsSchema = z.object({
+  players: z.array(StatisticsPlayerSchema),
+  titles: z.array(
+    z.object({
+      title: z.string().trim().min(1),
+      playerIds: z.array(IdSchema),
+      value: z.number().nonnegative().nullable(),
+    }),
+  ),
+  handPeaks: z.object({
+    global: z
+      .object({
+        handType: HandTypeSchema,
+        playerIds: z.array(IdSchema),
+        bestFiveCards: z
+          .array(z.string().regex(/^[2-9TJQKA][cdhs]$/))
+          .length(5),
+      })
+      .nullable(),
+    players: z.array(
+      z.object({
+        playerId: IdSchema,
+        handType: HandTypeSchema,
+        bestFiveCards: z
+          .array(z.string().regex(/^[2-9TJQKA][cdhs]$/))
+          .length(5),
+      }),
+    ),
+    hasLegacyCoverageGap: z.boolean(),
+  }),
+});
+
 export const RoomRecordManagementRequestSchema = z.discriminatedUnion('type', [
   ListRoomRecordsRequestSchema,
   CreateRoomRecordRequestSchema,
@@ -84,6 +144,7 @@ export const RoomRecordManagementRequestSchema = z.discriminatedUnion('type', [
   RestoreRoomRecordRequestSchema,
   DeleteRoomRecordRequestSchema,
   GetRoomRecordRequestSchema,
+  GetRoomRecordStatisticsRequestSchema,
 ]);
 
 export const RoomRecordManagementResponseSchema = z.discriminatedUnion(
@@ -132,6 +193,10 @@ export type DeleteRoomRecordRequest = z.infer<
   typeof DeleteRoomRecordRequestSchema
 >;
 export type GetRoomRecordRequest = z.infer<typeof GetRoomRecordRequestSchema>;
+export type GetRoomRecordStatisticsRequest = z.infer<
+  typeof GetRoomRecordStatisticsRequestSchema
+>;
+export type RoomRecordStatistics = z.infer<typeof RoomRecordStatisticsSchema>;
 export type RoomRecordManagementRequest = z.infer<
   typeof RoomRecordManagementRequestSchema
 >;

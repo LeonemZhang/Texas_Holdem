@@ -41,6 +41,8 @@ const bridge: DesktopBridge = Object.freeze({
     ipcRenderer.invoke('room-records:restore', roomId),
   deleteRoomRecord: (roomId: string) =>
     ipcRenderer.invoke('room-records:delete', roomId),
+  getRoomRecordStatistics: (roomId: string) =>
+    ipcRenderer.invoke('room-records:statistics', roomId),
   copyImageToClipboard: (imageDataUrl: string) =>
     ipcRenderer.invoke(
       'clipboard:write-image',

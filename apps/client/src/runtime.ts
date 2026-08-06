@@ -1,4 +1,7 @@
-import type { RoomSessionResponse } from '@texas-holdem/protocol';
+import type {
+  RoomRecordStatistics,
+  RoomSessionResponse,
+} from '@texas-holdem/protocol';
 
 export type RuntimeKind = 'browser' | 'desktop';
 
@@ -33,6 +36,7 @@ export interface RuntimeAdapter {
   archiveRoomRecord(roomId: string): Promise<void>;
   restoreRoomRecord(roomId: string): Promise<void>;
   deleteRoomRecord(roomId: string): Promise<void>;
+  getRoomRecordStatistics?(roomId: string): Promise<RoomRecordStatistics>;
   copyImageToClipboard?(imageDataUrl: string): Promise<void>;
   onHostServiceExited(
     listener: (event: HostServiceExitEvent) => void,
@@ -139,6 +143,9 @@ const browserAdapter: RuntimeAdapter = {
     throw new Error('浏览器不能管理对局记录');
   },
   async deleteRoomRecord() {
+    throw new Error('浏览器不能管理对局记录');
+  },
+  async getRoomRecordStatistics() {
     throw new Error('浏览器不能管理对局记录');
   },
   onHostServiceExited() {

@@ -728,4 +728,47 @@ describe('GameRuntime', () => {
     expect(after?.statistics).toEqual(before.statistics);
     recovered.dispose();
   });
+
+  it('keeps unfinished-hand action facts in a recovery snapshot', () => {
+    const summaries: HandSummaryEvent[] = [];
+    const facts: StatisticsFactEvent[] = [];
+    const store: StatisticsFactStorePort = {
+      saveSummary: (_roomId, _sequence, summary) => summaries.push(summary),
+      saveFacts: (_roomId, stored: readonly StoredStatisticsFact[]) =>
+        facts.push(...stored.map(({ event }) => event)),
+      loadSummaries: () => summaries,
+      loadFacts: () => facts,
+    };
+    const runtime = new GameRuntime({ statisticsStore: store });
+    const context = reachHandReady(runtime);
+    context.send(context.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    context.send(context.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    const actorId = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!.game!.currentActorId!;
+    context.send(actorId, { type: 'game.call' });
+    const before = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!;
+    const exported = runtime.exportState(context.host.roomId)!;
+    expect(exported.pendingStatisticsFacts).toHaveLength(1);
+    runtime.dispose();
+
+    const recovered = new GameRuntime({ statisticsStore: store });
+    recovered.restore(exported, exported.sequence);
+    const after = recovered.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!;
+    expect(after.statistics).toEqual(before.statistics);
+    recovered.dispose();
+  });
 });

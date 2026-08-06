@@ -70,10 +70,11 @@ const snapshot = {
       {
         playerId: 'p1',
         currentChips: 99,
+        netWinLoss: -1,
         participatedHands: 0,
         wonHands: 0,
         largestSingleHandProfit: 0,
-        largestWonPot: 0,
+        largestSingleHandLoss: 0,
         showdownCount: 0,
         showdownWinRate: null,
         actions: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },

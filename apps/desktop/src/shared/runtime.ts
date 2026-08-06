@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import type { RoomRecordStatistics } from '@texas-holdem/protocol' with {
+  'resolution-mode': 'import',
+};
 
 export interface DesktopRuntimeInfo {
   kind: 'desktop';
@@ -26,6 +29,7 @@ export interface DesktopBridge {
   archiveRoomRecord(roomId: string): Promise<void>;
   restoreRoomRecord(roomId: string): Promise<void>;
   deleteRoomRecord(roomId: string): Promise<void>;
+  getRoomRecordStatistics(roomId: string): Promise<RoomRecordStatistics>;
   copyImageToClipboard(imageDataUrl: string): Promise<void>;
   onHostServiceExited(
     listener: (event: HostServiceExitEvent) => void,

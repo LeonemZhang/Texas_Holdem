@@ -10,6 +10,17 @@ import {
 } from './primitives.js';
 
 const CardCodeSchema = z.string().regex(/^[2-9TJQKA][cdhs]$/);
+export const HandTypeSchema = z.enum([
+  'high-card',
+  'one-pair',
+  'two-pair',
+  'three-of-a-kind',
+  'straight',
+  'flush',
+  'full-house',
+  'four-of-a-kind',
+  'straight-flush',
+]);
 const StreetPotSchema = z.object({
   street: z.enum(['preflop', 'flop', 'turn', 'river']),
   amount: AmountSchema,
@@ -126,17 +137,7 @@ export const PlayerSnapshotSchema = z.object({
             .array(
               z.object({
                 playerId: IdSchema,
-                handType: z.enum([
-                  'high-card',
-                  'one-pair',
-                  'two-pair',
-                  'three-of-a-kind',
-                  'straight',
-                  'flush',
-                  'full-house',
-                  'four-of-a-kind',
-                  'straight-flush',
-                ]),
+                handType: HandTypeSchema,
                 bestFiveCards: z.array(CardCodeSchema).length(5),
               }),
             )
@@ -183,10 +184,11 @@ export const PlayerSnapshotSchema = z.object({
       z.object({
         playerId: IdSchema,
         currentChips: AmountSchema,
+        netWinLoss: z.number().int().safe(),
         participatedHands: AmountSchema,
         wonHands: AmountSchema,
         largestSingleHandProfit: AmountSchema,
-        largestWonPot: AmountSchema,
+        largestSingleHandLoss: AmountSchema,
         showdownCount: AmountSchema,
         showdownWinRate: z.number().min(0).max(1).nullable(),
         actions: z.object({
@@ -205,9 +207,29 @@ export const PlayerSnapshotSchema = z.object({
         value: z.number().nonnegative().nullable(),
       }),
     ),
+    handPeaks: z
+      .object({
+        global: z
+          .object({
+            handType: HandTypeSchema,
+            playerIds: z.array(IdSchema),
+            bestFiveCards: z.array(CardCodeSchema).length(5),
+          })
+          .nullable(),
+        players: z.array(
+          z.object({
+            playerId: IdSchema,
+            handType: HandTypeSchema,
+            bestFiveCards: z.array(CardCodeSchema).length(5),
+          }),
+        ),
+        hasLegacyCoverageGap: z.boolean(),
+      })
+      .optional(),
   }),
 });
 
 export type LegalActions = z.infer<typeof LegalActionsSchema>;
 export type ChipActivity = z.infer<typeof ChipActivitySchema>;
 export type PlayerSnapshot = z.infer<typeof PlayerSnapshotSchema>;
+export type HandType = z.infer<typeof HandTypeSchema>;

@@ -43,10 +43,11 @@ function snapshot(overrides: Partial<PlayerSnapshot> = {}): PlayerSnapshot {
         {
           playerId: 'alice',
           currentChips: 100,
+          netWinLoss: 0,
           participatedHands: 1,
           wonHands: 0,
           largestSingleHandProfit: 0,
-          largestWonPot: 0,
+          largestSingleHandLoss: 0,
           showdownCount: 0,
           showdownWinRate: null,
           actions: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },

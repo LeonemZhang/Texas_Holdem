@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import {
   BettingCommandSchema,
   PROTOCOL_VERSION,
+  RoomRecordStatisticsSchema,
   type CommandResponse,
   type ChipActivity,
   type CreateRoomSessionRequest,
@@ -33,6 +34,7 @@ import {
   type SessionIdentity,
 } from './session-authenticator.js';
 import { projectPlayerSnapshot } from './snapshot-projector.js';
+import { createStatisticsView } from './statistics-view.js';
 import type { HandSummaryEvent } from '@texas-holdem/poker-core';
 import type { RoomRecoveryState } from './persistence-ports.js';
 import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
@@ -237,6 +239,11 @@ export class GameRuntime implements RoomSessionBootstrapService {
     }
     this.#roomHandler.restoreState(state);
     this.#chipActivity.set(state.room.roomId, state.chipActivity);
+    for (const fact of state.pendingStatisticsFacts ?? []) {
+      const facts = this.#facts.get(fact.event.handId) ?? [];
+      facts.push(fact);
+      this.#facts.set(fact.event.handId, facts);
+    }
     this.#sequences.set(state.room.roomId, sequence);
     if (this.#statisticsStore) {
       this.#completedHands.set(
@@ -289,6 +296,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       handReady: this.#roomHandler.getHandReady(roomId),
       chipRequests: this.#roomHandler.getChipRequests(roomId),
       chipActivity: this.#chipActivity.get(roomId) ?? Object.freeze([]),
+      pendingStatisticsFacts: Object.freeze([...this.#facts.values()].flat()),
       sequence: this.#sequences.get(roomId) ?? 0,
       reconnectTokens: Object.freeze(
         Object.fromEntries(this.#reconnectTokens.get(roomId) ?? []),
@@ -453,6 +461,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       scheduledAction.actorId === hand.betting.currentActorId
         ? scheduledAction.deadlineMs
         : null;
+    const statisticsView = createStatisticsView(room, rebuilt);
     return projectPlayerSnapshot({
       room,
       viewerPlayerId: playerId,
@@ -463,28 +472,30 @@ export class GameRuntime implements RoomSessionBootstrapService {
       chipRequests: this.#roomHandler.getChipRequests(roomId),
       chipActivity: this.#chipActivity.get(roomId) ?? Object.freeze([]),
       completedHands: this.#completedHands.get(roomId) ?? 0,
-      statistics: room.players.map((player) => ({
-        playerId: player.playerId,
-        currentChips: player.chips,
-        participatedHands:
-          rebuilt.basic[player.playerId]?.participatedHands ?? 0,
-        wonHands: rebuilt.basic[player.playerId]?.wonHands ?? 0,
-        largestSingleHandProfit:
-          rebuilt.outcomes[player.playerId]?.largestSingleHandProfit ?? 0,
-        largestWonPot: rebuilt.basic[player.playerId]?.largestWonPot ?? 0,
-        showdownCount: rebuilt.outcomes[player.playerId]?.showdownCount ?? 0,
-        showdownWinRate:
-          rebuilt.outcomes[player.playerId]?.showdownWinRate ?? null,
-        actions: rebuilt.basic[player.playerId]?.actionCounts ?? {
-          fold: 0,
-          check: 0,
-          call: 0,
-          raiseTo: 0,
-          allIn: 0,
-        },
-      })),
-      titles: rebuilt.titles,
+      statistics: statisticsView.players,
+      titles: statisticsView.titles,
+      handPeaks: statisticsView.handPeaks,
     });
+  }
+
+  statisticsForRoom(roomId: string) {
+    const room = this.rooms.get(roomId);
+    const viewer = room?.players[0];
+    if (!room || !viewer) return null;
+    const snapshot = this.snapshot(roomId, viewer.playerId);
+    return snapshot
+      ? RoomRecordStatisticsSchema.parse({
+          players: snapshot.statistics.players.map((player) => ({
+            ...player,
+            nickname:
+              room.players.find(({ playerId }) => playerId === player.playerId)
+                ?.nickname ?? player.playerId,
+            initialChips: room.settings.initialChips,
+          })),
+          titles: snapshot.statistics.titles,
+          handPeaks: snapshot.statistics.handPeaks,
+        })
+      : null;
   }
 
   snapshotsForRoom(roomId: string): readonly PlayerSnapshot[] {

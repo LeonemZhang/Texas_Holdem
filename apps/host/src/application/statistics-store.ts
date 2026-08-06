@@ -14,6 +14,10 @@ import {
   type OutcomePlayerStatistics,
 } from '../statistics/outcome-statistics.js';
 import { computeFunTitles, type TitleAward } from '../statistics/titles.js';
+import {
+  reduceHandPeakStatistics,
+  type HandPeakStatistics,
+} from '../statistics/hand-peak-statistics.js';
 
 export interface StoredStatisticsFact {
   readonly factId: string;
@@ -41,6 +45,7 @@ export interface RebuiltStatistics {
   readonly outcomes: Readonly<Record<string, OutcomePlayerStatistics>>;
   readonly facts: Readonly<Record<string, FactPlayerStatistics>>;
   readonly titles: readonly TitleAward[];
+  readonly handPeaks: HandPeakStatistics;
 }
 
 export function rebuildStatistics(
@@ -62,5 +67,6 @@ export function rebuildStatistics(
     outcomes,
     facts: factStatistics,
     titles: computeFunTitles(basic, outcomes, factStatistics),
+    handPeaks: reduceHandPeakStatistics(playerIds, summaries),
   });
 }

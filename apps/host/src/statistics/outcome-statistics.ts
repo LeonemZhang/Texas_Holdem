@@ -6,6 +6,7 @@ export interface OutcomePlayerStatistics {
   readonly showdownWins: number;
   readonly showdownWinRate: number | null;
   readonly largestSingleHandProfit: number;
+  readonly largestSingleHandLoss: number;
   readonly uncontestedWins: number;
 }
 
@@ -21,6 +22,7 @@ export function reduceOutcomeStatistics(
         showdownCount: 0,
         showdownWins: 0,
         largestSingleHandProfit: 0,
+        largestSingleHandLoss: 0,
         uncontestedWins: 0,
       },
     ]),
@@ -41,6 +43,10 @@ export function reduceOutcomeStatistics(
         largestSingleHandProfit: Math.max(
           current.largestSingleHandProfit,
           summary.netChanges[playerId] ?? 0,
+        ),
+        largestSingleHandLoss: Math.max(
+          current.largestSingleHandLoss,
+          -(summary.netChanges[playerId] ?? 0),
         ),
         uncontestedWins:
           current.uncontestedWins +
