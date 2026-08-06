@@ -7,6 +7,7 @@ import { PlayingCard } from '../table/CardsAndPots.js';
 export interface PlayerStatisticsView {
   readonly playerId: string;
   readonly nickname: string;
+  readonly removed?: boolean | undefined;
   readonly initialChips: number;
   readonly currentChips: number;
   readonly netWinLoss: number;
@@ -138,9 +139,11 @@ export function StatisticsPanel({
         </button>
       </aside>
     );
-  const ranked = [...players].sort(
-    (left, right) => right.currentChips - left.currentChips,
-  );
+  const ranked = [...players].sort((left, right) => {
+    const removedOrder =
+      Number(Boolean(left.removed)) - Number(Boolean(right.removed));
+    return removedOrder || right.currentChips - left.currentChips;
+  });
   const nicknames = new Map(
     players.map((player) => [player.playerId, player.nickname]),
   );

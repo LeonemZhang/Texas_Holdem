@@ -62,7 +62,7 @@ describe('RoomCommandHandler', () => {
     room = rooms.get('room-1');
     expect(
       room?.players.find(({ playerId }) => playerId === 'bob')?.status,
-    ).toBe('left');
+    ).toBe('removed');
   });
 
   it('maps first-hand start, pause and resume after the lobby is ready', () => {

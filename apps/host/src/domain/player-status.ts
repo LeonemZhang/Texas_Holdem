@@ -47,11 +47,7 @@ export function removePlayer(
   if (!target || ['left', 'removed'].includes(target.status)) {
     throw new RangeError(`Player cannot be removed: ${targetPlayerId}`);
   }
-  return updateStatus(
-    room,
-    targetPlayerId,
-    room.firstHandStarted ? 'removed' : 'left',
-  );
+  return updateStatus(room, targetPlayerId, 'removed');
 }
 
 export function sitOutPlayerForHand(

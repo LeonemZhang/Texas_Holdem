@@ -16,6 +16,7 @@ export const JoinRoomSessionRequestSchema = z.object({
 export const ResumeRoomSessionRequestSchema = z.object({
   playerId: IdSchema,
   token: z.string().min(16),
+  nickname: z.string().trim().min(1).max(40).optional(),
 });
 
 export const RoomSessionResponseSchema = z.object({

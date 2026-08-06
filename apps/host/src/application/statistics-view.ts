@@ -27,6 +27,7 @@ export function createStatisticsView(
     players: room.players.map((player) => ({
       playerId: player.playerId,
       nickname: player.nickname,
+      removed: player.status === 'removed',
       initialChips: room.settings.initialChips,
       currentChips: player.chips,
       netWinLoss: rebuilt.basic[player.playerId]?.netWinLoss ?? 0,

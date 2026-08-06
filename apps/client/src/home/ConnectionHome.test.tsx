@@ -85,6 +85,21 @@ describe('ConnectionHome', () => {
     expect(props.onJoin).toHaveBeenCalledWith('Bob');
   });
 
+  it('shows the original nickname when a lobby recovery is waiting for confirmation', () => {
+    const props = {
+      ...handlers(),
+      joinReady: true,
+      initialNickname: 'Alice',
+      resumeNicknameChange: true,
+    };
+    render(<ConnectionHome runtimeKind="browser" {...props} />);
+
+    expect(screen.getByText('恢复原身份')).toBeInTheDocument();
+    expect(screen.getByLabelText('玩家昵称')).toHaveValue('Alice');
+    fireEvent.click(screen.getByRole('button', { name: '确认恢复' }));
+    expect(props.onJoin).toHaveBeenCalledWith('Alice');
+  });
+
   it('shows a running local room above direct joining and delegates recovery', () => {
     const props = {
       ...handlers(),

@@ -149,7 +149,11 @@ describe('host framework server', () => {
     const resumed = await activeHost.app.inject({
       method: 'POST',
       url: `/api/rooms/${host.roomId}/resume`,
-      payload: { playerId: guest.playerId, token: guest.token },
+      payload: {
+        playerId: guest.playerId,
+        token: guest.token,
+        nickname: 'Bobby',
+      },
     });
 
     expect(resumed.statusCode).toBe(200);
@@ -158,7 +162,7 @@ describe('host framework server', () => {
       runtime
         .snapshot(host.roomId, host.playerId)
         ?.room.players.find(({ playerId }) => playerId === guest.playerId),
-    ).toMatchObject({ chips: 100, status: 'waiting' });
+    ).toMatchObject({ nickname: 'Bobby', chips: 100, status: 'waiting' });
   });
 
   it('returns a permanent removal error when an in-game player tries to recover', async () => {

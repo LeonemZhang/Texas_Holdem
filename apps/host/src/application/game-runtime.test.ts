@@ -318,7 +318,7 @@ describe('GameRuntime', () => {
     expect(exit.status).toBe('accepted');
     const restored = runtime.resume(
       host.roomId,
-      { playerId: guest.playerId, token: guest.token },
+      { playerId: guest.playerId, token: guest.token, nickname: 'Bobby' },
       'http://10.126.126.1:32100',
     );
 
@@ -331,7 +331,12 @@ describe('GameRuntime', () => {
       runtime
         .snapshot(host.roomId, host.playerId)
         ?.room.players.find(({ playerId }) => playerId === guest.playerId),
-    ).toMatchObject({ seatIndex: 1, chips: 100, status: 'waiting' });
+    ).toMatchObject({
+      nickname: 'Bobby',
+      seatIndex: 1,
+      chips: 100,
+      status: 'waiting',
+    });
     expect(() =>
       runtime.resume(
         host.roomId,
@@ -342,7 +347,77 @@ describe('GameRuntime', () => {
     runtime.dispose();
   });
 
-  it('allows a lobby player removed by the host to recover the same identity', () => {
+  it('recovers an in-game voluntary exit as sitting out for the current hand', () => {
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime);
+    context.send(context.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    context.send(context.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)?.room.phase,
+    ).toBe('playing');
+    const exit = context.send(context.guest.playerId, {
+      type: 'room.exit',
+    });
+
+    expect(exit).toMatchObject({ status: 'accepted' });
+    expect(
+      runtime
+        .snapshot(context.host.roomId, context.host.playerId)
+        ?.room.players.find(
+          ({ playerId }) => playerId === context.guest.playerId,
+        ),
+    ).toMatchObject({
+      seatIndex: 1,
+      status: 'left',
+    });
+    expect(() =>
+      runtime.resume(
+        context.host.roomId,
+        {
+          playerId: context.guest.playerId,
+          token: context.guest.token,
+          nickname: 'Guest 2',
+        },
+        'http://10.126.126.1:32100',
+      ),
+    ).toThrow('Nickname can only be changed while recovering to the lobby');
+    expect(
+      runtime.resume(
+        context.host.roomId,
+        {
+          playerId: context.guest.playerId,
+          token: context.guest.token,
+        },
+        'http://10.126.126.1:32100',
+      ),
+    ).toMatchObject({ playerId: context.guest.playerId });
+    expect(
+      runtime
+        .snapshot(context.host.roomId, context.host.playerId)
+        ?.room.players.find(
+          ({ playerId }) => playerId === context.guest.playerId,
+        ),
+    ).toMatchObject({ status: 'sitting-out' });
+    expect(
+      runtime.snapshot(context.host.roomId, context.guest.playerId)?.game
+        ?.legalActions,
+    ).toBeNull();
+    expect(
+      context.send(context.guest.playerId, {
+        type: 'game.raise-to',
+        amount: 10,
+      }),
+    ).toMatchObject({ status: 'unauthorized' });
+    runtime.dispose();
+  });
+
+  it('rejects recovery after a host removes a lobby player', () => {
     const runtime = new GameRuntime();
     const host = runtime.create(
       { hostNickname: 'Alice', settings },
@@ -369,19 +444,19 @@ describe('GameRuntime', () => {
       runtime
         .snapshot(host.roomId, host.playerId)
         ?.room.players.find(({ playerId }) => playerId === guest.playerId),
-    ).toMatchObject({ status: 'left' });
+    ).toMatchObject({ status: 'removed' });
     expect(
+      runtime
+        .statisticsForRoom(host.roomId)
+        ?.players.find(({ playerId }) => playerId === guest.playerId),
+    ).toMatchObject({ removed: true });
+    expect(() =>
       runtime.resume(
         host.roomId,
         { playerId: guest.playerId, token: guest.token },
         'http://10.126.126.1:32100',
       ),
-    ).toMatchObject({ playerId: guest.playerId });
-    expect(
-      runtime
-        .snapshot(host.roomId, host.playerId)
-        ?.room.players.find(({ playerId }) => playerId === guest.playerId),
-    ).toMatchObject({ status: 'waiting', playerId: guest.playerId });
+    ).toThrow('Player was removed from this room');
     runtime.dispose();
   });
 
@@ -422,6 +497,20 @@ describe('GameRuntime', () => {
         )!.stateVersion,
         type: 'hand-ready.set-choice',
         choice: 'ready',
+      }),
+    ).toMatchObject({ status: 'unauthorized' });
+    expect(
+      runtime.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: 'removed-raise',
+        roomId: context.host.roomId,
+        playerId: context.guest.playerId,
+        expectedVersion: runtime.snapshot(
+          context.host.roomId,
+          context.guest.playerId,
+        )!.stateVersion,
+        type: 'game.raise-to',
+        amount: 10,
       }),
     ).toMatchObject({ status: 'unauthorized' });
     expect(
@@ -677,6 +766,55 @@ describe('GameRuntime', () => {
       street: 'flop',
       actionDeadlineMs: 3_000,
     });
+    runtime.dispose();
+  });
+
+  it('uses the normal timeout action for a player who left during the hand', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime);
+    context.send(context.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    context.send(context.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+
+    let actorId = runtime.snapshot(context.host.roomId, context.host.playerId)!
+      .game!.currentActorId!;
+    if (actorId === context.host.playerId) {
+      expect(context.send(actorId, { type: 'game.call' })).toMatchObject({
+        status: 'accepted',
+      });
+      actorId = runtime.snapshot(context.host.roomId, context.host.playerId)!
+        .game!.currentActorId!;
+    }
+    expect(actorId).toBe(context.guest.playerId);
+    expect(
+      context.send(context.guest.playerId, { type: 'room.exit' }),
+    ).toMatchObject({ status: 'accepted' });
+
+    const automatic = vi.fn();
+    runtime.onAutomaticStateChange(automatic);
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    const afterTimeout = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!;
+    expect(
+      afterTimeout.room.players.find(
+        ({ playerId }) => playerId === context.guest.playerId,
+      ),
+    ).toMatchObject({ status: 'left' });
+    expect(
+      afterTimeout.room.phase === 'hand-ready' ||
+        afterTimeout.game?.currentActorId !== context.guest.playerId,
+    ).toBe(true);
+    expect(automatic).toHaveBeenCalledWith(context.host.roomId);
     runtime.dispose();
   });
 

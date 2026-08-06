@@ -66,7 +66,7 @@ export function ExitRoomAction({
           onCancel={() => setConfirming(false)}
         >
           <strong>确认主动退出房间？</strong>
-          <p>退出后将清除本机重连身份；关闭网页则不会清除。</p>
+          <p>退出后仍可用原设备恢复；关闭网页则按意外掉线处理。</p>
         </ModalDialog>
       ) : null}
     </div>

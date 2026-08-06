@@ -32,6 +32,11 @@ interface JoinTarget {
   readonly roomId: string;
 }
 
+interface PendingLobbyResume {
+  readonly roomId: string;
+  readonly nickname: string;
+}
+
 type DesktopSetupMode = 'create';
 type HomeDataPage = 'discovery' | 'diagnostics';
 
@@ -84,6 +89,8 @@ export function App() {
   const [managingRecords, setManagingRecords] = useState(false);
   const [homeDataPage, setHomeDataPage] = useState<HomeDataPage | null>(null);
   const [joinTarget, setJoinTarget] = useState<JoinTarget | null>(null);
+  const [pendingLobbyResume, setPendingLobbyResume] =
+    useState<PendingLobbyResume | null>(null);
   const [session, setSession] = useState<RoomSessionResponse | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const roomCommand = useRef<
@@ -104,6 +111,7 @@ export function App() {
     }
     setSession(created);
     setJoinTarget(null);
+    setPendingLobbyResume(null);
     void adapter.setWindowRoomContext({ inRoom: true, isHost });
   }
 
@@ -254,6 +262,10 @@ export function App() {
       const roomId =
         url.searchParams.get('room') ??
         (await new RoomSessionClient(url.origin).currentRoomId());
+      if (pendingLobbyResume?.roomId === roomId) {
+        setJoinTarget({ baseUrl: url.origin, roomId });
+        return true;
+      }
       if (await restoreStoredSession(url.origin, roomId)) return false;
       setJoinTarget({ baseUrl: url.origin, roomId });
       return true;
@@ -272,18 +284,47 @@ export function App() {
       return;
     }
     try {
-      const joined = await new RoomSessionClient(joinTarget.baseUrl).join(
-        joinTarget.roomId,
-        { nickname },
-      );
+      const client = new RoomSessionClient(joinTarget.baseUrl);
+      const pendingResume =
+        pendingLobbyResume?.roomId === joinTarget.roomId
+          ? pendingLobbyResume
+          : null;
+      let joined: RoomSessionResponse;
+      if (pendingResume) {
+        const stored = browserReconnectSessionStore().load(joinTarget.roomId);
+        if (!stored) {
+          setPendingLobbyResume(null);
+          setJoinTarget(null);
+          setJoinError('本机恢复身份已失效，请重新加入房间。');
+          return;
+        }
+        joined = await client.resume(joinTarget.roomId, {
+          playerId: stored.playerId,
+          token: stored.token,
+          nickname,
+        });
+      } else {
+        joined = await client.join(joinTarget.roomId, { nickname });
+      }
       saveSession(joined, false);
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : null;
+      if (
+        reason instanceof RoomSessionRequestError &&
+        reason.code === 'PLAYER_REMOVED'
+      ) {
+        browserReconnectSessionStore().clear(joinTarget.roomId);
+        forgetBrowserRoomInUrl(joinTarget.roomId);
+        setPendingLobbyResume(null);
+        setJoinTarget(null);
+        setJoinError('你已被房主移出房间，无法重新加入本场对局。');
+        return;
+      }
       setJoinError(
         message === 'Room is not accepting new players'
           ? '对局已经开始：只有原玩家可使用本机保存的身份恢复，不能以新昵称加入。'
           : message?.startsWith('Nickname already exists:')
-            ? '该昵称已被房间中的原玩家保留，请在原设备恢复或使用其他昵称。'
+            ? '该昵称已被房间中的其他玩家使用，请更换昵称。'
             : networkErrorMessage(message),
       );
     }
@@ -362,17 +403,24 @@ export function App() {
         onCommandPortChange={(port) => {
           roomCommand.current = port;
         }}
-        onExited={(reason) => {
-          if (
-            reason === 'closed' ||
-            reason === 'removed' ||
-            reason === 'left'
-          ) {
+        onExited={(reason, details) => {
+          if (reason === 'closed' || reason === 'removed') {
             browserReconnectSessionStore().clear(session.roomId);
             forgetBrowserRoomInUrl(session.roomId);
           }
+          setPendingLobbyResume(
+            reason === 'left' && details?.canChangeNickname
+              ? {
+                  roomId: session.roomId,
+                  nickname: details.nickname ?? '',
+                }
+              : null,
+          );
+          setJoinTarget(null);
           if (reason === 'removed') {
             setJoinError('你已被房主移出房间，无法重新加入本场对局。');
+          } else {
+            setJoinError(null);
           }
           setSession(null);
           void adapter.setWindowRoomContext({ inRoom: false, isHost: false });
@@ -408,6 +456,10 @@ export function App() {
             ? { onOpenDiagnostics: () => setHomeDataPage('diagnostics') }
             : {})}
           joinReady={joinTarget !== null}
+          {...(pendingLobbyResume
+            ? { initialNickname: pendingLobbyResume.nickname }
+            : {})}
+          resumeNicknameChange={pendingLobbyResume !== null}
           joinError={joinError}
           runningRoomRecord={runningRoomRecord}
           recoveringRunningRoom={recoveringRunningRoom}

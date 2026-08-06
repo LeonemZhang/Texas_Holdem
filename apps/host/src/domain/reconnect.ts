@@ -115,7 +115,11 @@ export function reconnectPlayer(
   });
 }
 
-export function resumeLeftPlayer(room: RoomState, playerId: string): RoomState {
+export function resumeLeftPlayer(
+  room: RoomState,
+  playerId: string,
+  nickname?: string,
+): RoomState {
   if (room.phase === 'closed') throw new RangeError('Room is closed');
   const player = room.players.find(
     (candidate) => candidate.playerId === playerId,
@@ -123,12 +127,31 @@ export function resumeLeftPlayer(room: RoomState, playerId: string): RoomState {
   if (!player || player.status !== 'left') {
     throw new RangeError('Player is not waiting to resume');
   }
+  if (nickname !== undefined && room.phase !== 'lobby') {
+    throw new RangeError(
+      'Nickname can only be changed while recovering to the lobby',
+    );
+  }
+  const nextNickname =
+    nickname === undefined ? player.nickname : nickname.trim();
+  if (!nextNickname) throw new RangeError('Nickname cannot be empty');
+  if (
+    room.players.some(
+      (candidate) =>
+        candidate.playerId !== playerId &&
+        candidate.nickname.toLocaleLowerCase() ===
+          nextNickname.toLocaleLowerCase(),
+    )
+  ) {
+    throw new RangeError(`Nickname already exists: ${nextNickname}`);
+  }
   return freezeRoom({
     ...room,
     players: room.players.map((candidate) =>
       candidate.playerId === playerId
         ? {
             ...candidate,
+            nickname: nextNickname,
             status: room.phase === 'lobby' ? 'waiting' : 'sitting-out',
             lobbyReady: false,
           }

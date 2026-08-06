@@ -39,6 +39,22 @@ describe('room player statuses', () => {
     });
   });
 
+  it('keeps an in-game voluntary exit recoverable as left', () => {
+    const started = Object.freeze({
+      ...room(),
+      phase: 'playing' as const,
+      firstHandStarted: true,
+    });
+
+    const left = leaveRoom(started, 'bob');
+
+    expect(left.players[1]).toMatchObject({
+      playerId: 'bob',
+      seatIndex: 1,
+      status: 'left',
+    });
+  });
+
   it('keeps one-hand sitting out distinct from leaving and elimination', () => {
     const sittingOut = sitOutPlayerForHand(room(), 'bob');
     expect(sittingOut.players[1]?.status).toBe('sitting-out');
@@ -73,11 +89,11 @@ describe('room player statuses', () => {
     );
   });
 
-  it('lets only the host remove another player before the first hand', () => {
+  it('records a host kick as removed even before the first hand', () => {
     const removed = removePlayer(room(), 'host', 'bob');
     expect(removed.players[1]).toMatchObject({
       playerId: 'bob',
-      status: 'left',
+      status: 'removed',
       lobbyReady: false,
     });
     expect(() => removePlayer(room(), 'bob', 'host')).toThrow(

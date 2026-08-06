@@ -34,6 +34,9 @@ describe('ExitRoomAction', () => {
     expect(
       screen.getByRole('alertdialog', { name: '确认退出房间' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      '退出后仍可用原设备恢复',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '取消' }));
     expect(action).toHaveTextContent('×');

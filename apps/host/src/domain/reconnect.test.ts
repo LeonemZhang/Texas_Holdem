@@ -92,12 +92,56 @@ describe('reconnection identity', () => {
       ),
     });
 
-    expect(resumeLeftPlayer(left, 'bob').players[1]).toMatchObject({
+    const resumed = resumeLeftPlayer(left, 'bob', 'Bobby');
+    expect(resumed.players[1]).toMatchObject({
       playerId: 'bob',
+      nickname: 'Bobby',
       seatIndex: 1,
       chips: 37,
       status: 'waiting',
       lobbyReady: false,
     });
+    expect(resumed.players).toHaveLength(2);
+  });
+
+  it('rejects a lobby recovery nickname that conflicts with another player', () => {
+    const { room } = context();
+    const left = Object.freeze({
+      ...room,
+      phase: 'lobby' as const,
+      players: Object.freeze(
+        room.players.map((player) =>
+          player.playerId === 'bob'
+            ? Object.freeze({ ...player, status: 'left' as const })
+            : player,
+        ),
+      ),
+    });
+
+    expect(() => resumeLeftPlayer(left, 'bob', 'alice')).toThrow(
+      'Nickname already exists: alice',
+    );
+    expect(left.players[1]).toMatchObject({
+      nickname: 'Bob',
+      status: 'left',
+    });
+  });
+
+  it('does not allow an in-game recovery to change the nickname', () => {
+    const { room } = context();
+    const left = Object.freeze({
+      ...room,
+      players: Object.freeze(
+        room.players.map((player) =>
+          player.playerId === 'bob'
+            ? Object.freeze({ ...player, status: 'left' as const })
+            : player,
+        ),
+      ),
+    });
+
+    expect(() => resumeLeftPlayer(left, 'bob', 'Bobby')).toThrow(
+      'Nickname can only be changed while recovering to the lobby',
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 import { parseManualJoinAddress } from '@texas-holdem/lan-discovery/health';
 
@@ -12,6 +12,8 @@ export interface ConnectionHomeProps {
   readonly onRefreshRooms: () => void;
   readonly onOpenDiagnostics?: () => void;
   readonly joinReady: boolean;
+  readonly initialNickname?: string;
+  readonly resumeNicknameChange?: boolean;
   readonly joinError?: string | null;
   readonly runningRoomRecord?: RoomRecordSummary | null;
   readonly recoveringRunningRoom?: boolean;
@@ -30,6 +32,8 @@ export function ConnectionHome({
   onRefreshRooms,
   onOpenDiagnostics,
   joinReady,
+  initialNickname,
+  resumeNicknameChange = false,
   joinError = null,
   runningRoomRecord = null,
   recoveringRunningRoom = false,
@@ -42,8 +46,14 @@ export function ConnectionHome({
   const [address, setAddress] = useState(initialAddress);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const [nickname, setNickname] = useState('Bob');
+  const [nickname, setNickname] = useState(initialNickname ?? 'Bob');
   const desktop = runtimeKind === 'desktop';
+
+  useEffect(() => {
+    if (resumeNicknameChange && initialNickname !== undefined) {
+      setNickname(initialNickname);
+    }
+  }, [initialNickname, resumeNicknameChange]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -182,7 +192,12 @@ export function ConnectionHome({
         )}
         {joinReady ? (
           <div className="join-form__confirm" role="status">
-            <strong>牌桌连接正常</strong>
+            <strong>
+              {resumeNicknameChange ? '恢复原身份' : '牌桌连接正常'}
+            </strong>
+            {resumeNicknameChange ? (
+              <p className="form-help">使用原令牌恢复，不会创建新的座位。</p>
+            ) : null}
             <label htmlFor="join-nickname">玩家昵称</label>
             <div className="join-form__row">
               <input
@@ -197,7 +212,7 @@ export function ConnectionHome({
                 disabled={!nickname.trim()}
                 onClick={() => onJoin(nickname.trim())}
               >
-                确认加入
+                {resumeNicknameChange ? '确认恢复' : '确认加入'}
               </button>
             </div>
           </div>

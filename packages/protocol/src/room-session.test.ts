@@ -32,8 +32,20 @@ describe('room session bootstrap protocol', () => {
       ResumeRoomSessionRequestSchema.parse({
         playerId: 'bob',
         token: 'bob-reconnect-token-123456',
+        nickname: 'Bobby',
       }),
-    ).toEqual({ playerId: 'bob', token: 'bob-reconnect-token-123456' });
+    ).toEqual({
+      playerId: 'bob',
+      token: 'bob-reconnect-token-123456',
+      nickname: 'Bobby',
+    });
+    expect(
+      ResumeRoomSessionRequestSchema.safeParse({
+        playerId: 'bob',
+        token: 'bob-reconnect-token-123456',
+        nickname: '   ',
+      }).success,
+    ).toBe(false);
     expect(
       RoomSessionResponseSchema.parse({
         protocolVersion: PROTOCOL_VERSION,

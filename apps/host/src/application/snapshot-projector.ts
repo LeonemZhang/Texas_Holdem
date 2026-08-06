@@ -295,6 +295,7 @@ export function projectPlayerSnapshot(
             input.room.voluntarilyRevealedHoleCardPlayerIds,
           ),
           legalActions:
+            viewer.status === 'active' &&
             hand.betting.currentActorId === input.viewerPlayerId
               ? legalBettingActions(hand.betting, input.viewerPlayerId)
               : null,

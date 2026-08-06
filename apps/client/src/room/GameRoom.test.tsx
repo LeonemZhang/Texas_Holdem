@@ -364,6 +364,10 @@ describe('GameRoom', () => {
       ),
     );
     expect(onExited).toHaveBeenCalledOnce();
+    expect(onExited).toHaveBeenCalledWith('left', {
+      canChangeNickname: true,
+      nickname: 'Bob',
+    });
   });
 
   it('keeps an ordinary player in the room when voluntary exit is rejected', async () => {
@@ -573,7 +577,7 @@ describe('GameRoom', () => {
     expect(connection.sendCommand).not.toHaveBeenCalled();
   });
 
-  it('keeps a removed seat visible without offering it as a host removal target', async () => {
+  it('does not render a removed player on the table or offer removal again', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
     const connection: ConnectionAdapter = {
       connect: vi.fn(async () =>
@@ -615,7 +619,8 @@ describe('GameRoom', () => {
       />,
     );
 
-    expect(await screen.findByText('已退出')).toBeInTheDocument();
+    expect(await screen.findAllByText('Alice')).not.toHaveLength(0);
+    expect(screen.queryByText('Bob')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
     expect(screen.queryByRole('button', { name: '踢出 Bob' })).toBeNull();
   });
@@ -833,6 +838,66 @@ describe('GameRoom', () => {
     ).toHaveTextContent('Bob· 1,250 筹码输掉 20 筹码');
   });
 
+  it('does not render removed players on the poker table', async () => {
+    const playingSnapshot: PlayerSnapshot = {
+      ...snapshot,
+      playerId: 'host',
+      room: {
+        ...snapshot.room,
+        phase: 'playing',
+        players: snapshot.room.players.map((player) =>
+          player.playerId === 'bob'
+            ? { ...player, status: 'removed' as const }
+            : { ...player, status: 'active' as const },
+        ),
+      },
+      game: {
+        handId: 'hand-1',
+        street: 'preflop',
+        buttonPlayerId: 'host',
+        smallBlindPlayerId: 'host',
+        bigBlindPlayerId: 'bob',
+        currentActorId: 'host',
+        actionDeadlineMs: Date.now() + 30_000,
+        communityCards: [],
+        totalPot: 0,
+        streetPots: [],
+        ownHoleCards: ['As', 'Kd'],
+        showdownHoleCards: {},
+        legalActions: null,
+      },
+    };
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () => undefined),
+      disconnect: vi.fn(),
+      sendCommand: vi.fn(),
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        listener(playingSnapshot);
+        return () => undefined;
+      }),
+    };
+
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'host',
+          token: 'host-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+      />,
+    );
+
+    expect(await screen.findAllByText('Alice')).not.toHaveLength(0);
+    expect(screen.queryByText('Bob')).not.toBeInTheDocument();
+  });
+
   it('shows the server action countdown on the table felt', async () => {
     const playingSnapshot: PlayerSnapshot = {
       ...snapshot,
@@ -861,10 +926,17 @@ describe('GameRoom', () => {
       },
     };
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const onExited = vi.fn();
     const connection: ConnectionAdapter = {
       connect: vi.fn(async () => consumeSnapshot(playingSnapshot)),
       disconnect: vi.fn(),
-      sendCommand: vi.fn(),
+      sendCommand: vi.fn().mockResolvedValue({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: 'table-exit',
+        status: 'accepted',
+        stateVersion: 3,
+        sequence: 3,
+      }),
       requestResync: vi.fn(),
       onConnectionLost: vi.fn(() => () => undefined),
       onDomainEvent: vi.fn(() => () => undefined),
@@ -885,6 +957,7 @@ describe('GameRoom', () => {
           socketPath: '/socket.io',
         }}
         connectionFactory={() => connection}
+        onExited={onExited}
       />,
     );
 
@@ -895,6 +968,14 @@ describe('GameRoom', () => {
       '第 1 局 · 翻牌前 · 当前行动：Alice',
     );
     expect(screen.getByText('行动中')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '退出房间' }));
+    fireEvent.click(screen.getByRole('button', { name: '退出房间' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认退出' }));
+    await waitFor(() =>
+      expect(onExited).toHaveBeenCalledWith('left', {
+        canChangeNickname: false,
+      }),
+    );
   });
 
   it('shows a terminal closed-room state and returns without another command', async () => {

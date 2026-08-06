@@ -85,6 +85,7 @@ export const GetRoomRecordStatisticsRequestSchema =
 const StatisticsPlayerSchema = z.object({
   playerId: IdSchema,
   nickname: z.string().trim().min(1),
+  removed: z.boolean().optional(),
   initialChips: z.number().int().nonnegative().safe(),
   currentChips: z.number().int().nonnegative().safe(),
   netWinLoss: z.number().int().safe(),

@@ -33,6 +33,11 @@ export type CommandAuthorizer = (
   room: RoomState | null,
 ) => boolean;
 
+export interface CommandDispatchOptions {
+  /** Internal server automation may act for a player who has left. */
+  readonly bypassAuthorization?: boolean;
+}
+
 export class CommandDispatcher {
   private readonly results = new Map<string, CommandResponse>();
 
@@ -42,7 +47,10 @@ export class CommandDispatcher {
     private readonly handle: CommandHandler,
   ) {}
 
-  dispatch(input: unknown): CommandResponse {
+  dispatch(
+    input: unknown,
+    options: CommandDispatchOptions = {},
+  ): CommandResponse {
     const parsed = ClientCommandSchema.safeParse(input);
     if (!parsed.success) {
       const commandId =
@@ -88,7 +96,7 @@ export class CommandDispatcher {
         error: { code: 'CONFLICT', message: 'Room state version changed' },
       });
     }
-    if (!this.authorize(command, room)) {
+    if (!options.bypassAuthorization && !this.authorize(command, room)) {
       return this.remember(resultKey, {
         protocolVersion: PROTOCOL_VERSION,
         commandId: command.commandId,

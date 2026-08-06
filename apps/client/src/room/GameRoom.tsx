@@ -97,7 +97,13 @@ export interface GameRoomProps {
   readonly connectionFactory?: (
     session: RoomSessionResponse,
   ) => ConnectionAdapter;
-  readonly onExited?: (reason: 'left' | 'removed' | 'closed') => void;
+  readonly onExited?: (
+    reason: 'left' | 'removed' | 'closed',
+    details?: {
+      readonly canChangeNickname?: boolean;
+      readonly nickname?: string;
+    },
+  ) => void;
   readonly onHostRoomClosed?: () => Promise<void>;
   readonly onCommandPortChange?: (
     port: ((command: Record<string, unknown>) => Promise<boolean>) | null,
@@ -397,6 +403,9 @@ export function GameRoom({
   const statistics = snapshot.statistics.players.map((player) => ({
     ...player,
     nickname: names.get(player.playerId) ?? player.playerId,
+    removed:
+      snapshot.room.players.find(({ playerId }) => playerId === player.playerId)
+        ?.status === 'removed',
     initialChips: snapshot.room.initialChips,
   }));
 
@@ -450,7 +459,12 @@ export function GameRoom({
             type="button"
             onClick={() => {
               void send({ type: 'room.exit' }).then((accepted) => {
-                if (accepted) onExited?.('left');
+                if (accepted) {
+                  onExited?.('left', {
+                    canChangeNickname: true,
+                    ...(own ? { nickname: own.nickname } : {}),
+                  });
+                }
               });
             }}
           >
@@ -592,7 +606,9 @@ export function GameRoom({
                 ? undefined
                 : () => {
                     void send({ type: 'room.exit' }).then((accepted) => {
-                      if (accepted) onExited?.('left');
+                      if (accepted) {
+                        onExited?.('left', { canChangeNickname: false });
+                      }
                     });
                   }
             }
@@ -602,27 +618,29 @@ export function GameRoom({
           <TableSeats
             actionRoundKey={game ? `${game.handId}:${game.street}` : null}
             ownPlayerId={session.playerId}
-            players={snapshot.room.players.map((player) => ({
-              ...player,
-              ...(gameSettlement
-                ? (() => {
-                    const handType = settlementHandTypes.get(player.playerId);
-                    return {
-                      settlement: {
-                        netChange:
-                          gameSettlement.netChanges[player.playerId] ?? 0,
-                        ...(handType ? { handType } : {}),
-                      },
-                    };
-                  })()
-                : {}),
-              isCurrentActor:
-                snapshot.room.phase !== 'paused' &&
-                game?.currentActorId === player.playerId,
-              isDealer: game?.buttonPlayerId === player.playerId,
-              isSmallBlind: game?.smallBlindPlayerId === player.playerId,
-              isBigBlind: game?.bigBlindPlayerId === player.playerId,
-            }))}
+            players={snapshot.room.players
+              .filter(({ status }) => status !== 'removed')
+              .map((player) => ({
+                ...player,
+                ...(gameSettlement
+                  ? (() => {
+                      const handType = settlementHandTypes.get(player.playerId);
+                      return {
+                        settlement: {
+                          netChange:
+                            gameSettlement.netChanges[player.playerId] ?? 0,
+                          ...(handType ? { handType } : {}),
+                        },
+                      };
+                    })()
+                  : {}),
+                isCurrentActor:
+                  snapshot.room.phase !== 'paused' &&
+                  game?.currentActorId === player.playerId,
+                isDealer: game?.buttonPlayerId === player.playerId,
+                isSmallBlind: game?.smallBlindPlayerId === player.playerId,
+                isBigBlind: game?.bigBlindPlayerId === player.playerId,
+              }))}
           />
         }
         communityCards={

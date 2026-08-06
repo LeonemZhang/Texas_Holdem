@@ -15,6 +15,7 @@ import {
 } from '@texas-holdem/protocol';
 
 import { GameCommandHandler } from './game-command-handler.js';
+import { timedOutBettingAction } from './deadline-scheduler.js';
 import {
   rebuildStatistics,
   type StatisticsFactStorePort,
@@ -108,14 +109,23 @@ export class GameRuntime implements RoomSessionBootstrapService {
   readonly #statisticsStore: StatisticsFactStorePort | null;
   readonly #dispatcher = new CommandDispatcher(
     this.rooms,
-    (command, room) =>
-      command.type === 'room.create' ||
-      command.type === 'room.join' ||
-      room?.players.some(
-        ({ playerId, status }) =>
-          playerId === command.playerId &&
-          !['left', 'removed'].includes(status),
-      ) === true,
+    (command, room) => {
+      if (command.type === 'room.create' || command.type === 'room.join') {
+        return true;
+      }
+      const player = room?.players.find(
+        ({ playerId }) => playerId === command.playerId,
+      );
+      if (!player || ['left', 'removed'].includes(player.status)) return false;
+      const isBettingCommand = [
+        'game.fold',
+        'game.check',
+        'game.call',
+        'game.raise-to',
+        'game.all-in',
+      ].includes(command.type);
+      return !isBettingCommand || player.status === 'active';
+    },
     (command, room) => this.handle(command, room),
   );
 
@@ -134,6 +144,13 @@ export class GameRuntime implements RoomSessionBootstrapService {
   }
 
   dispatch(input: unknown): CommandResponse {
+    return this.dispatchCommand(input);
+  }
+
+  private dispatchCommand(
+    input: unknown,
+    options: { readonly bypassAuthorization?: boolean } = {},
+  ): CommandResponse {
     const resultKey = this.commandResultKey(input);
     if (resultKey) {
       const previous = this.#results.get(resultKey);
@@ -150,7 +167,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       previousRoom === null
         ? null
         : this.#roomHandler.getChipRequests(previousRoom.roomId);
-    const response = this.#dispatcher.dispatch(input);
+    const response = this.#dispatcher.dispatch(input, options);
     if (response.status !== 'accepted') return response;
     const command = input as ClientCommand;
     const afterCommand = this.rooms.get(command.roomId);
@@ -401,13 +418,25 @@ export class GameRuntime implements RoomSessionBootstrapService {
     if (player.status === 'removed') {
       throw new RangeError('Player was removed from this room');
     }
-    this.sessions.register(identity, request.token);
-    this.rememberReconnectToken(roomId, identity.playerId, request.token);
+    if (
+      request.nickname !== undefined &&
+      (player.status !== 'left' || room.phase !== 'lobby')
+    ) {
+      throw new RangeError(
+        'Nickname can only be changed while recovering to the lobby',
+      );
+    }
     if (player.status === 'left') {
-      this.#roomHandler.resumeLeftPlayer(roomId, identity.playerId);
+      this.#roomHandler.resumeLeftPlayer(
+        roomId,
+        identity.playerId,
+        request.nickname,
+      );
       this.#sequences.set(roomId, (this.#sequences.get(roomId) ?? 0) + 1);
       this.#committedListeners.forEach((listener) => listener(roomId));
     }
+    this.sessions.register(identity, request.token);
+    this.rememberReconnectToken(roomId, identity.playerId, request.token);
     return this.sessionResponse(
       roomId,
       identity.playerId,
@@ -490,6 +519,9 @@ export class GameRuntime implements RoomSessionBootstrapService {
             nickname:
               room.players.find(({ playerId }) => playerId === player.playerId)
                 ?.nickname ?? player.playerId,
+            removed:
+              room.players.find(({ playerId }) => playerId === player.playerId)
+                ?.status === 'removed',
             initialChips: room.settings.initialChips,
           })),
           titles: snapshot.statistics.titles,
@@ -731,18 +763,31 @@ export class GameRuntime implements RoomSessionBootstrapService {
           ({ playerId }) => playerId === actorId,
         );
         if (!actor) return;
+        const roomPlayer = currentRoom.players.find(
+          ({ playerId }) => playerId === actorId,
+        );
+        if (!roomPlayer) return;
+        const timedOutAction = timedOutBettingAction(
+          currentHand.betting,
+          actorId,
+        );
         const commandType =
-          actor.streetCommitted === currentHand.betting.currentBet
-            ? 'game.check'
-            : 'game.fold';
-        const response = this.dispatch({
-          protocolVersion: PROTOCOL_VERSION,
-          commandId: randomUUID(),
-          roomId,
-          playerId: actorId,
-          expectedVersion: currentRoom.version,
-          type: commandType,
-        });
+          timedOutAction.type === 'check' ? 'game.check' : 'game.fold';
+        const response = this.dispatchCommand(
+          {
+            protocolVersion: PROTOCOL_VERSION,
+            commandId: randomUUID(),
+            roomId,
+            playerId: actorId,
+            expectedVersion: currentRoom.version,
+            type: commandType,
+          },
+          {
+            bypassAuthorization: ['left', 'sitting-out'].includes(
+              roomPlayer.status,
+            ),
+          },
+        );
         if (response.status === 'accepted') {
           this.#automaticListeners.forEach((listener) => listener(roomId));
         }

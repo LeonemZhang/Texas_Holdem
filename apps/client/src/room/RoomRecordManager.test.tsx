@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { RoomRecordManager } from './RoomRecordManager.js';
@@ -129,6 +135,61 @@ describe('RoomRecordManager', () => {
       await screen.findByRole('heading', { name: '牌局战报' }),
     ).toBeInTheDocument();
     expect(screen.getByText('周末牌局')).toBeInTheDocument();
+  });
+
+  it('keeps a removed player at the end of historical statistics', async () => {
+    const recordRuntime = runtime();
+    recordRuntime.getRoomRecordStatistics = async () => ({
+      players: [
+        {
+          playerId: 'host',
+          nickname: 'Alice',
+          initialChips: 1_000,
+          currentChips: 800,
+          netWinLoss: -200,
+          participatedHands: 7,
+          wonHands: 2,
+          largestSingleHandProfit: 250,
+          largestSingleHandLoss: 400,
+          showdownCount: 3,
+          showdownWinRate: 2 / 3,
+          actions: { fold: 1, check: 2, call: 3, raiseTo: 1, allIn: 0 },
+        },
+        {
+          playerId: 'bob',
+          nickname: 'Bob',
+          removed: true,
+          initialChips: 1_000,
+          currentChips: 1_200,
+          netWinLoss: 200,
+          participatedHands: 7,
+          wonHands: 3,
+          largestSingleHandProfit: 250,
+          largestSingleHandLoss: 400,
+          showdownCount: 3,
+          showdownWinRate: 2 / 3,
+          actions: { fold: 1, check: 2, call: 3, raiseTo: 1, allIn: 0 },
+        },
+      ],
+      titles: [],
+      handPeaks: { global: null, players: [], hasLegacyCoverageGap: false },
+    });
+
+    render(
+      <RoomRecordManager
+        runtime={recordRuntime}
+        onCreateRoom={vi.fn()}
+        onClose={vi.fn()}
+        onRecovered={vi.fn()}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '查看统计' }));
+
+    const rows = within(
+      await screen.findByRole('tabpanel', { name: '牌局统计' }),
+    ).getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('#1 Alice');
+    expect(rows[1]).toHaveTextContent('#2 Bob');
   });
 
   it('opens the recovered host session instead of leaving the host in records', async () => {

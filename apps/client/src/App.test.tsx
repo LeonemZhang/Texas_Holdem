@@ -18,12 +18,26 @@ vi.mock('./room/GameRoom.js', () => ({
     onExited,
   }: {
     readonly session: { readonly roomId: string };
-    readonly onExited: (reason: 'removed') => void;
+    readonly onExited: (
+      reason: 'left' | 'removed',
+      details?: {
+        readonly canChangeNickname?: boolean;
+        readonly nickname?: string;
+      },
+    ) => void;
   }) => (
     <>
       <p>已恢复对局：{session.roomId}</p>
       <button type="button" onClick={() => onExited('removed')}>
         模拟被移出
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onExited('left', { canChangeNickname: true, nickname: 'Bob' })
+        }
+      >
+        模拟大厅退出
       </button>
     </>
   ),
@@ -241,6 +255,109 @@ describe('application shell', () => {
     ).toBeInTheDocument();
     expect(browserReconnectSessionStore().load(roomId)).toBeNull();
     expect(new URL(window.location.href).searchParams.get('room')).toBeNull();
+  });
+
+  it('keeps the reconnect identity after a lobby exit', async () => {
+    const roomId = 'room-left-live';
+    window.history.replaceState(null, '', `/?room=${roomId}`);
+    browserReconnectSessionStore().save({
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      playerId: 'bob',
+      token: 'bob-reconnect-token-123456',
+      joinUrl: `http://host.test/?room=${roomId}`,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).endsWith('/api/rooms/current')
+          ? new Response(JSON.stringify({ roomId }))
+          : new Response(
+              JSON.stringify({
+                protocolVersion: PROTOCOL_VERSION,
+                roomId,
+                playerId: 'bob',
+                token: 'bob-reconnect-token-123456',
+                joinUrl: `http://host.test/?room=${roomId}`,
+                socketPath: '/socket.io',
+              }),
+            ),
+      ),
+    );
+    render(<App />);
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '模拟大厅退出' }),
+    );
+
+    expect(browserReconnectSessionStore().load(roomId)).toMatchObject({
+      playerId: 'bob',
+      token: 'bob-reconnect-token-123456',
+    });
+  });
+
+  it('shows the nickname form after re-detection and resumes the original seat', async () => {
+    const roomId = 'room-left-rename';
+    window.history.replaceState(null, '', `/?room=${roomId}`);
+    browserReconnectSessionStore().save({
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      playerId: 'bob',
+      token: 'bob-reconnect-token-123456',
+      joinUrl: `http://host.test/?room=${roomId}`,
+    });
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, _init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith('/api/rooms/current')) {
+          return new Response(JSON.stringify({ roomId }));
+        }
+        return new Response(
+          JSON.stringify({
+            protocolVersion: PROTOCOL_VERSION,
+            roomId,
+            playerId: 'bob',
+            token: 'bob-reconnect-token-123456',
+            joinUrl: `http://host.test/?room=${roomId}`,
+            socketPath: '/socket.io',
+          }),
+        );
+      },
+    );
+    vi.stubGlobal('fetch', fetcher);
+    render(<App />);
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '模拟大厅退出' }),
+    );
+    expect(browserReconnectSessionStore().load(roomId)).not.toBeNull();
+    fireEvent.change(screen.getByLabelText('IP 直连到房主牌桌'), {
+      target: { value: '10.126.126.1:32100' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '检测房间' }));
+
+    expect(await screen.findByText('恢复原身份')).toBeInTheDocument();
+    expect(screen.getByLabelText('玩家昵称')).toHaveValue('Bob');
+    fireEvent.change(screen.getByLabelText('玩家昵称'), {
+      target: { value: 'Bobby' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '确认恢复' }));
+
+    await waitFor(() =>
+      expect(screen.getByText(`已恢复对局：${roomId}`)).toBeInTheDocument(),
+    );
+    const resumeCall = fetcher.mock.calls
+      .filter(([input]) => String(input).endsWith('/resume'))
+      .at(-1);
+    expect(resumeCall).toBeDefined();
+    expect(JSON.parse(String(resumeCall?.[1]?.body))).toEqual({
+      playerId: 'bob',
+      token: 'bob-reconnect-token-123456',
+      nickname: 'Bobby',
+    });
+    expect(
+      fetcher.mock.calls.some(([input]) => String(input).endsWith('/join')),
+    ).toBe(false);
   });
 
   it('shows the permanent removal reason instead of an authentication error', async () => {

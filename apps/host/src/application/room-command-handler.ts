@@ -96,9 +96,13 @@ export class RoomCommandHandler {
     return this.#chipRequests.get(roomId) ?? null;
   }
 
-  resumeLeftPlayer(roomId: string, playerId: string): RoomState {
+  resumeLeftPlayer(
+    roomId: string,
+    playerId: string,
+    nickname?: string,
+  ): RoomState {
     const room = this.requireRoom(this.rooms.get(roomId));
-    const resumed = resumeLeftPlayer(room, playerId);
+    const resumed = resumeLeftPlayer(room, playerId, nickname);
     if (room.phase === 'hand-ready') {
       const context = this.requireHandReady(roomId);
       this.#handReady.set(

@@ -60,6 +60,26 @@ describe('StatisticsPanel', () => {
     ]);
   });
 
+  it('places removed players after active players regardless of chip totals', () => {
+    render(
+      <StatisticsPanel
+        open
+        players={[
+          player('a', 'Alice', 800),
+          { ...player('b', 'Bob', 1_200), removed: true },
+        ]}
+        titles={[]}
+        onCollapse={vi.fn()}
+      />,
+    );
+
+    const rows = within(
+      screen.getByRole('tabpanel', { name: '牌局统计' }),
+    ).getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('#1 Alice');
+    expect(rows[1]).toHaveTextContent('#2 Bob');
+  });
+
   it('uses settlement-only net win or loss rather than exchanged chips', () => {
     render(
       <StatisticsPanel
