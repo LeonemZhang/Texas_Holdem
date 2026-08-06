@@ -578,7 +578,7 @@ export function GameRoom({
           snapshot.room.phase === 'paused'
             ? '游戏暂停中'
             : game
-              ? `第 1 局 · 第 ${snapshot.room.completedHands + 1} 手 · ${streetLabels[game.street]}${actionActor ? ` · 当前行动：${actionActor.nickname}` : ''}`
+              ? `第 ${snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]}${actionActor ? ` · 当前行动：${actionActor.nickname}` : ''}`
               : '等待牌局开始'
         }
         status={
