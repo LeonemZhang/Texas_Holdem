@@ -465,8 +465,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       completedHands: this.#completedHands.get(roomId) ?? 0,
       statistics: room.players.map((player) => ({
         playerId: player.playerId,
-        currentChips:
-          rebuilt.basic[player.playerId]?.currentChips ?? player.chips,
+        currentChips: player.chips,
         participatedHands:
           rebuilt.basic[player.playerId]?.participatedHands ?? 0,
         wonHands: rebuilt.basic[player.playerId]?.wonHands ?? 0,

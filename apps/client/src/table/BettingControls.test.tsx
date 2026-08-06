@@ -38,7 +38,7 @@ describe('BettingControls', () => {
     fireEvent.change(screen.getByLabelText('加注增量'), {
       target: { value: '120' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '关闭加注设置' }));
+    fireEvent.click(screen.getByRole('button', { name: '收起加注设置' }));
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(onAction).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '确认加注 180' })).toBeEnabled();
@@ -93,13 +93,14 @@ describe('BettingControls', () => {
     expect(screen.getByRole('button', { name: '过牌' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '跟注 20' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '全押' })).toBeEnabled();
-    expect(screen.getByText('最小 60 · 最大 400')).toBeInTheDocument();
+    expect(screen.getByText('最小 60')).toBeInTheDocument();
+    expect(screen.getByText('最大 400')).toBeInTheDocument();
     expect(
       screen.getByText('20', { selector: '.betting-controls__call-amount' }),
     ).toBeInTheDocument();
   });
 
-  it.each([1, 40, 1000])(
+  it.each([1, 40, 1000, 10000])(
     'keeps call amount %i in the inline amount badge',
     (callAmount) => {
       const onAction = vi.fn();
@@ -135,21 +136,10 @@ describe('BettingControls', () => {
     });
   });
 
-  it('adds quick chips to the pending raise total and shows contribution details', () => {
+  it('adds quick chips to the pending raise total', () => {
     const onAction = vi.fn();
-    render(
-      <BettingControls
-        legalActions={legalActions}
-        roundContribution={20}
-        handContribution={80}
-        currentRoundBet={60}
-        onAction={onAction}
-      />,
-    );
+    render(<BettingControls legalActions={legalActions} onAction={onAction} />);
 
-    expect(screen.getByText('本轮已投 20')).toBeInTheDocument();
-    expect(screen.getByText('本手累计 80')).toBeInTheDocument();
-    expect(screen.getByText('本轮最高 60')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '增加 20 筹码' }));
     fireEvent.click(screen.getByRole('button', { name: '增加 5 筹码' }));
     fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
@@ -157,6 +147,20 @@ describe('BettingControls', () => {
       type: 'game.raise-to',
       amount: 85,
     });
+  });
+
+  it('renders every decrease chip with a leading minus sign', () => {
+    render(<BettingControls legalActions={legalActions} onAction={vi.fn()} />);
+
+    for (const value of [1, 2, 5, 10, 20, 50, 100]) {
+      const chip = screen.getByRole('button', {
+        name: `减少 ${value} 筹码`,
+      });
+      expect(chip).toHaveTextContent(`−${value}`);
+      expect(
+        chip.querySelector('.poker-chip__value--negative'),
+      ).toHaveTextContent(`−${value}`);
+    }
   });
 
   it('sets a quick chip as the raise target before adding later chips', () => {
@@ -190,7 +194,26 @@ describe('BettingControls', () => {
     expect(slider).toHaveValue('15');
     fireEvent.click(screen.getByRole('button', { name: '清零' }));
     expect(slider).toHaveValue('0');
-    expect(screen.getByText('加注至 60')).toBeInTheDocument();
+    expect(
+      screen.getByText('60', { selector: '.raise-control__value' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the raise bounds and current amount in the slider header', () => {
+    render(<BettingControls legalActions={legalActions} onAction={vi.fn()} />);
+
+    const bar = screen
+      .getByLabelText('加注增量')
+      .closest('.raise-control__bar')!;
+    expect(bar).toHaveClass('raise-control__bar');
+    expect(bar).toHaveTextContent('最小 60');
+    expect(bar).toHaveTextContent('60');
+    expect(bar).toHaveTextContent('最大 400');
+    expect(bar.textContent?.replace(/\s+/g, '')).toBe('60最小60最大400');
+    expect(
+      screen.queryByText('加注增量', { selector: 'label' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('本轮已投')).not.toBeInTheDocument();
   });
 
   it('locks every action while recovering or when it is not this player turn', () => {

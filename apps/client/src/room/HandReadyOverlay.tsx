@@ -16,6 +16,7 @@ export interface HandReadyOverlayProps {
   readonly pendingRequests: readonly HandReadyRequestView[];
   readonly complete: boolean;
   readonly ownChips: number;
+  readonly bigBlind?: number;
   readonly nowMs?: number;
   readonly onChoose: (choice: 'ready' | 'sitting-out') => void;
   readonly onShowHoleCards?: () => void;
@@ -142,6 +143,7 @@ export function HandReadyOverlay({
   pendingRequests,
   complete,
   ownChips,
+  bigBlind = 1,
   nowMs,
   onChoose,
   onShowHoleCards,
@@ -211,11 +213,7 @@ export function HandReadyOverlay({
                   : ''
               }`}
               type="button"
-              disabled={
-                ownChoice === 'ready' ||
-                ownChips <= 0 ||
-                pendingRequests.length > 0
-              }
+              disabled={ownChoice === 'ready' || ownChips < bigBlind}
               onClick={() => onChoose('ready')}
             >
               {ownChoice === 'ready'

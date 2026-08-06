@@ -23,6 +23,7 @@ export interface TableSeatPlayer {
   readonly seatIndex: number;
   readonly chips: number;
   readonly streetCommitted?: number;
+  readonly totalCommitted?: number;
   readonly actionOrder?: number | null | undefined;
   readonly status: TableSeatStatus;
   readonly isCurrentActor?: boolean;
@@ -124,8 +125,31 @@ function SeatContents({ player }: { readonly player: TableSeatPlayer }) {
           </strong>
         </div>
       ) : null}
-      <span className="table-seat__street-bet">
-        本轮下注 {player.streetCommitted?.toLocaleString('zh-CN') ?? 0}
+      <span className="table-seat__bets">
+        <span
+          className="table-seat__hand-bet"
+          aria-label={`本局下注 ${player.totalCommitted ?? 0}`}
+        >
+          <span className="table-seat__bet-label--desktop" aria-hidden="true">
+            本局下注{' '}
+          </span>
+          <span className="table-seat__bet-label--mobile" aria-hidden="true">
+            本局{' '}
+          </span>
+          {player.totalCommitted?.toLocaleString('zh-CN') ?? 0}
+        </span>
+        <span
+          className="table-seat__street-bet"
+          aria-label={`本轮下注 ${player.streetCommitted ?? 0}`}
+        >
+          <span className="table-seat__bet-label--desktop" aria-hidden="true">
+            本轮下注{' '}
+          </span>
+          <span className="table-seat__bet-label--mobile" aria-hidden="true">
+            本轮{' '}
+          </span>
+          {player.streetCommitted?.toLocaleString('zh-CN') ?? 0}
+        </span>
       </span>
     </>
   );

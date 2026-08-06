@@ -147,7 +147,18 @@ describe('GameCommandHandler', () => {
     );
 
     expect(result.stateVersion).toBe(rooms.get('room-1')?.version);
-    expect(runtime.getCurrentHand('room-1')).not.toBe(before);
+    const after = runtime.getCurrentHand('room-1');
+    expect(after).not.toBe(before);
+    expect(
+      rooms
+        .get('room-1')
+        ?.players.map(({ playerId, chips }) => ({ playerId, chips })),
+    ).toEqual(
+      after?.players.map(({ playerId, stack }) => ({
+        playerId,
+        chips: stack,
+      })),
+    );
   });
 
   it('lets poker-core reject an action from a non-current player', () => {

@@ -44,6 +44,7 @@ import {
 } from '../domain/room-settings.js';
 import { startFirstHand } from '../domain/start-first-hand.js';
 import { startNextRoomHand } from '../domain/start-next-hand.js';
+import { syncLiveChipBalances } from './live-chip-balances.js';
 import type {
   ClientCommand,
   CommandHandler,
@@ -182,7 +183,7 @@ export class RoomCommandHandler {
         ready.players.some(
           (player) => player.playerId === playerId && player.choice === 'ready',
         ) &&
-        chips > 0 &&
+        chips >= room.settings.bigBlind &&
         !['left', 'removed', 'eliminated'].includes(status),
     ).length;
     if (readyPlayerCount < 2) {
@@ -198,11 +199,12 @@ export class RoomCommandHandler {
       randomSource: this.randomSource,
       allowPendingRequests: input.deadlineElapsed,
     });
-    this.rooms.save(started.room);
+    const roomWithLiveChips = syncLiveChipBalances(started.room, started.hand);
+    this.rooms.save(roomWithLiveChips);
     this.#hands.set(roomId, started.hand);
     this.#handReady.delete(roomId);
     if (pendingRequests === 0) this.#chipRequests.delete(roomId);
-    return started.room;
+    return roomWithLiveChips;
   }
 
   private accepted(room: RoomState): CommandHandlerResult {
@@ -328,7 +330,7 @@ export class RoomCommandHandler {
           this.randomSource,
         );
         this.#hands.set(room.roomId, started.hand);
-        return this.accepted(started.room);
+        return this.accepted(syncLiveChipBalances(started.room, started.hand));
       }
       case 'room.pause': {
         const paused = pauseRoom(room, command.playerId);
@@ -461,8 +463,12 @@ export class RoomCommandHandler {
                 ]),
               )
             : undefined;
+        const roomWithLiveChips =
+          room.phase === 'playing' && activeHand
+            ? syncLiveChipBalances(room, activeHand)
+            : room;
         const transferred = approveChipRequest(
-          room,
+          roomWithLiveChips,
           requests,
           command.requestId,
           command.playerId,
@@ -471,7 +477,7 @@ export class RoomCommandHandler {
         );
         if (room.phase === 'playing' && request) {
           this.applyPlayingChipTransfer(
-            room,
+            roomWithLiveChips,
             command.playerId,
             request.requesterId,
             request.amount,

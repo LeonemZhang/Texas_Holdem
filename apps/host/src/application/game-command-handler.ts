@@ -15,6 +15,7 @@ import type { BettingCommand } from '@texas-holdem/protocol';
 
 import { freezeRoom, type RoomState } from '../domain/room.js';
 import { beginHandReadyPhase } from '../domain/hand-ready.js';
+import { syncLiveChipBalances } from './live-chip-balances.js';
 import type { CommandHandlerResult } from './command-dispatcher.js';
 import type { RoomCommandHandler } from './room-command-handler.js';
 import type { RoomRepository } from './room-registry.js';
@@ -93,7 +94,10 @@ export class GameCommandHandler {
       }
     }
     this.runtime.replaceCurrentHand(room.roomId, nextHand);
-    const nextRoom = freezeRoom({ ...room, version: room.version + 1 });
+    const nextRoom = syncLiveChipBalances(
+      freezeRoom({ ...room, version: room.version + 1 }),
+      nextHand,
+    );
     this.rooms.save(nextRoom);
     return { stateVersion: nextRoom.version, sequence: 0 };
   }

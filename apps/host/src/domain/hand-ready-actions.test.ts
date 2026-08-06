@@ -51,11 +51,27 @@ describe('hand-ready actions', () => {
     expect(canBeginNextHand(state, 1)).toBe(false);
   });
 
-  it('rejects ready for a zero-chip player', () => {
+  it('requires at least the current big blind to become ready', () => {
     const { room, handReady } = phase();
     expect(() => setHandReadyChoice(room, handReady, 'bob', 'ready')).toThrow(
-      'A zero-chip player cannot become ready',
+      'A player needs at least the big blind to become ready',
     );
+
+    const atBigBlind = Object.freeze({
+      ...room,
+      players: Object.freeze(
+        room.players.map((player) =>
+          player.playerId === 'bob'
+            ? Object.freeze({ ...player, chips: room.settings.bigBlind })
+            : player,
+        ),
+      ),
+    });
+    expect(
+      setHandReadyChoice(atBigBlind, handReady, 'bob', 'ready').players.find(
+        ({ playerId }) => playerId === 'bob',
+      )?.choice,
+    ).toBe('ready');
   });
 
   it('normalizes every unanswered player to sitting-out at the deadline', () => {

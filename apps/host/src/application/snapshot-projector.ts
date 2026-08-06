@@ -211,8 +211,7 @@ export function projectPlayerSnapshot(
   const requests = input.chipRequests ?? null;
   const currentViewer = handPlayer(hand, input.viewerPlayerId);
   const actionOrder = actionOrderByPlayerId(hand);
-  const currentChips = (player: RoomPlayer) =>
-    handPlayer(hand, player.playerId)?.stack ?? player.chips;
+  const currentChips = (player: RoomPlayer) => player.chips;
   const statistics =
     input.statistics ??
     input.room.players.map((player) => ({

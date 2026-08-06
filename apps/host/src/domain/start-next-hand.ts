@@ -51,7 +51,7 @@ export function startNextRoomHand(
     .filter(
       ({ playerId, chips, status }) =>
         choices.get(playerId) === 'ready' &&
-        chips > 0 &&
+        chips >= room.settings.bigBlind &&
         !['left', 'removed', 'eliminated'].includes(status),
     )
     .map(({ playerId, seatIndex, chips: stack }) => ({

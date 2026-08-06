@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 
 import type { LegalActions } from '@texas-holdem/protocol';
 
@@ -11,18 +11,12 @@ export type BettingActionIntent =
 
 export interface BettingControlsProps {
   readonly legalActions: LegalActions | null;
-  readonly roundContribution?: number;
-  readonly handContribution?: number;
-  readonly currentRoundBet?: number;
   readonly disabled?: boolean;
   readonly onAction: (action: BettingActionIntent) => void;
 }
 
 export function BettingControls({
   legalActions,
-  roundContribution = 0,
-  handContribution = 0,
-  currentRoundBet = 0,
   disabled = false,
   onAction,
 }: BettingControlsProps) {
@@ -34,6 +28,10 @@ export function BettingControls({
   const effectiveRaiseTo = minimum + Math.min(maximumIncrement, raiseIncrement);
   const locked = disabled || legalActions === null;
   const canRaise = !locked && minimum > 0 && maximum >= minimum;
+  const sliderPercent =
+    maximumIncrement > 0
+      ? (Math.min(maximumIncrement, raiseIncrement) / maximumIncrement) * 100
+      : 0;
   const quickChipValues = [1, 2, 5, 10, 20, 50, 100] as const;
   const submitRaise = () => {
     if (!canRaise) return;
@@ -120,31 +118,43 @@ export function BettingControls({
           <strong>加注设置</strong>
           <button
             type="button"
-            aria-label="关闭加注设置"
+            aria-label="收起加注设置"
             disabled={!raiseOpen}
             onClick={() => setRaiseOpen(false)}
           >
-            关闭
+            收起
           </button>
         </header>
-        <label htmlFor="raise-increment">加注增量</label>
-        <input
-          id="raise-increment"
-          type="range"
-          min="0"
-          max={maximumIncrement}
-          value={raiseIncrement}
-          disabled={!canRaise}
-          onChange={(event) => setRaiseIncrement(Number(event.target.value))}
-        />
-        <output htmlFor="raise-increment">加注至 {effectiveRaiseTo}</output>
-        <span className="raise-control__range">
-          最小 {minimum} · 最大 {maximum}
-        </span>
-        <div className="raise-control__summary" aria-label="本手投注信息">
-          <span>本轮已投 {roundContribution}</span>
-          <span>本手累计 {handContribution}</span>
-          <span>本轮最高 {currentRoundBet}</span>
+        <div className="raise-control__bar">
+          <div className="raise-control__slider">
+            <output
+              className="raise-control__value"
+              htmlFor="raise-increment"
+              style={
+                {
+                  '--raise-percent': `${sliderPercent}%`,
+                } as CSSProperties
+              }
+            >
+              {effectiveRaiseTo}
+            </output>
+            <input
+              id="raise-increment"
+              type="range"
+              aria-label="加注增量"
+              min="0"
+              max={maximumIncrement}
+              value={raiseIncrement}
+              disabled={!canRaise}
+              onChange={(event) =>
+                setRaiseIncrement(Number(event.target.value))
+              }
+            />
+          </div>
+          <div className="raise-control__marks" aria-hidden="true">
+            <span>最小 {minimum}</span>
+            <span>最大 {maximum}</span>
+          </div>
         </div>
         <div
           className="raise-control__quick-chips raise-control__quick-chips--positive"
@@ -194,7 +204,9 @@ export function BettingControls({
               }
             >
               <span className="poker-chip__disc" aria-hidden="true">
-                <span className="poker-chip__value">−{value}</span>
+                <span className="poker-chip__value poker-chip__value--negative">
+                  −{value}
+                </span>
               </span>
             </button>
           ))}

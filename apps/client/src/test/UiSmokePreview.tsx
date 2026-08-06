@@ -117,6 +117,7 @@ const players = [
     seatIndex: 0,
     chips: 1_480,
     streetCommitted: 120,
+    totalCommitted: 320,
     status: 'active' as const,
     isCurrentActor: true,
     isSmallBlind: true,
@@ -127,6 +128,7 @@ const players = [
     seatIndex: 1,
     chips: 720,
     streetCommitted: 120,
+    totalCommitted: 320,
     status: 'active' as const,
     isBigBlind: true,
   },
@@ -136,6 +138,7 @@ const players = [
     seatIndex: 2,
     chips: 800,
     streetCommitted: 340,
+    totalCommitted: 340,
     status: 'all-in' as const,
     isDealer: true,
   },
@@ -147,6 +150,7 @@ const fullTablePlayers = Array.from({ length: 10 }, (_, index) => ({
   seatIndex: index,
   chips: 2_000 - index * 75,
   streetCommitted: index * 10,
+  totalCommitted: index * 25,
   status:
     index === 4
       ? ('disconnected' as const)
@@ -423,14 +427,11 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
               legalActions={{
                 canFold: true,
                 canCheck: false,
-                callAmount: 40,
+                callAmount: 2_660,
                 minimumRaiseTo: 120,
                 maximumRaiseTo: 720,
                 canAllIn: true,
               }}
-              roundContribution={80}
-              handContribution={220}
-              currentRoundBet={120}
               onAction={noop}
             />
           )

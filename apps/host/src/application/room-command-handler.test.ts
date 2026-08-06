@@ -213,7 +213,7 @@ describe('RoomCommandHandler', () => {
     );
 
     const nextRoom = rooms.get('room-1')!;
-    expect(nextRoom.players.map(({ chips }) => chips)).toEqual([80, 120]);
+    expect(nextRoom.players.map(({ chips }) => chips)).toEqual([79, 118]);
     expect(handler.getHandReady('room-1')?.players[0]?.choice).toBe('ready');
     expect(handler.getChipRequests('room-1')?.requests[0]?.status).toBe(
       'completed',

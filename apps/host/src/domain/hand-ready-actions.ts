@@ -28,8 +28,10 @@ export function setHandReadyChoice(
   if (!readiness || !roomPlayer) {
     throw new RangeError(`Player is not in hand readiness: ${playerId}`);
   }
-  if (choice === 'ready' && roomPlayer.chips <= 0) {
-    throw new RangeError('A zero-chip player cannot become ready');
+  if (choice === 'ready' && roomPlayer.chips < room.settings.bigBlind) {
+    throw new RangeError(
+      'A player needs at least the big blind to become ready',
+    );
   }
   return freezeHandReady({
     ...state,

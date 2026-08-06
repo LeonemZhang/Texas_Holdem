@@ -103,6 +103,27 @@ describe('projectPlayerSnapshot', () => {
     ]);
   });
 
+  it('uses room balances even while retaining the settled hand for hand readiness', () => {
+    const started = startedRoom();
+    const room = {
+      ...started.room,
+      phase: 'hand-ready' as const,
+      players: started.room.players.map((player) =>
+        player.playerId === 'bob' ? { ...player, chips: 77 } : player,
+      ),
+    };
+    const snapshot = projectPlayerSnapshot({
+      room,
+      viewerPlayerId: 'host',
+      sequence: 2,
+      hand: started.hand,
+    });
+
+    expect(
+      snapshot.room.players.find(({ playerId }) => playerId === 'bob')?.chips,
+    ).toBe(77);
+  });
+
   it('only projects legal actions for the server-selected current actor', () => {
     const started = startedRoom();
     const actorId = started.hand.betting.currentActorId!;

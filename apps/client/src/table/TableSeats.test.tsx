@@ -128,7 +128,10 @@ describe('TableSeats', () => {
       within(summaries[0] as HTMLElement).getByText('小盲'),
     ).toBeInTheDocument();
     expect(
-      within(summaries[0] as HTMLElement).getByText('本轮下注 0'),
+      within(summaries[0] as HTMLElement).getByLabelText('本局下注 0'),
+    ).toBeInTheDocument();
+    expect(
+      within(summaries[0] as HTMLElement).getByLabelText('本轮下注 0'),
     ).toBeInTheDocument();
     expect(mobileQueuePlayerIds(container)).toHaveLength(4);
     expect(screen.getAllByRole('listitem')).toHaveLength(4);
@@ -278,18 +281,38 @@ describe('TableSeats', () => {
     expect(screen.getAllByText('过牌')).toHaveLength(2);
   });
 
-  it('shows every player’s current-street bet on the table', () => {
+  it('shows every player’s hand and current-street bets on the table', () => {
     render(
       <TableSeats
         ownPlayerId="p0"
         players={[
-          { ...makePlayers(2)[0]!, streetCommitted: 20 },
-          { ...makePlayers(2)[1]!, streetCommitted: 60 },
+          {
+            ...makePlayers(2)[0]!,
+            streetCommitted: 20,
+            totalCommitted: 80,
+          },
+          {
+            ...makePlayers(2)[1]!,
+            streetCommitted: 60,
+            totalCommitted: 140,
+          },
         ]}
       />,
     );
-    expect(screen.getAllByText('本轮下注 20')).toHaveLength(2);
-    expect(screen.getByText('本轮下注 60')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('本轮下注 20')).toHaveLength(2);
+    expect(screen.getByLabelText('本轮下注 60')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('本局下注 80')).toHaveLength(2);
+    expect(screen.getByLabelText('本局下注 140')).toBeInTheDocument();
+
+    const handContribution = screen.getAllByLabelText('本局下注 80')[0]!;
+    const streetContribution = screen.getAllByLabelText('本轮下注 20')[0]!;
+    expect(handContribution.parentElement).toHaveClass('table-seat__bets');
+    expect(streetContribution.parentElement).toBe(
+      handContribution.parentElement,
+    );
+    expect(handContribution.parentElement?.children).toHaveLength(2);
+    expect(handContribution).toHaveClass('table-seat__hand-bet');
+    expect(streetContribution).toHaveClass('table-seat__street-bet');
   });
 
   it('labels each seat with its server-provided action order', () => {

@@ -79,19 +79,57 @@ describe('HandReadyOverlay', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('shows the ready state but prevents a zero-chip player from sending it', () => {
-    render(
+  it('derives readiness from the latest chip balance and big blind', () => {
+    const { rerender } = render(
       <HandReadyOverlay
         deadlineMs={30_000}
         nowMs={5_000}
         ownChoice="pending"
         pendingRequests={[]}
         complete={false}
-        ownChips={0}
+        ownChips={1}
+        bigBlind={2}
         onChoose={vi.fn()}
       />,
     );
     expect(screen.getByRole('button', { name: '就绪' })).toBeDisabled();
+    rerender(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        complete={false}
+        ownChips={2}
+        bigBlind={2}
+        onChoose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '就绪' })).toBeEnabled();
+  });
+
+  it('allows a funded player to choose ready while requests remain pending', () => {
+    render(
+      <HandReadyOverlay
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[
+          {
+            requestId: 'r1',
+            requesterId: 'bob',
+            requesterName: 'Bob',
+            targetPlayerId: 'alice',
+            amount: 20,
+          },
+        ]}
+        complete={false}
+        ownChips={2}
+        bigBlind={2}
+        onChoose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '就绪' })).toBeEnabled();
   });
 
   it('lets a timed-out sitting-out player join the next hand again', () => {

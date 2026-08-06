@@ -564,10 +564,6 @@ export function GameRoom({
         ({ playerId }) => playerId === game.currentActorId,
       )
     : null;
-  const currentRoundBet = Math.max(
-    0,
-    ...snapshot.room.players.map(({ streetCommitted }) => streetCommitted ?? 0),
-  );
   return (
     <div className="game-room-shell" aria-busy={sending}>
       {error ? (
@@ -656,6 +652,7 @@ export function GameRoom({
               deadlineMs={snapshot.handReady.deadlineMs}
               ownChoice={snapshot.handReady.ownChoice}
               ownChips={own?.chips ?? 0}
+              bigBlind={snapshot.room.bigBlind}
               pendingRequests={snapshot.handReady.pendingRequests.map(
                 (request) => ({
                   requestId: request.requestId,
@@ -738,9 +735,6 @@ export function GameRoom({
           snapshot.handReady ? null : (
             <BettingControls
               legalActions={game?.legalActions ?? null}
-              roundContribution={own?.streetCommitted ?? 0}
-              handContribution={own?.totalCommitted ?? 0}
-              currentRoundBet={currentRoundBet}
               disabled={sending || snapshot.room.phase !== 'playing'}
               onAction={sendBetting}
             />
