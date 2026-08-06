@@ -118,7 +118,9 @@ const players = [
     chips: 1_480,
     streetCommitted: 120,
     totalCommitted: 320,
+    actionOrder: 1,
     status: 'active' as const,
+    lastAction: 'raiseTo' as const,
     isCurrentActor: true,
     isSmallBlind: true,
   },
@@ -129,7 +131,9 @@ const players = [
     chips: 720,
     streetCommitted: 120,
     totalCommitted: 320,
+    actionOrder: 2,
     status: 'active' as const,
+    lastAction: 'call' as const,
     isBigBlind: true,
   },
   {
@@ -139,7 +143,9 @@ const players = [
     chips: 800,
     streetCommitted: 340,
     totalCommitted: 340,
+    actionOrder: 3,
     status: 'all-in' as const,
+    lastAction: 'allIn' as const,
     isDealer: true,
   },
 ];
@@ -151,12 +157,19 @@ const fullTablePlayers = Array.from({ length: 10 }, (_, index) => ({
   chips: 2_000 - index * 75,
   streetCommitted: index * 10,
   totalCommitted: index * 25,
+  actionOrder: index + 1,
   status:
     index === 4
       ? ('disconnected' as const)
       : index === 6
         ? ('folded' as const)
         : ('active' as const),
+  lastAction:
+    index % 3 === 0
+      ? ('check' as const)
+      : index % 3 === 1
+        ? ('call' as const)
+        : ('raiseTo' as const),
   isCurrentActor: index === 3,
   isDealer: index === 0,
   isSmallBlind: index === 1,
@@ -187,6 +200,27 @@ const titles = [
   { title: 'river-killer', playerIds: [], value: null },
   { title: 'tight-player', playerIds: ['player-1'], value: 0.7 },
 ];
+
+const handPeaks = {
+  global: {
+    handType: 'three-of-a-kind',
+    playerIds: ['player-0'],
+    bestFiveCards: ['Qd', '2s', 'Kh', '2h', '2c'],
+  },
+  players: [
+    {
+      playerId: 'player-0',
+      handType: 'one-pair',
+      bestFiveCards: ['Kc', 'Tc', '9h', '9d', 'Qh'],
+    },
+    {
+      playerId: 'player-1',
+      handType: 'one-pair',
+      bestFiveCards: ['Ac', 'Ad', 'Ks', 'Qh', 'Jc'],
+    },
+  ],
+  hasLegacyCoverageGap: false,
+};
 
 export const uiSmokePreviewPages = [
   'overview',
@@ -253,6 +287,18 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
           page === 'table-ten-own-action' ? index === 0 : index === 3,
       }))
     : players;
+  const showSettlement = page === 'settlement' || page === 'settlement-waiting';
+  const renderedTablePlayers = tablePlayers.map((player, index) => ({
+    ...player,
+    ...(showSettlement
+      ? {
+          settlement: {
+            netChange: index === 0 ? 780 : -Math.max(20, index * 20),
+            ...(index < 3 ? { handType: index === 0 ? '一对' : '两对' } : {}),
+          },
+        }
+      : {}),
+  }));
   const actorName =
     page === 'table-ten-own-action'
       ? '玩家 1'
@@ -307,6 +353,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
         open
         players={statistics}
         titles={titles}
+        handPeaks={handPeaks}
         onCollapse={() => setActiveUtilityPanel(null)}
       />
     ) : null;
@@ -331,7 +378,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
         seats={
           <TableSeats
             actionRoundKey={handReady ? 'preview:settled' : 'preview:flop'}
-            players={tablePlayers}
+            players={renderedTablePlayers}
             ownPlayerId={tablePlayers[0]!.playerId}
           />
         }
@@ -599,6 +646,7 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
         open
         players={statistics}
         titles={titles}
+        handPeaks={handPeaks}
         onCollapse={noop}
       />
     );

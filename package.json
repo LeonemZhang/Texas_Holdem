@@ -20,6 +20,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "pretypecheck": "pnpm --filter \"./packages/*\" build",
     "typecheck": "pnpm -r --if-present typecheck",
     "version:check": "node scripts/version.mjs --check",
     "version:sync": "node scripts/version.mjs --sync",
