@@ -209,9 +209,14 @@ export function GameRoom({
         onExitedRef.current?.('removed');
       }
     });
-    const stopLost = connection.onConnectionLost(() =>
-      setError('网络异常，请重试'),
-    );
+    const stopLost = connection.onConnectionLost(() => {
+      // A host closes its local service only after the final closed snapshot
+      // has been delivered. That expected disconnect must not mask the normal
+      // room-closed state as a network failure.
+      if (latestSnapshot.current?.room.phase !== 'closed') {
+        setError('网络异常，请重试');
+      }
+    });
     const stopEvent = connection.onDomainEvent(() => undefined);
     void connection
       .connect({

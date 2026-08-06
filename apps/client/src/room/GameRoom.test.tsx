@@ -897,6 +897,7 @@ describe('GameRoom', () => {
 
   it('shows a terminal closed-room state and returns without another command', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    let reportConnectionLost: (reason: string) => void = () => undefined;
     const onExited = vi.fn();
     const onHostRoomClosed = vi.fn(async () => undefined);
     const sendCommand = vi.fn();
@@ -910,7 +911,10 @@ describe('GameRoom', () => {
       disconnect: vi.fn(),
       sendCommand,
       requestResync: vi.fn(),
-      onConnectionLost: vi.fn(() => () => undefined),
+      onConnectionLost: vi.fn((listener) => {
+        reportConnectionLost = listener;
+        return () => undefined;
+      }),
       onDomainEvent: vi.fn(() => () => undefined),
       onSnapshot: vi.fn((listener) => {
         consumeSnapshot = listener;
@@ -936,6 +940,8 @@ describe('GameRoom', () => {
     expect(
       await screen.findByRole('heading', { name: '房间已关闭' }),
     ).toBeInTheDocument();
+    act(() => reportConnectionLost('transport close'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '返回联机首页' }));
     expect(onExited).toHaveBeenCalledOnce();
     expect(sendCommand).not.toHaveBeenCalled();
