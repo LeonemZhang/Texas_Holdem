@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { legalBettingActions, startHand } from '@texas-holdem/poker-core';
+import {
+  advanceAfterCompletedBetting,
+  applyHandAction,
+  legalBettingActions,
+  startHand,
+} from '@texas-holdem/poker-core';
 
 import { GameCommandHandler } from './game-command-handler.js';
 import { RoomCommandHandler } from './room-command-handler.js';
@@ -250,4 +255,118 @@ describe('GameCommandHandler', () => {
       deadlineMs: 35_000,
     });
   });
+
+  it('settles the smaller contribution fold after three flop raises', () => {
+    const { rooms, runtime } = playingRoom();
+    const handler = new GameCommandHandler(rooms, runtime, () => 5_000);
+    let hand = startHand({
+      handId: 'hand-1',
+      participants: [
+        { playerId: 'host', seatIndex: 0, stack: 100 },
+        { playerId: 'bob', seatIndex: 1, stack: 100 },
+      ],
+      previousButtonIndex: null,
+      smallBlind: 1,
+      randomSource: { next: () => 0.5 },
+    });
+    hand = applyHandAction(hand, hand.betting.currentActorId!, {
+      type: 'call',
+    });
+    hand = applyHandAction(hand, hand.betting.currentActorId!, {
+      type: 'check',
+    });
+    hand = advanceAfterCompletedBetting(hand);
+    const firstRaiser = hand.betting.currentActorId!;
+    hand = applyHandAction(hand, firstRaiser, {
+      type: 'raiseTo',
+      amount: legalBettingActions(hand.betting, firstRaiser).minimumRaiseTo!,
+    });
+    const secondRaiser = hand.betting.currentActorId!;
+    hand = applyHandAction(hand, secondRaiser, {
+      type: 'raiseTo',
+      amount: legalBettingActions(hand.betting, secondRaiser).minimumRaiseTo!,
+    });
+    const thirdRaiser = hand.betting.currentActorId!;
+    hand = applyHandAction(hand, thirdRaiser, {
+      type: 'raiseTo',
+      amount: legalBettingActions(hand.betting, thirdRaiser).minimumRaiseTo!,
+    });
+    runtime.replaceCurrentHand('room-1', hand);
+
+    const result = handler.handle(
+      {
+        ...identity,
+        commandId: 'flop-fold',
+        playerId: hand.betting.currentActorId!,
+        type: 'game.fold',
+      },
+      rooms.get('room-1'),
+    );
+
+    expect(result.stateVersion).toBe(rooms.get('room-1')?.version);
+    expect(rooms.get('room-1')?.phase).toBe('hand-ready');
+  });
+
+  it.each([
+    ['flop raise then fold', 'flop', 'raiseTo'],
+    ['flop check then fold', 'flop', 'check'],
+    ['turn raise then fold', 'turn', 'raiseTo'],
+    ['turn check then fold', 'turn', 'check'],
+  ] as const)(
+    '%s settles without an internal error',
+    (_label, street, action) => {
+      const { rooms, runtime } = playingRoom();
+      const handler = new GameCommandHandler(rooms, runtime, () => 5_000);
+      let hand = startHand({
+        handId: 'hand-1',
+        participants: [
+          { playerId: 'host', seatIndex: 0, stack: 100 },
+          { playerId: 'bob', seatIndex: 1, stack: 100 },
+        ],
+        previousButtonIndex: null,
+        smallBlind: 1,
+        randomSource: { next: () => 0.5 },
+      });
+      hand = applyHandAction(hand, hand.betting.currentActorId!, {
+        type: 'call',
+      });
+      hand = applyHandAction(hand, hand.betting.currentActorId!, {
+        type: 'check',
+      });
+      hand = advanceAfterCompletedBetting(hand);
+      if (street === 'turn') {
+        hand = applyHandAction(hand, hand.betting.currentActorId!, {
+          type: 'check',
+        });
+        hand = applyHandAction(hand, hand.betting.currentActorId!, {
+          type: 'check',
+        });
+        hand = advanceAfterCompletedBetting(hand);
+      }
+      const firstActor = hand.betting.currentActorId!;
+      if (action === 'raiseTo') {
+        hand = applyHandAction(hand, firstActor, {
+          type: 'raiseTo',
+          amount: legalBettingActions(hand.betting, firstActor).minimumRaiseTo!,
+        });
+      } else {
+        hand = applyHandAction(hand, firstActor, { type: 'check' });
+      }
+      const foldingActor = hand.betting.currentActorId!;
+      runtime.replaceCurrentHand('room-1', hand);
+
+      const result = handler.handle(
+        {
+          ...identity,
+          commandId: `${street}-${action}-fold`,
+          playerId: foldingActor,
+          type: 'game.fold',
+        },
+        rooms.get('room-1'),
+      );
+
+      expect(result.stateVersion).toBe(rooms.get('room-1')?.version);
+      expect(rooms.get('room-1')?.phase).toBe('hand-ready');
+    },
+  );
 });

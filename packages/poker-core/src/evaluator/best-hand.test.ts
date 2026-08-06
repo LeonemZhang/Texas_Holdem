@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatCard, parseCard } from '../cards/card.js';
-import { findBestFiveCardHand } from './best-hand.js';
+import {
+  findBestAvailableFiveCardHand,
+  findBestFiveCardHand,
+} from './best-hand.js';
 import { HAND_CATEGORY } from './hand-rank.js';
 
 function best(codes: readonly string[]) {
@@ -48,5 +51,25 @@ describe('findBestFiveCardHand', () => {
     expect(() => best(['As', 'As', 'Qs', 'Js', 'Ts', '2d', '3d'])).toThrow(
       'Duplicate card: As',
     );
+  });
+
+  it('evaluates the five to seven cards available before an early settlement', () => {
+    const result = findBestAvailableFiveCardHand(
+      ['As', 'Ah', 'Ad', 'Ks', 'Qh'].map(parseCard),
+    );
+
+    expect(result.rank).toEqual([HAND_CATEGORY.THREE_OF_A_KIND, 14, 13, 12]);
+    expect(result.cards).toHaveLength(5);
+  });
+
+  it('rejects an unavailable-card count for early settlement evaluation', () => {
+    expect(() =>
+      findBestAvailableFiveCardHand(['As', 'Kh', 'Qd', 'Jc'].map(parseCard)),
+    ).toThrow('Expected at least 5 cards, received 4');
+    expect(() =>
+      findBestAvailableFiveCardHand(
+        ['As', 'Kh', 'Qd', 'Jc', 'Ts', '9h', '8d', '7c'].map(parseCard),
+      ),
+    ).toThrow('Expected at most 7 cards, received 8');
   });
 });

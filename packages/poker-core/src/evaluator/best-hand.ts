@@ -1,5 +1,5 @@
 import type { Card } from '../cards/card.js';
-import { chooseFiveFromSeven } from './combinations.js';
+import { chooseFiveFrom, chooseFiveFromSeven } from './combinations.js';
 import { compareHandRanks } from './compare-hand-ranks.js';
 import { rankFiveCards, type HandRank } from './hand-rank.js';
 
@@ -8,10 +8,9 @@ export interface BestFiveCardHand {
   readonly rank: HandRank;
 }
 
-export function findBestFiveCardHand(
-  sevenCards: readonly Card[],
+function bestFromCombinations(
+  combinations: readonly (readonly Card[])[],
 ): BestFiveCardHand {
-  const combinations = chooseFiveFromSeven(sevenCards);
   let bestCards = combinations[0];
   if (!bestCards) {
     throw new RangeError('No five-card combinations were generated');
@@ -27,4 +26,22 @@ export function findBestFiveCardHand(
   }
 
   return Object.freeze({ cards: bestCards, rank: bestRank });
+}
+
+export function findBestFiveCardHand(
+  sevenCards: readonly Card[],
+): BestFiveCardHand {
+  return bestFromCombinations(chooseFiveFromSeven(sevenCards));
+}
+
+/** Evaluates the best five-card hand from the 5–7 cards available at settlement. */
+export function findBestAvailableFiveCardHand(
+  availableCards: readonly Card[],
+): BestFiveCardHand {
+  if (availableCards.length > 7) {
+    throw new RangeError(
+      `Expected at most 7 cards, received ${availableCards.length}`,
+    );
+  }
+  return bestFromCombinations(chooseFiveFrom(availableCards));
 }

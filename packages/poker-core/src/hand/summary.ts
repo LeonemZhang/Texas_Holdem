@@ -1,5 +1,5 @@
 import { formatCard, type CardCode } from '../cards/card.js';
-import { findBestFiveCardHand } from '../evaluator/best-hand.js';
+import { findBestAvailableFiveCardHand } from '../evaluator/best-hand.js';
 import type { HandRank } from '../evaluator/hand-rank.js';
 import type { ShowdownSettledHand } from './showdown.js';
 import type { UncontestedSettledHand } from './uncontested.js';
@@ -95,7 +95,7 @@ export function createHandSummary(
             ? [...winner.holeCards, ...hand.communityCards]
             : [];
           if (!winner || availableCards.length < 5) return Object.freeze({});
-          const best = findBestFiveCardHand(availableCards);
+          const best = findBestAvailableFiveCardHand(availableCards);
           return Object.freeze({
             [winner.playerId]: Object.freeze({
               rank: best.rank,
