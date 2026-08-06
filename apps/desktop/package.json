@@ -1,6 +1,6 @@
 {
   "name": "@texas-holdem/desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "局域网德州扑克游戏",
   "author": "LeonemZhang",
   "private": true,
