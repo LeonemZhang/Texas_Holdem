@@ -1,36 +1,77 @@
-# Texas Holdem
+# Texas Holdem：局域网 / 虚拟局域网联机德州扑克
 
-> 面向朋友局的本地优先局域网德州扑克。
+> 开源、自托管、无需账号的朋友局无限注德州扑克；Windows 房主，桌面与手机浏览器均可通过 LAN 或 EasyTier 虚拟局域网加入。
 
 [![Quality](https://github.com/LeonemZhang/Texas_Holdem/actions/workflows/quality.yml/badge.svg)](https://github.com/LeonemZhang/Texas_Holdem/actions/workflows/quality.yml)
 [![Latest Release](https://img.shields.io/github/v/release/LeonemZhang/Texas_Holdem?display_name=tag&sort=semver)](https://github.com/LeonemZhang/Texas_Holdem/releases/latest)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078d4)
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](./LICENSE)
 
-Texas Holdem 是一款供朋友通过实体局域网或虚拟局域网游玩的无限注德州扑克游戏。房主使用 Windows 客户端运行权威房间服务，其他玩家可以使用 Windows 客户端，或直接通过手机、电脑浏览器加入。
+Texas Holdem 是一款面向朋友局的开源、自托管无限注德州扑克（No-Limit Texas Hold'em）多人游戏。房主使用 Windows 客户端运行权威房间服务，其他玩家可以使用 Windows 客户端，或直接通过手机、电脑浏览器从实体局域网或 EasyTier 虚拟局域网加入。
 
-**English summary:** Texas Holdem is a local-first no-limit Hold'em game for friends. A Windows host runs the authoritative room service, while other players join from Windows or a browser over a physical LAN or a virtual LAN such as EasyTier. The project does not operate public matchmaking, accounts, payments, or real-money features.
+**English summary:** Texas Holdem is an open-source, self-hosted LAN multiplayer poker game for private no-limit Hold'em tables. A Windows host runs the authoritative room service, while other players join from Windows or a desktop/mobile browser over a physical LAN or a virtual LAN such as EasyTier. The project does not operate public matchmaking, accounts, payments, or real-money features.
 
 ## 界面预览
 
-<table>
-  <tr>
-    <td align="center"><strong>桌面端牌局</strong></td>
-    <td align="center"><strong>桌面端结算</strong></td>
-  </tr>
-  <tr>
-    <td><img src="docs/images/readme/desktop-gameplay.png" alt="桌面端牌局界面" /></td>
-    <td><img src="docs/images/readme/desktop-settlement.png" alt="桌面端结算界面" /></td>
-  </tr>
-  <tr>
-    <td align="center"><strong>手机端牌局</strong></td>
-    <td align="center"><strong>手机端结算</strong></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/images/readme/mobile-gameplay.png" alt="手机端牌局界面" width="393" /></td>
-    <td align="center"><img src="docs/images/readme/mobile-settlement.png" alt="手机端结算界面" width="393" /></td>
-  </tr>
-</table>
+### 牌局
+
+<p align="center">
+  <strong>桌面端 · 1920×1080</strong><br />
+  <img src="docs/images/readme/desktop-gameplay.png" alt="桌面端牌局界面" />
+</p>
+
+<p align="center">
+  <strong>手机端 · 393×852</strong><br />
+  <img src="docs/images/readme/mobile-gameplay.png" alt="手机端牌局界面" width="393" />
+</p>
+
+### 本手结算
+
+<p align="center">
+  <strong>桌面端 · 1920×1080</strong><br />
+  <img src="docs/images/readme/desktop-settlement.png" alt="桌面端结算界面" />
+</p>
+
+<p align="center">
+  <strong>手机端 · 393×852</strong><br />
+  <img src="docs/images/readme/mobile-settlement.png" alt="手机端结算界面" width="393" />
+</p>
+
+### 大厅与座位管理
+
+<p align="center">
+  <strong>桌面端 · 1920×1080</strong><br />
+  <img src="docs/images/readme/desktop-lobby.png" alt="桌面端大厅与座位管理界面" />
+</p>
+
+<p align="center">
+  <strong>手机端 · 393×852</strong><br />
+  <img src="docs/images/readme/mobile-lobby.png" alt="手机端大厅与座位管理界面" width="393" />
+</p>
+
+### 牌局统计
+
+<p align="center">
+  <strong>桌面端 · 1920×1080</strong><br />
+  <img src="docs/images/readme/desktop-statistics.png" alt="桌面端牌局统计界面" />
+</p>
+
+<p align="center">
+  <strong>手机端 · 393×852</strong><br />
+  <img src="docs/images/readme/mobile-statistics.png" alt="手机端牌局统计界面" width="393" />
+</p>
+
+### 筹码交换
+
+<p align="center">
+  <strong>桌面端 · 1920×1080</strong><br />
+  <img src="docs/images/readme/desktop-chip-exchange.png" alt="桌面端筹码交换界面" />
+</p>
+
+<p align="center">
+  <strong>手机端 · 393×852</strong><br />
+  <img src="docs/images/readme/mobile-chip-exchange.png" alt="手机端筹码交换界面" width="393" />
+</p>
 
 ## 核心功能
 
