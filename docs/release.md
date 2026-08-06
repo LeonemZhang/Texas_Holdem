@@ -20,11 +20,17 @@ MSI 使用固定的 UpgradeCode。发布更高版本号的 MSI 时，Windows Ins
 ## 升级源码版本
 
 ```powershell
-pnpm version:set 1.0.0
+pnpm version:set <版本>
 pnpm package:win
 ```
 
 `version:set` 会更新根版本、所有 workspace 清单和房主服务的版本常量。若手动修改了根版本，可运行 `pnpm version:sync`；构建前可用 `pnpm version:check` 验证一致性。
+
+本次 v1.0.1 发布使用：
+
+```powershell
+pnpm version:set 1.0.1
+```
 
 ## 品牌资源
 

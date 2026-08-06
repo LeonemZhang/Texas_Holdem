@@ -11,6 +11,8 @@ Texas Holdem 是一款面向朋友局的开源、自托管无限注德州扑克�
 
 **English summary:** Texas Holdem is an open-source, self-hosted LAN multiplayer poker game for private no-limit Hold'em tables. A Windows host runs the authoritative room service, while other players join from Windows or a desktop/mobile browser over a physical LAN or a virtual LAN such as EasyTier. The project does not operate public matchmaking, accounts, payments, or real-money features.
 
+当前发布版本：`v1.0.1`。本次版本同步 Windows 安装包、便携包与源码版本，并刷新了牌桌、结算、大厅、统计和筹码交换的桌面/手机界面预览；统计预览已包含当前牌型记录组件。
+
 ## 界面预览
 
 ### 牌局
@@ -238,11 +240,12 @@ pnpm package:win
 
 ## 项目文档
 
+- [v1.0.1 发布说明](./docs/releases/v1.0.1.md)
 - [产品规则与明确边界](./docs/product-spec.md)
 - [系统架构与模块职责](./docs/architecture.md)
 - [Windows 打包与版本管理](./docs/release.md)
 - [Luna 增量开发计划](./docs/plans/luna-incremental-plan.md)
-- [最终 Windows 与联机验收记录](./docs/verification/e2e10-final-smoke.md)
+- [v1.0.1 最终 Windows 与联机验收记录](./docs/verification/e2e10-v1.0.1-final-smoke.md)
 
 产品和架构文档是行为修改的事实来源；实现计划与它们冲突时，以产品和架构文档为准。
 
