@@ -21,4 +21,15 @@ describe('UiSmokePreview', () => {
     fireEvent.click(screen.getByRole('tab', { name: '牌型记录' }));
     expect(screen.getByText('本局最高牌型')).toBeInTheDocument();
   });
+
+  it('opens the nickname dialog when the discovery preview joins a room', () => {
+    render(<UiSmokePreview page="room-discovery" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '加入' }));
+
+    expect(
+      screen.getByRole('dialog', { name: '加入“周末牌局”' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('玩家昵称')).toHaveValue('Bob');
+  });
 });

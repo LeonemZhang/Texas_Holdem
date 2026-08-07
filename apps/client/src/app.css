@@ -724,6 +724,30 @@ h1 {
   color: #fda4af;
 }
 
+.discovery-join-dialog__form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.discovery-join-dialog__form label {
+  font-weight: 700;
+}
+
+.discovery-join-dialog__form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgb(167 243 208 / 30%);
+  border-radius: 0.75rem;
+  color: inherit;
+  background: rgb(4 17 14 / 72%);
+  font: inherit;
+}
+
+.discovery-join-dialog__form .form-error {
+  margin-top: 0.1rem;
+}
+
 .nickname-join,
 .game-room-loading {
   margin-top: 1rem;

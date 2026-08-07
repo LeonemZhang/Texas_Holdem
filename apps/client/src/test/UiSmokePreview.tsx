@@ -5,6 +5,7 @@ import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
 
 import { ConnectionGuard } from '../connection/ConnectionGuard';
 import { ConnectionHome } from '../home/ConnectionHome';
+import { DiscoveryJoinDialog } from '../home/DiscoveryJoinDialog';
 import { NetworkDiagnostics } from '../home/NetworkDiagnostics';
 import {
   RoomDiscoveryList,
@@ -507,6 +508,10 @@ function isTablePreviewPage(page: string): page is TablePreviewPage {
 }
 
 export function UiSmokePreview({ page }: { readonly page: string }) {
+  const [previewJoinRoom, setPreviewJoinRoom] = useState<
+    RoomDiscoveryListItem['room'] | null
+  >(null);
+
   if (
     page === 'overview' ||
     page === 'home-browser' ||
@@ -562,8 +567,18 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
             rooms={previewRooms}
             refreshing={false}
             onRefresh={noop}
-            onJoin={noop}
+            onJoin={setPreviewJoinRoom}
           />
+          {previewJoinRoom ? (
+            <DiscoveryJoinDialog
+              key={previewJoinRoom.roomId}
+              roomName={previewJoinRoom.roomName}
+              joining={false}
+              error={null}
+              onCancel={() => setPreviewJoinRoom(null)}
+              onConfirm={() => setPreviewJoinRoom(null)}
+            />
+          ) : null}
         </section>
       </PageShell>
     );

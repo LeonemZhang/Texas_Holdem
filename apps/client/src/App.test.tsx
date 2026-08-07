@@ -460,6 +460,151 @@ describe('application shell', () => {
     );
   });
 
+  it('opens a nickname dialog for a discovered room and joins after confirmation', async () => {
+    const room = {
+      magic: 'TEXAS_HOLDEM_LAN_V1' as const,
+      protocolVersion: PROTOCOL_VERSION,
+      requestId: 'scan-1',
+      type: 'room' as const,
+      roomId: 'room-1',
+      roomName: '周末牌局',
+      hostNickname: 'Alice',
+      hostAddress: '10.126.126.1',
+      httpPort: 32_100,
+      lastSeenAtMs: 1_000,
+      playerCount: 1,
+      maxPlayers: 10,
+      smallBlind: 1,
+      bigBlind: 2,
+      phase: 'lobby' as const,
+    };
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/api/rooms/current')) {
+        return new Response(JSON.stringify({ roomId: room.roomId }));
+      }
+      return new Response(
+        JSON.stringify({
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: room.roomId,
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetcher);
+    window.texasHoldemDesktop = desktopRuntime({
+      scanLanRooms: async () => [room],
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole('heading', { name: '管理对局记录' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '返回首页' }));
+    fireEvent.click(await screen.findByRole('button', { name: '扫描牌桌' }));
+    fireEvent.click(await screen.findByRole('button', { name: '加入' }));
+
+    expect(
+      screen.getByRole('dialog', { name: '加入“周末牌局”' }),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('玩家昵称'), {
+      target: { value: 'Carol' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '确定加入' }));
+
+    expect(await screen.findByText('已恢复对局：room-1')).toBeInTheDocument();
+    expect(fetcher.mock.calls.map(([input]) => String(input))).toEqual([
+      'http://10.126.126.1:32100/api/rooms/current',
+      'http://10.126.126.1:32100/api/rooms/room-1/join',
+    ]);
+  });
+
+  it('uses a new nickname when a player exits, rescans, and resumes a lobby room', async () => {
+    const roomId = 'room-rescan-rename';
+    const room = {
+      magic: 'TEXAS_HOLDEM_LAN_V1' as const,
+      protocolVersion: PROTOCOL_VERSION,
+      requestId: 'scan-rename',
+      type: 'room' as const,
+      roomId,
+      roomName: '周末牌局',
+      hostNickname: 'Alice',
+      hostAddress: '10.126.126.1',
+      httpPort: 32_100,
+      lastSeenAtMs: 1_000,
+      playerCount: 1,
+      maxPlayers: 10,
+      smallBlind: 1,
+      bigBlind: 2,
+      phase: 'lobby' as const,
+    };
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith('/api/rooms/current')) {
+          return new Response(JSON.stringify({ roomId }));
+        }
+        const response = {
+          protocolVersion: PROTOCOL_VERSION,
+          roomId,
+          playerId: 'bob',
+          token: 'bob-reconnect-token-123456',
+          joinUrl: `http://10.126.126.1:32100/?room=${roomId}`,
+          socketPath: '/socket.io',
+        };
+        if (init?.method === 'POST' && url.endsWith('/resume')) {
+          return new Response(JSON.stringify(response));
+        }
+        return new Response(JSON.stringify(response));
+      },
+    );
+    vi.stubGlobal('fetch', fetcher);
+    window.texasHoldemDesktop = desktopRuntime({
+      scanLanRooms: async () => [room],
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole('heading', { name: '管理对局记录' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '返回首页' }));
+    fireEvent.click(await screen.findByRole('button', { name: '扫描牌桌' }));
+    fireEvent.click(await screen.findByRole('button', { name: '加入' }));
+    fireEvent.click(screen.getByRole('button', { name: '确定加入' }));
+    expect(
+      await screen.findByText(`已恢复对局：${roomId}`),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '模拟大厅退出' }));
+    fireEvent.click(await screen.findByRole('button', { name: '加入' }));
+    expect(
+      screen.getByRole('dialog', { name: '恢复“周末牌局”' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('玩家昵称')).toHaveValue('Bob');
+    fireEvent.change(screen.getByLabelText('玩家昵称'), {
+      target: { value: 'Bobby' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '确认恢复' }));
+
+    expect(
+      await screen.findByText(`已恢复对局：${roomId}`),
+    ).toBeInTheDocument();
+    const resumeCall = fetcher.mock.calls
+      .filter(([input]) => String(input).endsWith('/resume'))
+      .at(-1);
+    expect(JSON.parse(String(resumeCall?.[1]?.body))).toMatchObject({
+      nickname: 'Bobby',
+    });
+    expect(
+      fetcher.mock.calls.filter(([input]) => String(input).endsWith('/join')),
+    ).toHaveLength(1);
+  });
+
   it('wires the homepage running-room card to the active host recovery action', async () => {
     const recoverRoomRecord = vi.fn(async () => ({
       protocolVersion: PROTOCOL_VERSION,

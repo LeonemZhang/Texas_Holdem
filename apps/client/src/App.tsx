@@ -10,6 +10,7 @@ import {
 } from './connection/room-session-client.js';
 import { networkErrorMessage } from './connection/error-message.js';
 import { ConnectionHome } from './home/ConnectionHome.js';
+import { DiscoveryJoinDialog } from './home/DiscoveryJoinDialog.js';
 import { NetworkDiagnostics } from './home/NetworkDiagnostics.js';
 import {
   RoomDiscoveryList,
@@ -78,6 +79,10 @@ export function App() {
   const [desktopSetupMode, setDesktopSetupMode] =
     useState<DesktopSetupMode | null>(null);
   const [rooms, setRooms] = useState<readonly RoomDiscoveryListItem[]>([]);
+  const [discoveryJoinRoom, setDiscoveryJoinRoom] = useState<
+    RoomDiscoveryListItem['room'] | null
+  >(null);
+  const [joiningDiscoveredRoom, setJoiningDiscoveredRoom] = useState(false);
   const [refreshingRooms, setRefreshingRooms] = useState(false);
   const [hostService, setHostService] = useState<HostServiceInfo | null>(null);
   const [runningRoomRecord, setRunningRoomRecord] =
@@ -255,70 +260,82 @@ export function App() {
     };
   }, [adapter, hostService, runtime?.kind]);
 
-  const selectHost = async (address: string): Promise<boolean> => {
+  const resolveJoinTarget = async (
+    address: string,
+  ): Promise<JoinTarget | null> => {
     setJoinError(null);
     try {
       const url = new URL(address);
       const roomId =
         url.searchParams.get('room') ??
         (await new RoomSessionClient(url.origin).currentRoomId());
-      if (pendingLobbyResume?.roomId === roomId) {
-        setJoinTarget({ baseUrl: url.origin, roomId });
-        return true;
-      }
-      if (await restoreStoredSession(url.origin, roomId)) return false;
-      setJoinTarget({ baseUrl: url.origin, roomId });
-      return true;
+      return { baseUrl: url.origin, roomId };
     } catch (reason) {
       setJoinError(
         networkErrorMessage(reason instanceof Error ? reason.message : null),
       );
-      return false;
+      return null;
     }
   };
 
-  const join = async (nickname: string) => {
-    if (!joinTarget) return;
+  const selectHost = async (address: string): Promise<boolean> => {
+    const target = await resolveJoinTarget(address);
+    if (!target) return false;
+    if (pendingLobbyResume?.roomId === target.roomId) {
+      setJoinTarget(target);
+      return true;
+    }
+    if (await restoreStoredSession(target.baseUrl, target.roomId)) return false;
+    setJoinTarget(target);
+    return true;
+  };
+
+  const join = async (
+    nickname: string,
+    target: JoinTarget | null = joinTarget,
+  ): Promise<boolean> => {
+    if (!target) return false;
     if (!nickname) {
       setJoinError('请输入昵称');
-      return;
+      return false;
     }
     try {
-      const client = new RoomSessionClient(joinTarget.baseUrl);
+      const client = new RoomSessionClient(target.baseUrl);
       const pendingResume =
-        pendingLobbyResume?.roomId === joinTarget.roomId
+        pendingLobbyResume?.roomId === target.roomId
           ? pendingLobbyResume
           : null;
       let joined: RoomSessionResponse;
       if (pendingResume) {
-        const stored = browserReconnectSessionStore().load(joinTarget.roomId);
+        const stored = browserReconnectSessionStore().load(target.roomId);
         if (!stored) {
           setPendingLobbyResume(null);
           setJoinTarget(null);
           setJoinError('本机恢复身份已失效，请重新加入房间。');
-          return;
+          return false;
         }
-        joined = await client.resume(joinTarget.roomId, {
+        joined = await client.resume(target.roomId, {
           playerId: stored.playerId,
           token: stored.token,
           nickname,
         });
       } else {
-        joined = await client.join(joinTarget.roomId, { nickname });
+        joined = await client.join(target.roomId, { nickname });
       }
       saveSession(joined, false);
+      return true;
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : null;
       if (
         reason instanceof RoomSessionRequestError &&
         reason.code === 'PLAYER_REMOVED'
       ) {
-        browserReconnectSessionStore().clear(joinTarget.roomId);
-        forgetBrowserRoomInUrl(joinTarget.roomId);
+        browserReconnectSessionStore().clear(target.roomId);
+        forgetBrowserRoomInUrl(target.roomId);
         setPendingLobbyResume(null);
         setJoinTarget(null);
         setJoinError('你已被房主移出房间，无法重新加入本场对局。');
-        return;
+        return false;
       }
       setJoinError(
         message === 'Room is not accepting new players'
@@ -327,6 +344,30 @@ export function App() {
             ? '该昵称已被房间中的其他玩家使用，请更换昵称。'
             : networkErrorMessage(message),
       );
+      return false;
+    }
+  };
+
+  const joinDiscoveredRoom = async (nickname: string) => {
+    const room = discoveryJoinRoom;
+    if (!room || joiningDiscoveredRoom) return;
+    setJoiningDiscoveredRoom(true);
+    try {
+      const target = await resolveJoinTarget(
+        `http://${room.hostAddress}:${room.httpPort}`,
+      );
+      if (!target) return;
+      if (
+        pendingLobbyResume?.roomId !== target.roomId &&
+        (await restoreStoredSession(target.baseUrl, target.roomId))
+      ) {
+        setDiscoveryJoinRoom(null);
+        return;
+      }
+      setJoinTarget(target);
+      if (await join(nickname, target)) setDiscoveryJoinRoom(null);
+    } finally {
+      setJoiningDiscoveredRoom(false);
     }
   };
 
@@ -512,9 +553,17 @@ export function App() {
             rooms={rooms}
             refreshing={refreshingRooms}
             onRefresh={() => void refreshRooms()}
-            onJoin={(room) =>
-              void selectHost(`http://${room.hostAddress}:${room.httpPort}`)
-            }
+            onJoin={(room) => {
+              const discoveredRoom = rooms.find(
+                ({ room: candidate }) => candidate.roomId === room.roomId,
+              );
+              if (discoveredRoom?.reconnectable && room.phase !== 'lobby') {
+                void selectHost(`http://${room.hostAddress}:${room.httpPort}`);
+                return;
+              }
+              setJoinError(null);
+              setDiscoveryJoinRoom(room);
+            }}
           />
         </section>
       ) : null}
@@ -532,10 +581,30 @@ export function App() {
           <NetworkDiagnostics runtime={adapter} hostService={hostService} />
         </section>
       ) : null}
-      {joinError && (desktopPanelOpen || homeDataPage) ? (
+      {joinError &&
+      (desktopPanelOpen || (homeDataPage && !discoveryJoinRoom)) ? (
         <p className="form-error" role="alert">
           {joinError}
         </p>
+      ) : null}
+      {discoveryJoinRoom ? (
+        <DiscoveryJoinDialog
+          key={discoveryJoinRoom.roomId}
+          roomName={discoveryJoinRoom.roomName}
+          {...(pendingLobbyResume?.roomId === discoveryJoinRoom.roomId
+            ? {
+                initialNickname: pendingLobbyResume.nickname,
+                resumeNicknameChange: true,
+              }
+            : {})}
+          joining={joiningDiscoveredRoom}
+          error={joinError}
+          onCancel={() => {
+            setDiscoveryJoinRoom(null);
+            setJoinError(null);
+          }}
+          onConfirm={(nickname) => void joinDiscoveredRoom(nickname)}
+        />
       ) : null}
     </PageShell>
   );
