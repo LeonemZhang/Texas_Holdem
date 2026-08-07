@@ -965,7 +965,7 @@ describe('GameRoom', () => {
       await screen.findByLabelText(/Alice 行动剩余 \d+ 秒/),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('牌局进度')).toHaveTextContent(
-      '第 1 局 · 翻牌前 · 当前行动：Alice',
+      '第 1 局 · 翻牌前 · 盲注：1/2 · 当前行动：Alice',
     );
     expect(screen.getByText('行动中')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '退出房间' }));

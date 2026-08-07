@@ -8,7 +8,7 @@ describe('PokerTableLayout', () => {
     render(
       <PokerTableLayout
         roomName="朋友局"
-        handLabel="第 8 局 · 翻牌前 · 当前行动：Alice"
+        handLabel="第 8 局 · 翻牌前 · 盲注：1/2 · 当前行动：Alice"
         seats={<span>Alice 的座位</span>}
         communityCards={<span>翻牌</span>}
         actionTimer={<span>轮到 Alice · 18s</span>}
@@ -20,10 +20,12 @@ describe('PokerTableLayout', () => {
 
     expect(screen.getByRole('heading', { name: '朋友局' })).toBeInTheDocument();
     const gameStatus = screen.getByLabelText('牌局进度');
-    expect(gameStatus).toHaveTextContent('第 8 局 · 翻牌前 · 当前行动：Alice');
+    expect(gameStatus).toHaveTextContent(
+      '第 8 局 · 翻牌前 · 盲注：1/2 · 当前行动：Alice',
+    );
     expect(gameStatus).toHaveAttribute(
       'title',
-      '第 8 局 · 翻牌前 · 当前行动：Alice',
+      '第 8 局 · 翻牌前 · 盲注：1/2 · 当前行动：Alice',
     );
     expect(gameStatus.closest('.poker-table__felt')).toBeInTheDocument();
     expect(

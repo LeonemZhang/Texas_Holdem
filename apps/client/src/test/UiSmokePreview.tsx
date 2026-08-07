@@ -365,7 +365,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
         handLabel={
           handReady
             ? '第 8 局 · 结算与准备'
-            : `第 8 局 · 翻牌 · 当前行动：${actorName}`
+            : `第 8 局 · 翻牌 · 盲注：10/20 · 当前行动：${actorName}`
         }
         status={
           <TableUtilityToolbar
