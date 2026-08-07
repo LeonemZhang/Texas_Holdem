@@ -38,6 +38,16 @@ function numberToIpv4(value: number): string {
   return [24, 16, 8, 0].map((shift) => (value >>> shift) & 255).join('.');
 }
 
+function isIpv4Address(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    ipv4ToNumber(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function ipv4BroadcastAddress(address: string, netmask: string): string {
   const ip = ipv4ToNumber(address);
   const mask = ipv4ToNumber(netmask);
@@ -67,13 +77,28 @@ export class DiscoveryResultSet {
     }
   }
 
-  accept(raw: unknown, requestId: string, receivedAtMs: number): boolean {
+  accept(
+    raw: unknown,
+    requestId: string,
+    receivedAtMs: number,
+    sourceAddress?: string,
+  ): boolean {
     const response = RoomDiscoveryResponseSchema.safeParse(raw);
     if (!response.success || response.data.requestId !== requestId)
       return false;
+    // The advertised address may belong to another host interface. For a
+    // discovery response, the UDP source is the interface that answered this
+    // client's broadcast and is therefore the reachable TCP target.
+    const hostAddress = isIpv4Address(sourceAddress)
+      ? sourceAddress
+      : response.data.hostAddress;
     this.#rooms.set(
       response.data.roomId,
-      Object.freeze({ ...response.data, lastSeenAtMs: receivedAtMs }),
+      Object.freeze({
+        ...response.data,
+        hostAddress,
+        lastSeenAtMs: receivedAtMs,
+      }),
     );
     return true;
   }
@@ -185,13 +210,14 @@ export class LanRoomScanner {
     if (this.#socket) return this.#socket;
     const socket = createSocket('udp4');
     this.#socket = socket;
-    socket.on('message', (message) => {
+    socket.on('message', (message, remote) => {
       if (!this.#requestId) return;
       try {
         this.#results.accept(
           JSON.parse(message.toString('utf8')),
           this.#requestId,
           this.#nowMs(),
+          remote.address,
         );
       } catch {
         // Malformed UDP traffic is ignored at the network boundary.

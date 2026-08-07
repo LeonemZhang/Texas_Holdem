@@ -11,11 +11,16 @@ import {
   ipv4BroadcastAddress,
   listIpv4BroadcastTargets,
 } from './scanner.js';
+import { UdpDiscoveryResponder } from './responder.js';
 
 const scanners: LanRoomScanner[] = [];
+const responders: UdpDiscoveryResponder[] = [];
 
 afterEach(async () => {
-  await Promise.all(scanners.splice(0).map((scanner) => scanner.close()));
+  await Promise.all([
+    ...scanners.splice(0).map((scanner) => scanner.close()),
+    ...responders.splice(0).map((responder) => responder.close()),
+  ]);
 });
 
 const room = {
@@ -82,6 +87,53 @@ describe('LAN room scanner', () => {
       }),
     ]);
     expect(results.list(1_201)).toEqual([]);
+  });
+
+  it('uses the discovery response source address for a reachable multi-NIC host', () => {
+    const results = new DiscoveryResultSet(1_000);
+    expect(results.accept(room, 'scan-1', 100, '192.168.20.10')).toBe(true);
+    expect(results.list(100)).toEqual([
+      expect.objectContaining({
+        roomId: 'room-1',
+        hostAddress: '192.168.20.10',
+      }),
+    ]);
+  });
+
+  it('discovers the host interface that answered the local network request', async () => {
+    const responder = new UdpDiscoveryResponder({
+      bindAddress: '127.0.0.2',
+      discoveryPort: 0,
+      advertisedAddress: '10.126.126.1',
+      httpPort: 32_100,
+      roomSummary: () => ({
+        roomId: room.roomId,
+        roomName: room.roomName,
+        hostNickname: room.hostNickname,
+        playerCount: room.playerCount,
+        maxPlayers: room.maxPlayers,
+        smallBlind: room.smallBlind,
+        bigBlind: room.bigBlind,
+        phase: room.phase,
+      }),
+    });
+    responders.push(responder);
+    const bound = await responder.start();
+    const scanner = new LanRoomScanner({
+      discoveryPort: bound.port,
+      scanWindowMs: 20,
+      interfaces: () => ({
+        TestAdapter: [ipv4('127.0.0.2', '255.255.255.255')],
+      }),
+    });
+    scanners.push(scanner);
+
+    await expect(scanner.scan('scan-1')).resolves.toEqual([
+      expect.objectContaining({
+        roomId: room.roomId,
+        hostAddress: '127.0.0.2',
+      }),
+    ]);
   });
 
   it('opens, scans and closes its UDP resource cleanly', async () => {
