@@ -53,22 +53,22 @@ describe('hand-ready actions', () => {
 
   it('requires at least the current big blind to become ready', () => {
     const { room, handReady } = phase();
-    expect(() => setHandReadyChoice(room, handReady, 'bob', 'ready')).toThrow(
-      'A player needs at least the big blind to become ready',
-    );
+    expect(() =>
+      setHandReadyChoice(room, handReady, 'bob', 'ready', 4),
+    ).toThrow('A player needs at least the big blind to become ready');
 
     const atBigBlind = Object.freeze({
       ...room,
       players: Object.freeze(
         room.players.map((player) =>
           player.playerId === 'bob'
-            ? Object.freeze({ ...player, chips: room.settings.bigBlind })
+            ? Object.freeze({ ...player, chips: 4 })
             : player,
         ),
       ),
     });
     expect(
-      setHandReadyChoice(atBigBlind, handReady, 'bob', 'ready').players.find(
+      setHandReadyChoice(atBigBlind, handReady, 'bob', 'ready', 4).players.find(
         ({ playerId }) => playerId === 'bob',
       )?.choice,
     ).toBe('ready');

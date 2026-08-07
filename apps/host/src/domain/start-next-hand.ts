@@ -22,6 +22,7 @@ export function startNextRoomHand(
     readonly handId: string;
     readonly previousButtonIndex: number;
     readonly smallBlind: number;
+    readonly bigBlind?: number;
     readonly randomSource: RandomSource;
     readonly allowPendingRequests?: boolean;
   },
@@ -47,11 +48,12 @@ export function startNextRoomHand(
   const choices = new Map(
     handReady.players.map(({ playerId, choice }) => [playerId, choice]),
   );
+  const bigBlind = input.bigBlind ?? room.settings.bigBlind;
   const participants = room.players
     .filter(
       ({ playerId, chips, status }) =>
         choices.get(playerId) === 'ready' &&
-        chips >= room.settings.bigBlind &&
+        chips >= bigBlind &&
         !['left', 'removed', 'eliminated'].includes(status),
     )
     .map(({ playerId, seatIndex, chips: stack }) => ({

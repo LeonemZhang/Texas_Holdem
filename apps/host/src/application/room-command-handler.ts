@@ -64,6 +64,8 @@ function incrementVersion(room: RoomState): RoomState {
   return freezeRoom({ ...room, version: room.version + 1 });
 }
 
+type CurrentBigBlindResolver = (roomId: string, room: RoomState) => number;
+
 export class RoomCommandHandler {
   readonly handle: CommandHandler = (command, room) =>
     this.handleCommand(command, room);
@@ -76,6 +78,10 @@ export class RoomCommandHandler {
   constructor(
     private readonly rooms: RoomRepository,
     private readonly randomSource: RandomSource,
+    private readonly currentBigBlind: CurrentBigBlindResolver = (
+      _roomId,
+      room,
+    ) => room.settings.bigBlind,
   ) {}
 
   getCurrentHand(roomId: string): StartedHandState | null {
@@ -165,12 +171,14 @@ export class RoomCommandHandler {
       readonly nowMs: number;
       readonly deadlineElapsed: boolean;
       readonly smallBlind: number;
+      readonly bigBlind?: number;
     },
   ): RoomState | null {
     const room = this.rooms.get(roomId);
     const previousHand = this.#hands.get(roomId);
     const context = this.requireHandReady(roomId);
     if (!room || !previousHand) return null;
+    const bigBlind = input.bigBlind ?? this.currentBigBlind(roomId, room);
     let ready = context.ready;
     const requests = context.requests;
     if (input.deadlineElapsed) {
@@ -188,7 +196,7 @@ export class RoomCommandHandler {
         ready.players.some(
           (player) => player.playerId === playerId && player.choice === 'ready',
         ) &&
-        chips >= room.settings.bigBlind &&
+        chips >= bigBlind &&
         !['left', 'removed', 'eliminated'].includes(status),
     ).length;
     if (readyPlayerCount < 2) {
@@ -201,6 +209,7 @@ export class RoomCommandHandler {
       handId: input.handId,
       previousButtonIndex: previousHand.positions.button.index,
       smallBlind: input.smallBlind,
+      bigBlind,
       randomSource: this.randomSource,
       allowPendingRequests: input.deadlineElapsed,
     });
@@ -426,6 +435,7 @@ export class RoomCommandHandler {
             context.ready,
             command.playerId,
             command.choice,
+            this.currentBigBlind(room.roomId, room),
           ),
         );
         return this.accepted(incrementVersion(room));

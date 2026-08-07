@@ -15,6 +15,7 @@ export function setHandReadyChoice(
   state: HandReadyState,
   playerId: string,
   choice: Exclude<HandReadyChoice, 'pending'>,
+  bigBlind = room.settings.bigBlind,
 ): HandReadyState {
   if (room.phase !== 'hand-ready' || state.roomId !== room.roomId) {
     throw new RangeError('Room is not in this hand-ready phase');
@@ -28,7 +29,7 @@ export function setHandReadyChoice(
   if (!readiness || !roomPlayer) {
     throw new RangeError(`Player is not in hand readiness: ${playerId}`);
   }
-  if (choice === 'ready' && roomPlayer.chips < room.settings.bigBlind) {
+  if (choice === 'ready' && roomPlayer.chips < bigBlind) {
     throw new RangeError(
       'A player needs at least the big blind to become ready',
     );

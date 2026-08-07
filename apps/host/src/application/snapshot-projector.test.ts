@@ -37,6 +37,40 @@ function startedRoom() {
 }
 
 describe('projectPlayerSnapshot', () => {
+  it('projects the blind level actually used by an active hand', () => {
+    const started = startedRoom();
+    const grownHand = {
+      ...started.hand,
+      smallBlind: 20,
+      bigBlind: 40,
+    };
+    const snapshot = projectPlayerSnapshot({
+      room: started.room,
+      viewerPlayerId: 'host',
+      sequence: 1,
+      hand: grownHand,
+    });
+
+    expect(snapshot.room.smallBlind).toBe(20);
+    expect(snapshot.room.bigBlind).toBe(40);
+    expect(snapshot.room.settings?.smallBlind).toBe(1);
+  });
+
+  it('projects the upcoming grown blind during hand readiness', () => {
+    const started = startedRoom();
+    const room = { ...started.room, phase: 'hand-ready' as const };
+    const snapshot = projectPlayerSnapshot({
+      room,
+      viewerPlayerId: 'host',
+      sequence: 2,
+      completedHands: 10,
+      hand: started.hand,
+    });
+
+    expect(snapshot.room.smallBlind).toBe(2);
+    expect(snapshot.room.bigBlind).toBe(4);
+  });
+
   it('projects only the viewing player hole cards for host and guest alike', () => {
     const started = startedRoom();
     const hostSnapshot = projectPlayerSnapshot({

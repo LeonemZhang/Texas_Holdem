@@ -1,4 +1,5 @@
 import {
+  calculateBlindLevel,
   HAND_CATEGORY,
   actionOrderForStreet,
   formatCard,
@@ -290,6 +291,14 @@ export function projectPlayerSnapshot(
   const requests = input.chipRequests ?? null;
   const currentViewer = handPlayer(hand, input.viewerPlayerId);
   const actionOrder = actionOrderByPlayerId(hand);
+  const blindLevel =
+    hand && input.room.phase !== 'hand-ready'
+      ? hand
+      : calculateBlindLevel(
+          input.room.settings.smallBlind,
+          input.completedHands ?? 0,
+          input.room.settings.blindGrowth,
+        );
   const currentChips = (player: RoomPlayer) => player.chips;
   const statistics =
     input.statistics ??
@@ -316,8 +325,8 @@ export function projectPlayerSnapshot(
       roomName: input.room.settings.roomName,
       phase: input.room.phase,
       initialChips: input.room.settings.initialChips,
-      smallBlind: input.room.settings.smallBlind,
-      bigBlind: input.room.settings.bigBlind,
+      smallBlind: blindLevel.smallBlind,
+      bigBlind: blindLevel.bigBlind,
       settings: {
         roomName: input.room.settings.roomName,
         maxPlayers: input.room.settings.maxPlayers,
