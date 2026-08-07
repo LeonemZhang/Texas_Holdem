@@ -1723,6 +1723,31 @@ body:has(.poker-table-page) .poker-table-controls {
 .hole-cards {
   position: relative;
   z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: clamp(0.18rem, 0.8vw, 0.5rem);
+}
+
+.hole-cards__hand-type {
+  grid-column: 1;
+  justify-self: end;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid rgb(45 212 191 / 58%);
+  border-radius: 0.55rem;
+  color: #ccfbf1;
+  background: rgb(6 78 59 / 82%);
+  font-size: clamp(0.66rem, 1.65vw, 0.84rem);
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.hole-cards__cards {
+  display: flex;
+  grid-column: 2;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.18rem, 0.8vw, 0.5rem);
 }
 
 .showdown-hands {

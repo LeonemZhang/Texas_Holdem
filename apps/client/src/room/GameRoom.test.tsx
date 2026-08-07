@@ -825,6 +825,13 @@ describe('GameRoom', () => {
           settlement: {
             ...handReadySnapshot.game!.settlement!,
             voluntaryRevealedHoleCards: { bob: ['2c', '3d'] },
+            revealedHandResults: [
+              {
+                playerId: 'bob',
+                handType: 'one-pair',
+                bestFiveCards: ['As', 'Ad', 'Kc', 'Qd', 'Jh'],
+              },
+            ],
           },
         },
       }),
@@ -836,6 +843,11 @@ describe('GameRoom', () => {
       within(screen.getByLabelText('本手结算玩家牌型')).getByText('Bob')
         .parentElement,
     ).toHaveTextContent('Bob· 1,250 筹码输掉 20 筹码');
+    expect(
+      within(screen.getByLabelText('本手结算玩家牌型')).getByLabelText(
+        'Bob 的一对',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('does not render removed players on the poker table', async () => {

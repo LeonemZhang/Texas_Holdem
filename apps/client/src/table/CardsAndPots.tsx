@@ -9,6 +9,7 @@ export interface CardsAndPotsProps {
   readonly streetPots: readonly StreetPotView[];
   readonly currentStreet?: StreetPotView['street'] | 'settled' | undefined;
   readonly ownHoleCards?: readonly string[] | null;
+  readonly ownHandType?: string | null;
   readonly showdownHands?: readonly {
     readonly playerId: string;
     readonly nickname: string;
@@ -66,6 +67,7 @@ export function CardsAndPots({
   streetPots,
   currentStreet,
   ownHoleCards = null,
+  ownHandType = null,
   showdownHands = [],
 }: CardsAndPotsProps) {
   return (
@@ -119,14 +121,24 @@ export function CardsAndPots({
         </ul>
       ) : (
         <div className="hole-cards" aria-label="我的底牌">
-          <PlayingCard
-            code={ownHoleCards?.[0] ?? null}
-            label="我的第一张底牌"
-          />
-          <PlayingCard
-            code={ownHoleCards?.[1] ?? null}
-            label="我的第二张底牌"
-          />
+          {ownHandType ? (
+            <span
+              className="hole-cards__hand-type"
+              aria-label={`当前最大牌型：${ownHandType}`}
+            >
+              {ownHandType}
+            </span>
+          ) : null}
+          <div className="hole-cards__cards">
+            <PlayingCard
+              code={ownHoleCards?.[0] ?? null}
+              label="我的第一张底牌"
+            />
+            <PlayingCard
+              code={ownHoleCards?.[1] ?? null}
+              label="我的第二张底牌"
+            />
+          </div>
         </div>
       )}
     </div>

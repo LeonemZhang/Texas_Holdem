@@ -53,6 +53,7 @@ const snapshot = {
     totalPot: 3,
     streetPots: [{ street: 'preflop', amount: 3 }],
     ownHoleCards: ['As', 'Kd'],
+    ownHandType: 'straight',
     legalActions: {
       canFold: true,
       canCheck: false,
@@ -91,6 +92,7 @@ describe('PlayerSnapshotSchema', () => {
       room: { initialChips: 100 },
       game: {
         ownHoleCards: ['As', 'Kd'],
+        ownHandType: 'straight',
         totalPot: 3,
         streetPots: [{ street: 'preflop', amount: 3 }],
         showdownHoleCards: {},

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCard, type ShowdownSettledHand } from '@texas-holdem/poker-core';
+import {
+  formatCard,
+  parseCard,
+  type ShowdownSettledHand,
+  type UncontestedSettledHand,
+} from '@texas-holdem/poker-core';
 
 import { createRoom } from '../domain/room.js';
 import { joinRoom } from '../domain/join-room.js';
@@ -56,6 +61,7 @@ describe('projectPlayerSnapshot', () => {
 
     expect(hostSnapshot.game?.ownHoleCards).toEqual(hostCards);
     expect(bobSnapshot.game?.ownHoleCards).toEqual(bobCards);
+    expect(hostSnapshot.game?.ownHandType).toBeNull();
     expect(hostSnapshot.game?.actionDeadlineMs).toBe(30_000);
     expect(hostSnapshot.game?.totalPot).toBe(3);
     expect(hostSnapshot.game?.streetPots).toEqual([
@@ -192,5 +198,72 @@ describe('projectPlayerSnapshot', () => {
       host: 99,
       bob: -2,
     });
+  });
+
+  it('projects the current best hand type after five cards are available', () => {
+    const started = startedRoom();
+    const hand = {
+      ...started.hand,
+      communityCards: [parseCard('Qd'), parseCard('Jh'), parseCard('Tc')],
+      players: started.hand.players.map((player) =>
+        player.playerId === 'host'
+          ? {
+              ...player,
+              holeCards: [parseCard('As'), parseCard('Ks')] as const,
+            }
+          : player,
+      ),
+    };
+
+    const snapshot = projectPlayerSnapshot({
+      room: started.room,
+      viewerPlayerId: 'host',
+      sequence: 2,
+      hand,
+    });
+
+    expect(snapshot.game?.ownHandType).toBe('straight');
+  });
+
+  it('projects a hand type for a voluntarily revealed player when five cards exist', () => {
+    const started = startedRoom();
+    const hand = {
+      ...started.hand,
+      communityCards: [parseCard('Qd'), parseCard('Jh'), parseCard('Tc')],
+      players: started.hand.players.map((player) =>
+        player.playerId === 'host'
+          ? {
+              ...player,
+              holeCards: [parseCard('As'), parseCard('Ks')] as const,
+            }
+          : player,
+      ),
+      settlement: {
+        reason: 'uncontested' as const,
+        winnerIds: ['host'],
+        payouts: { host: 100 },
+        revealedHoleCards: {},
+      },
+    } as unknown as UncontestedSettledHand;
+    const room = {
+      ...started.room,
+      phase: 'hand-ready' as const,
+      voluntarilyRevealedHoleCardPlayerIds: ['host'],
+    };
+
+    const snapshot = projectPlayerSnapshot({
+      room,
+      viewerPlayerId: 'bob',
+      sequence: 2,
+      hand,
+    });
+
+    expect(snapshot.game?.settlement?.revealedHandResults).toEqual([
+      {
+        playerId: 'host',
+        handType: 'straight',
+        bestFiveCards: ['Qd', 'Jh', 'Tc', 'As', 'Ks'],
+      },
+    ]);
   });
 });

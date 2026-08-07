@@ -123,6 +123,7 @@ export const PlayerSnapshotSchema = z.object({
       totalPot: AmountSchema.optional().default(0),
       streetPots: z.array(StreetPotSchema).max(4).optional().default([]),
       ownHoleCards: z.array(CardCodeSchema).length(2).nullable(),
+      ownHandType: HandTypeSchema.nullable().optional(),
       showdownHoleCards: z
         .record(IdSchema, z.array(CardCodeSchema).length(2))
         .optional()
@@ -142,6 +143,15 @@ export const PlayerSnapshotSchema = z.object({
               }),
             )
             .default([]),
+          revealedHandResults: z
+            .array(
+              z.object({
+                playerId: IdSchema,
+                handType: HandTypeSchema,
+                bestFiveCards: z.array(CardCodeSchema).length(5),
+              }),
+            )
+            .optional(),
           voluntaryRevealedHoleCards: z
             .record(IdSchema, z.array(CardCodeSchema).length(2))
             .optional()

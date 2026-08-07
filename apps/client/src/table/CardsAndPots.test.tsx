@@ -45,11 +45,25 @@ describe('CardsAndPots', () => {
         totalPot={120}
         streetPots={[{ street: 'river', amount: 120 }]}
         ownHoleCards={['Ah', 'Ks']}
+        ownHandType="顺子"
       />,
     );
     expect(screen.getByLabelText('公共牌牌面')).toBeInTheDocument();
     expect(screen.getByLabelText('本手底池')).toBeInTheDocument();
-    expect(screen.getByLabelText('我的底牌')).toBeInTheDocument();
+    const ownHand = screen.getByLabelText('我的底牌');
+    expect(ownHand).toBeInTheDocument();
+    expect(screen.getByLabelText('当前最大牌型：顺子')).toHaveTextContent(
+      '顺子',
+    );
+    expect(ownHand.querySelector('.hole-cards__hand-type')).toHaveTextContent(
+      '顺子',
+    );
+    expect(ownHand.querySelector('.hole-cards__cards')).not.toBeNull();
+    expect(
+      ownHand
+        .querySelector('.hole-cards__cards')
+        ?.querySelectorAll('.playing-card'),
+    ).toHaveLength(2);
     expect(screen.getByLabelText('我的第一张底牌 A♥')).toBeInTheDocument();
   });
 

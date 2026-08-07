@@ -2,7 +2,9 @@ import {
   HAND_CATEGORY,
   actionOrderForStreet,
   formatCard,
+  findBestAvailableFiveCardHand,
   legalBettingActions,
+  type Card,
   type StartedHandState,
   type ShowdownSettledHand,
   type UncontestedSettledHand,
@@ -125,6 +127,24 @@ function showdownHoleCards(
   );
 }
 
+function handTypeForCards(
+  cards: readonly Card[],
+): (typeof handTypeByCategory)[keyof typeof handTypeByCategory] | null {
+  if (cards.length < 5) return null;
+  const best = findBestAvailableFiveCardHand(cards);
+  return handTypeByCategory[best.rank[0]];
+}
+
+function currentViewerHandType(
+  hand: StartedHandState | null,
+  playerId: string,
+): (typeof handTypeByCategory)[keyof typeof handTypeByCategory] | null {
+  const player = handPlayer(hand, playerId);
+  return player
+    ? handTypeForCards([...(hand?.communityCards ?? []), ...player.holeCards])
+    : null;
+}
+
 function settlementSummary(
   hand: StartedHandState | null,
   voluntarilyRevealedHoleCardPlayerIds: readonly string[],
@@ -134,6 +154,11 @@ function settlementSummary(
   readonly payouts: Readonly<Record<string, number>>;
   readonly netChanges: Readonly<Record<string, number>>;
   readonly showdownResults: readonly {
+    readonly playerId: string;
+    readonly handType: (typeof handTypeByCategory)[keyof typeof handTypeByCategory];
+    readonly bestFiveCards: readonly string[];
+  }[];
+  readonly revealedHandResults: readonly {
     readonly playerId: string;
     readonly handType: (typeof handTypeByCategory)[keyof typeof handTypeByCategory];
     readonly bestFiveCards: readonly string[];
@@ -158,6 +183,24 @@ function settlementSummary(
         }),
       )
     : [];
+  const revealedHandResults = voluntarilyRevealedHoleCardPlayerIds.flatMap(
+    (playerId) => {
+      const player = hand.players.find(
+        (candidate) => candidate.playerId === playerId,
+      );
+      if (!player) return [];
+      const availableCards = [...hand.communityCards, ...player.holeCards];
+      if (availableCards.length < 5) return [];
+      const best = findBestAvailableFiveCardHand(availableCards);
+      return [
+        {
+          playerId,
+          handType: handTypeByCategory[best.rank[0]],
+          bestFiveCards: best.cards.map(formatCard),
+        },
+      ];
+    },
+  );
   const voluntaryRevealedHoleCards = Object.fromEntries(
     voluntarilyRevealedHoleCardPlayerIds.flatMap((playerId) => {
       const player = hand.players.find(
@@ -174,6 +217,7 @@ function settlementSummary(
     payouts: hand.settlement.payouts,
     netChanges,
     showdownResults,
+    revealedHandResults,
     voluntaryRevealedHoleCards,
   };
 }
@@ -289,6 +333,7 @@ export function projectPlayerSnapshot(
           ownHoleCards: currentViewer
             ? currentViewer.holeCards.map(formatCard)
             : null,
+          ownHandType: currentViewerHandType(hand, input.viewerPlayerId),
           showdownHoleCards: showdownHoleCards(hand),
           settlement: settlementSummary(
             hand,

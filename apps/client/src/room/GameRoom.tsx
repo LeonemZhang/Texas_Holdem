@@ -522,17 +522,21 @@ export function GameRoom({
 
   const game = snapshot.game;
   const gameSettlement = game?.settlement;
+  const settlementHandResults = [
+    ...(gameSettlement?.showdownResults ?? []),
+    ...(gameSettlement?.revealedHandResults ?? []),
+  ];
   const settlementHandTypes = new Map(
-    gameSettlement?.showdownResults.map((result) => [
+    settlementHandResults.map((result) => [
       result.playerId,
       handTypeLabels[result.handType] ?? result.handType,
-    ]) ?? [],
+    ]),
   );
   const settlementBestFiveCards = new Map(
-    gameSettlement?.showdownResults.map((result) => [
+    settlementHandResults.map((result) => [
       result.playerId,
       result.bestFiveCards,
-    ]) ?? [],
+    ]),
   );
   const settlementHoleCards = new Map(
     game ? Object.entries(game.showdownHoleCards) : [],
@@ -651,6 +655,11 @@ export function GameRoom({
               streetPots={game?.streetPots ?? []}
               currentStreet={game?.street}
               ownHoleCards={game?.ownHoleCards ?? null}
+              ownHandType={
+                game?.ownHandType
+                  ? (handTypeLabels[game.ownHandType] ?? game.ownHandType)
+                  : null
+              }
             />
           )
         }

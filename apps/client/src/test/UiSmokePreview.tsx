@@ -393,6 +393,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
                 { street: 'flop', amount: 160 },
               ]}
               ownHoleCards={['Ah', 'Ks']}
+              ownHandType="顺子"
             />
           )
         }
