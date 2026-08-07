@@ -1,5 +1,11 @@
 import type { PlayerSnapshot } from '@texas-holdem/protocol';
 
+const DEFAULT_SOUND_VOLUME_MULTIPLIER = 18;
+const TURN_CLOCK_PERIOD_MS = 2_000;
+const TURN_CLOCK_TICK_DURATION_MS = 160;
+const TURN_CLOCK_TOCK_DURATION_MS = 100;
+const TURN_CLOCK_VOLUME_MULTIPLIER = 10;
+
 type PlayerActionSound = 'fold' | 'check' | 'call' | 'raise' | 'all-in';
 
 export type PokerSoundCue =
@@ -84,6 +90,8 @@ type BrowserAudioContext = AudioContext;
 export class PokerSoundEffects {
   #context: BrowserAudioContext | null = null;
   #removeUnlockListeners: (() => void) | null = null;
+  #turnClockTimer: number | null = null;
+  #turnClockDeadlineMs: number | null = null;
 
   enableOnFirstInteraction(): void {
     if (this.#removeUnlockListeners || typeof window === 'undefined') return;
@@ -110,7 +118,43 @@ export class PokerSoundEffects {
     cues.forEach((cue, index) => this.playCue(context, cue, index * 0.18));
   }
 
+  setTurnClock(deadlineMs: number | null): void {
+    if (
+      deadlineMs === null ||
+      deadlineMs <= Date.now() ||
+      deadlineMs === this.#turnClockDeadlineMs
+    ) {
+      if (deadlineMs === null || deadlineMs <= Date.now()) {
+        this.stopTurnClock();
+      }
+      return;
+    }
+
+    this.stopTurnClock();
+    this.#turnClockDeadlineMs = deadlineMs;
+    this.scheduleTurnClock(TURN_CLOCK_PERIOD_MS);
+  }
+
+  private scheduleTurnClock(delayMs: number): void {
+    this.#turnClockTimer = window.setTimeout(() => {
+      if (
+        this.#turnClockDeadlineMs === null ||
+        Date.now() >= this.#turnClockDeadlineMs
+      ) {
+        this.stopTurnClock();
+        return;
+      }
+      this.playTurnClockPair();
+      this.scheduleTurnClock(
+        TURN_CLOCK_PERIOD_MS -
+          TURN_CLOCK_TICK_DURATION_MS -
+          TURN_CLOCK_TOCK_DURATION_MS,
+      );
+    }, delayMs);
+  }
+
   dispose(): void {
+    this.stopTurnClock();
     this.#removeUnlockListeners?.();
     this.#removeUnlockListeners = null;
     void this.#context?.close();
@@ -155,8 +199,8 @@ export class PokerSoundEffects {
         this.tone(context, 360, start, 0.13, 0.055, 'sawtooth', 150);
         return;
       case 'check':
-        this.tone(context, 330, start, 0.035, 0.05, 'square');
-        this.tone(context, 270, start + 0.055, 0.035, 0.04, 'square');
+        this.tone(context, 520, start, 0.045, 0.05);
+        this.tone(context, 700, start + 0.055, 0.055, 0.042);
         return;
       case 'call':
         this.tone(context, 660, start, 0.07, 0.06);
@@ -168,10 +212,60 @@ export class PokerSoundEffects {
         );
         return;
       case 'all-in':
-        [196, 262, 330, 523].forEach((frequency, index) =>
-          this.tone(context, frequency, start + index * 0.06, 0.14, 0.07),
+        this.tone(context, 98, start, 0.26, 0.03, 'sawtooth', 73);
+        this.tone(context, 147, start + 0.07, 0.2, 0.025, 'sawtooth', 196);
+        this.tone(context, 196, start + 0.14, 0.16, 0.025, 'square', 294);
+        [196, 294, 392].forEach((frequency) =>
+          this.tone(context, frequency, start + 0.22, 0.34, 0.015, 'sawtooth'),
         );
     }
+  }
+
+  private playTurnClockPair(): void {
+    const context = this.#context;
+    if (!context || context.state !== 'running') return;
+    const start = context.currentTime;
+    this.tone(
+      context,
+      1_900,
+      start,
+      0.05,
+      0.009,
+      'square',
+      1_900,
+      0.006,
+      TURN_CLOCK_VOLUME_MULTIPLIER,
+    );
+    this.tone(
+      context,
+      1_350,
+      start,
+      0.16,
+      0.01,
+      'triangle',
+      1_350,
+      0.025,
+      TURN_CLOCK_VOLUME_MULTIPLIER,
+    );
+    this.tone(
+      context,
+      760,
+      start + 0.16,
+      0.1,
+      0.018,
+      'triangle',
+      520,
+      0.02,
+      TURN_CLOCK_VOLUME_MULTIPLIER,
+    );
+  }
+
+  private stopTurnClock(): void {
+    if (this.#turnClockTimer !== null) {
+      window.clearTimeout(this.#turnClockTimer);
+      this.#turnClockTimer = null;
+    }
+    this.#turnClockDeadlineMs = null;
   }
 
   private tone(
@@ -182,6 +276,8 @@ export class PokerSoundEffects {
     volume: number,
     type: OscillatorType = 'sine',
     endFrequency = frequency,
+    attackDuration = 0.01,
+    volumeMultiplier = DEFAULT_SOUND_VOLUME_MULTIPLIER,
   ): void {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
@@ -192,7 +288,10 @@ export class PokerSoundEffects {
       start + duration,
     );
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(volume, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(
+      volume * volumeMultiplier,
+      start + attackDuration,
+    );
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start(start);

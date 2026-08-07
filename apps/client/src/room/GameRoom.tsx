@@ -201,6 +201,11 @@ export function GameRoom({
         setPotChipFlights((current) => [...current, ...flights]);
       }
       soundEffects.play(pokerSoundCues(latestSnapshot.current, next));
+      soundEffects.setTurnClock(
+        next.game?.currentActorId === next.playerId
+          ? (next.game.actionDeadlineMs ?? null)
+          : null,
+      );
       latestSnapshot.current = next;
       setSnapshot(next);
       setError(null);
