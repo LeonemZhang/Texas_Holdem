@@ -19,7 +19,10 @@ import { syncLiveChipBalances } from './live-chip-balances.js';
 import type { CommandHandlerResult } from './command-dispatcher.js';
 import type { RoomCommandHandler } from './room-command-handler.js';
 import type { RoomRepository } from './room-registry.js';
-import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
+import type {
+  PlayerActionEvent,
+  RecordedPlayerAction,
+} from '../statistics/basic-statistics.js';
 
 export interface GameCommandHandlerHooks {
   readonly onPlayerAction?: (event: PlayerActionEvent) => void;
@@ -38,6 +41,21 @@ function toBettingAction(command: BettingCommand): BettingAction {
       return { type: 'raiseTo', amount: command.amount };
     case 'game.all-in':
       return { type: 'allIn' };
+  }
+}
+
+function toRecordedAction(command: BettingCommand): RecordedPlayerAction {
+  switch (command.type) {
+    case 'game.fold':
+      return 'fold';
+    case 'game.check':
+      return 'check';
+    case 'game.call':
+      return 'call';
+    case 'game.raise-to':
+      return 'raiseTo';
+    case 'game.all-in':
+      return 'allIn';
   }
 }
 
@@ -69,12 +87,9 @@ export class GameCommandHandler {
       type: 'player.action',
       handId: hand.handId,
       playerId: command.playerId,
-      action:
-        command.type === 'game.raise-to'
-          ? 'raiseTo'
-          : command.type.slice('game.'.length),
+      action: toRecordedAction(command),
       street: hand.street,
-    } as PlayerActionEvent);
+    } satisfies PlayerActionEvent);
     if (isBettingRoundComplete(nextHand.betting)) {
       const contenders = nextHand.players.filter(
         ({ status }) => status !== 'folded',

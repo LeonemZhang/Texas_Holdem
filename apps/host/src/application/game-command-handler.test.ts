@@ -10,6 +10,7 @@ import {
 import { GameCommandHandler } from './game-command-handler.js';
 import { RoomCommandHandler } from './room-command-handler.js';
 import { InMemoryRoomRegistry } from './room-registry.js';
+import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
 
 const identity = {
   protocolVersion: '3' as const,
@@ -210,7 +211,13 @@ describe('GameCommandHandler', () => {
     );
 
     const allIn = playingRoom();
-    const allInHandler = new GameCommandHandler(allIn.rooms, allIn.runtime);
+    const actions: PlayerActionEvent[] = [];
+    const allInHandler = new GameCommandHandler(
+      allIn.rooms,
+      allIn.runtime,
+      Date.now,
+      { onPlayerAction: (event) => actions.push(event) },
+    );
     const allInHand = allIn.runtime.getCurrentHand('room-1')!;
     const allInPlayer = allInHand.betting.currentActorId!;
     allInHandler.handle(
@@ -227,6 +234,7 @@ describe('GameCommandHandler', () => {
         .getCurrentHand('room-1')
         ?.players.find(({ playerId }) => playerId === allInPlayer)?.status,
     ).toBe('all-in');
+    expect(actions.at(-1)).toMatchObject({ action: 'allIn' });
   });
 
   it('settles an uncontested hand, conserves chips, and enters timed hand readiness', () => {

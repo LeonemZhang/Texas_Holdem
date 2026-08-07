@@ -1,3 +1,10 @@
+import {
+  compareHandRanks,
+  findBestAvailableFiveCardHand,
+  parseCard,
+  type HandSummaryEvent,
+} from '@texas-holdem/poker-core';
+
 import type { PlayerActionEvent } from './basic-statistics.js';
 
 export interface HeadsUpShowdownLossEvent {
@@ -17,6 +24,56 @@ export interface RiverComebackEvent {
 
 export type StatisticsFactEvent =
   PlayerActionEvent | HeadsUpShowdownLossEvent | RiverComebackEvent;
+
+export function createRiverComebackEvents(
+  summary: HandSummaryEvent,
+): readonly RiverComebackEvent[] {
+  if (
+    summary.reason !== 'showdown' ||
+    summary.communityCards.length !== 5 ||
+    summary.winnerIds.length === 0
+  ) {
+    return [];
+  }
+
+  const boardBeforeRiver = summary.communityCards.slice(0, 4).map(parseCard);
+  const rankedPlayers = summary.participants.flatMap(({ playerId }) => {
+    const holeCards = summary.revealedHoleCards[playerId];
+    if (!holeCards || holeCards.length !== 2) return [];
+    return [
+      {
+        playerId,
+        rank: findBestAvailableFiveCardHand([
+          ...holeCards.map(parseCard),
+          ...boardBeforeRiver,
+        ]).rank,
+      },
+    ];
+  });
+  if (rankedPlayers.length < 2) return [];
+
+  const leadingRank = rankedPlayers.reduce(
+    (current, candidate) =>
+      compareHandRanks(candidate.rank, current) > 0 ? candidate.rank : current,
+    rankedPlayers[0]!.rank,
+  );
+  const leadersBeforeRiver = rankedPlayers
+    .filter(({ rank }) => compareHandRanks(rank, leadingRank) === 0)
+    .map(({ playerId }) => playerId);
+
+  return summary.winnerIds
+    .filter(
+      (playerId) =>
+        rankedPlayers.some((player) => player.playerId === playerId) &&
+        !leadersBeforeRiver.includes(playerId),
+    )
+    .map((winnerPlayerId) => ({
+      type: 'showdown.river-comeback' as const,
+      handId: summary.handId,
+      winnerPlayerId,
+      leadersBeforeRiver,
+    }));
+}
 
 export interface FactPlayerStatistics {
   readonly playerId: string;

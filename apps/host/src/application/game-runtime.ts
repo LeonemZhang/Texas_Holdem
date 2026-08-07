@@ -21,6 +21,7 @@ import {
   type StatisticsFactStorePort,
   type StoredStatisticsFact,
 } from './statistics-store.js';
+import { createRiverComebackEvents } from '../statistics/fact-statistics.js';
 import {
   CommandDispatcher,
   type ClientCommand,
@@ -633,13 +634,17 @@ export class GameRuntime implements RoomSessionBootstrapService {
           this.#roomHandler.getCurrentHand(roomId)?.handId === summary.handId,
       );
     if (!room) return;
+    const facts = this.#facts.get(summary.handId) ?? [];
+    for (const event of createRiverComebackEvents(summary)) {
+      facts.push({ factId: randomUUID(), event });
+    }
+    this.#facts.set(summary.handId, facts);
     if (summary.reason === 'showdown' && summary.participants.length === 2) {
       const winner = summary.winnerIds[0];
       const loser = summary.participants.find(
         ({ playerId }) => !summary.winnerIds.includes(playerId),
       )?.playerId;
       if (winner && loser) {
-        const facts = this.#facts.get(summary.handId) ?? [];
         facts.push({
           factId: randomUUID(),
           event: {
@@ -650,7 +655,6 @@ export class GameRuntime implements RoomSessionBootstrapService {
             contenderCount: 2,
           },
         });
-        this.#facts.set(summary.handId, facts);
       }
     }
     if (this.#statisticsStore) {

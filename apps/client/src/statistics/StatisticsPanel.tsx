@@ -285,7 +285,13 @@ export function StatisticsPanel({
                         .map((id) => nicknames.get(id) ?? id)
                         .join('、')}
                 </span>
-                <small>{award.value === null ? '—' : award.value}</small>
+                <small>
+                  {award.value === null
+                    ? '—'
+                    : award.title === 'tight-player'
+                      ? `${(award.value * 100).toFixed(2)}%`
+                      : award.value}
+                </small>
               </li>
             ))}
           </ul>

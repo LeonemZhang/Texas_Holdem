@@ -615,6 +615,52 @@ describe('GameRuntime', () => {
     runtime.dispose();
   });
 
+  it('counts live all-in actions in player statistics and titles', () => {
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime);
+    context.send(context.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    context.send(context.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+
+    const firstActor = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!.game!.currentActorId!;
+    expect(context.send(firstActor, { type: 'game.all-in' })).toMatchObject({
+      status: 'accepted',
+    });
+    const secondActor = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!.game!.currentActorId!;
+    expect(context.send(secondActor, { type: 'game.all-in' })).toMatchObject({
+      status: 'accepted',
+    });
+
+    const snapshot = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!;
+    expect(
+      snapshot.statistics.players.find(
+        ({ playerId }) => playerId === firstActor,
+      )?.actions.allIn,
+    ).toBe(1);
+    const allInTitle = snapshot.statistics.titles.find(
+      ({ title }) => title === 'all-in-king',
+    );
+    expect(allInTitle?.value).toBe(1);
+    expect(allInTitle?.playerIds).toEqual(
+      expect.arrayContaining([firstActor, secondActor]),
+    );
+    runtime.dispose();
+  });
+
   it('marks unanswered players sitting-out when the readiness deadline elapses', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);

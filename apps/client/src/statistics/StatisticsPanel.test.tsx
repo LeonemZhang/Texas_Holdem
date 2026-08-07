@@ -123,6 +123,20 @@ describe('StatisticsPanel', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('全押次数最多。');
   });
 
+  it('formats the tight-player ratio with two decimal places', () => {
+    render(
+      <StatisticsPanel
+        open
+        players={[player('a', 'Alice', 1_000)]}
+        titles={[{ title: 'tight-player', playerIds: ['a'], value: 0.7 }]}
+        onCollapse={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: '局内称号' }));
+    expect(screen.getByText('70.00%')).toBeInTheDocument();
+  });
+
   it('shows the authoritative global owner and five cards in hand records', () => {
     render(
       <StatisticsPanel
