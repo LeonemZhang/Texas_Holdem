@@ -109,30 +109,34 @@ export function startHand(options: StartHandOptions): StartedHandState {
     }
   }
 
-  const players = options.participants.map((participant) => {
-    const blind =
-      participant.playerId === positions.bigBlind.playerId
-        ? bigBlind
-        : participant.playerId === positions.smallBlind.playerId
-          ? options.smallBlind
-          : 0;
-    const paid = Math.min(blind, participant.stack);
-    const cards = holeCards.get(participant.playerId);
-    if (!cards?.[0] || !cards[1]) {
-      throw new RangeError(`Missing hole cards for ${participant.playerId}`);
-    }
-    return Object.freeze({
-      playerId: participant.playerId,
-      seatIndex: participant.seatIndex,
-      stack: participant.stack - paid,
-      streetCommitted: paid,
-      totalCommitted: paid,
-      status:
-        paid === participant.stack ? ('all-in' as const) : ('active' as const),
-      lastAction: paid === participant.stack ? 'allIn' : null,
-      holeCards: Object.freeze([cards[0], cards[1]]) as readonly [Card, Card],
-    });
-  });
+  const players = options.participants
+    .map((participant) => {
+      const blind =
+        participant.playerId === positions.bigBlind.playerId
+          ? bigBlind
+          : participant.playerId === positions.smallBlind.playerId
+            ? options.smallBlind
+            : 0;
+      const paid = Math.min(blind, participant.stack);
+      const cards = holeCards.get(participant.playerId);
+      if (!cards?.[0] || !cards[1]) {
+        throw new RangeError(`Missing hole cards for ${participant.playerId}`);
+      }
+      return Object.freeze({
+        playerId: participant.playerId,
+        seatIndex: participant.seatIndex,
+        stack: participant.stack - paid,
+        streetCommitted: paid,
+        totalCommitted: paid,
+        status:
+          paid === participant.stack
+            ? ('all-in' as const)
+            : ('active' as const),
+        lastAction: paid === participant.stack ? 'allIn' : null,
+        holeCards: Object.freeze([cards[0], cards[1]]) as readonly [Card, Card],
+      });
+    })
+    .sort((left, right) => left.seatIndex - right.seatIndex);
   const firstActor = actionOrderForStreet(seats, positions, 'preflop').find(
     (seat) =>
       players.find(({ playerId }) => playerId === seat.playerId)?.status ===

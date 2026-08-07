@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatCard } from '../cards/card.js';
+import { applyHandAction } from './hand-reducer.js';
 import { startHand } from './start-hand.js';
 
 const zeroRandom = { next: () => 0 };
@@ -49,6 +50,40 @@ describe('startHand', () => {
       hand.positions.bigBlind.playerId,
     ]).toEqual(['a', 'b', 'c']);
     expect(hand.betting.currentActorId).toBe('a');
+  });
+
+  it('keeps subsequent actions in physical seat order when participants are unsorted', () => {
+    let hand = startHand({
+      handId: 'h-unsorted',
+      participants: [
+        { playerId: 'seat-2', seatIndex: 2, stack: 100 },
+        { playerId: 'seat-0', seatIndex: 0, stack: 100 },
+        { playerId: 'seat-3', seatIndex: 3, stack: 100 },
+        { playerId: 'seat-1', seatIndex: 1, stack: 100 },
+      ],
+      previousButtonIndex: null,
+      smallBlind: 5,
+      randomSource: zeroRandom,
+    });
+    const actors: string[] = [];
+
+    while (hand.betting.currentActorId !== null) {
+      const actorId = hand.betting.currentActorId;
+      const actor = hand.betting.players.find(
+        ({ playerId }) => playerId === actorId,
+      );
+      if (!actor) throw new Error(`Missing actor ${actorId}`);
+      actors.push(actorId);
+      hand = applyHandAction(
+        hand,
+        actorId,
+        actor.streetCommitted === hand.betting.currentBet
+          ? { type: 'check' }
+          : { type: 'call' },
+      );
+    }
+
+    expect(actors).toEqual(['seat-3', 'seat-0', 'seat-1', 'seat-2']);
   });
 
   it('deals two unique cards per player and conserves stack plus investments', () => {
