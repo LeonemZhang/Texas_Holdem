@@ -827,6 +827,59 @@ describe('GameRuntime', () => {
     runtime.dispose();
   });
 
+  it('counts a heads-up loss after other players fold before showdown', () => {
+    const runtime = new GameRuntime();
+    const host = runtime.create(
+      { hostNickname: 'Alice', settings },
+      'http://10.126.126.1:32100',
+    );
+    const guest = runtime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      'http://10.126.126.1:32100',
+    );
+    const folded = runtime.join(
+      host.roomId,
+      { nickname: 'Carol' },
+      'http://10.126.126.1:32100',
+    );
+    let commandNumber = 0;
+    const send = (playerId: string, command: Record<string, unknown>) =>
+      runtime.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: `three-player-${++commandNumber}`,
+        roomId: host.roomId,
+        playerId,
+        expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+        ...command,
+      });
+    send(host.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(guest.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(folded.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(host.playerId, {
+      type: 'room.start-first-hand',
+      handId: 'three-player-hand',
+    });
+
+    while (
+      runtime.snapshot(host.roomId, host.playerId)!.room.phase === 'playing'
+    ) {
+      const actor = runtime.snapshot(host.roomId, host.playerId)!.game!
+        .currentActorId;
+      if (!actor) break;
+      send(actor, {
+        type: actor === folded.playerId ? 'game.fold' : 'game.all-in',
+      });
+    }
+
+    const title = runtime
+      .snapshot(host.roomId, host.playerId)!
+      .statistics.titles.find(({ title }) => title === 'unlucky-player');
+    expect(title).toMatchObject({ value: 1, playerIds: expect.any(Array) });
+    expect(title?.playerIds).toHaveLength(1);
+    runtime.dispose();
+  });
+
   it('marks unanswered players sitting-out when the readiness deadline elapses', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);

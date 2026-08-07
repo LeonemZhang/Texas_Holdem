@@ -659,11 +659,12 @@ export class GameRuntime implements RoomSessionBootstrapService {
       facts.push({ factId: randomUUID(), event });
     }
     this.#facts.set(summary.handId, facts);
-    if (summary.reason === 'showdown' && summary.participants.length === 2) {
+    const showdownPlayerIds = Object.keys(summary.revealedHoleCards);
+    if (summary.reason === 'showdown' && showdownPlayerIds.length === 2) {
       const winner = summary.winnerIds[0];
-      const loser = summary.participants.find(
-        ({ playerId }) => !summary.winnerIds.includes(playerId),
-      )?.playerId;
+      const loser = showdownPlayerIds.find(
+        (playerId) => !summary.winnerIds.includes(playerId),
+      );
       if (winner && loser) {
         facts.push({
           factId: randomUUID(),
