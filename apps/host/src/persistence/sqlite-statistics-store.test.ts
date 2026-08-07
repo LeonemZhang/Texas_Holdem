@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { HandSummaryEvent } from '@texas-holdem/poker-core';
+import { HAND_CATEGORY, type HandSummaryEvent } from '@texas-holdem/poker-core';
 
 import { rebuildStatistics } from '../application/statistics-store.js';
 import { HOST_MIGRATIONS } from './migrations.js';
@@ -58,6 +58,18 @@ describe('SQLite statistics fact store', () => {
     const store = new SqliteStatisticsStore(database);
     try {
       store.saveSummary('room-1', 1, summary, 2);
+      const updatedSummary: HandSummaryEvent = {
+        ...summary,
+        revealedHoleCards: { alice: ['As', 'Ad'], bob: ['Ks', 'Kd'] },
+        evaluatedHands: {
+          alice: {
+            rank: [HAND_CATEGORY.ONE_PAIR, 14, 13, 9, 5, 2],
+            bestFiveCards: ['As', 'Ad', '9c', '5s', '2c'],
+          },
+        },
+      };
+      store.updateSummary('room-1', updatedSummary);
+      expect(store.loadSummaries('room-1')).toEqual([updatedSummary]);
       store.saveFacts(
         'room-1',
         [
@@ -113,7 +125,7 @@ describe('SQLite statistics fact store', () => {
         rebuilt.titles.find(({ title }) => title === 'unlucky-player')
           ?.playerIds,
       ).toEqual(['bob']);
-      expect(store.loadSummaries('room-1')).toEqual([summary]);
+      expect(store.loadSummaries('room-1')).toEqual([updatedSummary]);
     } finally {
       database.close();
     }

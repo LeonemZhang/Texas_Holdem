@@ -243,6 +243,7 @@ parentPort?.on('message', ({ data }) => {
             rebuildStatistics(
               {
                 saveSummary: () => undefined,
+                updateSummary: () => undefined,
                 saveFacts: () => undefined,
                 loadSummaries: (roomId) =>
                   statisticsStore.loadSummaries(roomId),

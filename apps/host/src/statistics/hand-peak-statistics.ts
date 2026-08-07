@@ -27,14 +27,22 @@ export function reduceHandPeakStatistics(
   );
   let hasLegacyCoverageGap = false;
   for (const summary of summaries) {
-    if (summary.reason === 'uncontested') continue;
-    if (!summary.evaluatedHands) {
+    const evaluatedHands =
+      summary.reason === 'uncontested'
+        ? Object.fromEntries(
+            Object.entries(summary.evaluatedHands ?? {}).filter(
+              ([playerId]) =>
+                playerId in summary.revealedHoleCards &&
+                summary.winnerIds.includes(playerId),
+            ),
+          )
+        : summary.evaluatedHands;
+    if (!evaluatedHands || Object.keys(evaluatedHands).length === 0) {
+      if (summary.reason === 'uncontested') continue;
       hasLegacyCoverageGap = true;
       continue;
     }
-    for (const [playerId, evaluated] of Object.entries(
-      summary.evaluatedHands,
-    )) {
+    for (const [playerId, evaluated] of Object.entries(evaluatedHands)) {
       const current = players[playerId];
       if (!current || compareHandRanks(evaluated.rank, current.rank) > 0) {
         players[playerId] = Object.freeze({

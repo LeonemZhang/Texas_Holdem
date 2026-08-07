@@ -58,6 +58,111 @@ function reachHandReady(runtime: GameRuntime, handReadyTimeoutSeconds = 30) {
   return { host, guest, send };
 }
 
+function reachFlopUncontestedHandReady(runtime: GameRuntime) {
+  const host = runtime.create(
+    { hostNickname: 'Alice', settings },
+    'http://10.126.126.1:32100',
+  );
+  const guest = runtime.join(
+    host.roomId,
+    { nickname: 'Bob' },
+    'http://10.126.126.1:32100',
+  );
+  let commandNumber = 0;
+  const send = (playerId: string, command: Record<string, unknown>) =>
+    runtime.dispatch({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: `flop-command-${++commandNumber}`,
+      roomId: host.roomId,
+      playerId,
+      expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+      ...command,
+    });
+  send(host.playerId, { type: 'room.set-lobby-ready', ready: true });
+  send(guest.playerId, { type: 'room.set-lobby-ready', ready: true });
+  send(host.playerId, { type: 'room.start-first-hand', handId: 'flop-hand' });
+  let actorId = runtime.snapshot(host.roomId, host.playerId)!.game!
+    .currentActorId!;
+  send(actorId, { type: 'game.call' });
+  actorId = runtime.snapshot(host.roomId, host.playerId)!.game!.currentActorId!;
+  send(actorId, { type: 'game.check' });
+  expect(runtime.snapshot(host.roomId, host.playerId)!.game?.street).toBe(
+    'flop',
+  );
+  actorId = runtime.snapshot(host.roomId, host.playerId)!.game!.currentActorId!;
+  send(actorId, { type: 'game.fold' });
+  expect(runtime.snapshot(host.roomId, host.playerId)?.room.phase).toBe(
+    'hand-ready',
+  );
+  return {
+    host,
+    guest,
+    send,
+    winnerId: actorId === host.playerId ? guest.playerId : host.playerId,
+  };
+}
+
+function reachShowdownWithFoldedPlayerReady(runtime: GameRuntime) {
+  const host = runtime.create(
+    { hostNickname: 'Alice', settings },
+    'http://10.126.126.1:32100',
+  );
+  const folded = runtime.join(
+    host.roomId,
+    { nickname: 'Bob' },
+    'http://10.126.126.1:32100',
+  );
+  const third = runtime.join(
+    host.roomId,
+    { nickname: 'Carol' },
+    'http://10.126.126.1:32100',
+  );
+  let commandNumber = 0;
+  const send = (playerId: string, command: Record<string, unknown>) =>
+    runtime.dispatch({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: `showdown-command-${++commandNumber}`,
+      roomId: host.roomId,
+      playerId,
+      expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+      ...command,
+    });
+  send(host.playerId, { type: 'room.set-lobby-ready', ready: true });
+  send(folded.playerId, { type: 'room.set-lobby-ready', ready: true });
+  send(third.playerId, { type: 'room.set-lobby-ready', ready: true });
+  send(host.playerId, {
+    type: 'room.start-first-hand',
+    handId: 'showdown-with-folded-hand',
+  });
+
+  let foldedPlayer = false;
+  for (let actionNumber = 0; actionNumber < 100; actionNumber += 1) {
+    const current = runtime.snapshot(host.roomId, host.playerId)!;
+    if (current.room.phase === 'hand-ready') break;
+    const actorId = current.game?.currentActorId;
+    if (!actorId) throw new Error('Showdown hand has no current actor');
+    if (!foldedPlayer && actorId === folded.playerId) {
+      send(actorId, { type: 'game.fold' });
+      foldedPlayer = true;
+      continue;
+    }
+    const actorSnapshot = runtime.snapshot(host.roomId, actorId)!;
+    const legalActions = actorSnapshot.game?.legalActions;
+    const action = legalActions?.canCheck
+      ? 'game.check'
+      : typeof legalActions?.callAmount === 'number'
+        ? 'game.call'
+        : 'game.all-in';
+    send(actorId, { type: action });
+  }
+
+  const settled = runtime.snapshot(host.roomId, host.playerId)!;
+  expect(foldedPlayer).toBe(true);
+  expect(settled.room.phase).toBe('hand-ready');
+  expect(settled.game?.settlement?.reason).toBe('showdown');
+  return { host, folded, send };
+}
+
 describe('GameRuntime', () => {
   it('keeps one public history record per chip action across recovery', () => {
     vi.useFakeTimers();
@@ -168,6 +273,67 @@ describe('GameRuntime', () => {
     expect(() =>
       context.send(context.guest.playerId, { type: 'game.show-hole-cards' }),
     ).toThrow('already voluntarily revealed');
+    runtime.dispose();
+  });
+
+  it('adds a voluntarily revealed uncontested hand to hand peak statistics', () => {
+    const runtime = new GameRuntime();
+    const context = reachFlopUncontestedHandReady(runtime);
+    const before = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!;
+    const beforeHandPeaks = before.statistics.handPeaks;
+    if (!beforeHandPeaks) throw new Error('Hand peak statistics are missing');
+    expect(beforeHandPeaks.players).toEqual([]);
+
+    expect(
+      context.send(context.winnerId, { type: 'game.show-hole-cards' }),
+    ).toMatchObject({ status: 'accepted' });
+
+    const after = runtime.snapshot(context.host.roomId, context.host.playerId)!;
+    const revealedHandResults = after.game?.settlement?.revealedHandResults;
+    if (!revealedHandResults)
+      throw new Error('Revealed hand results are missing');
+    const revealed = revealedHandResults.find(
+      ({ playerId }) => playerId === context.winnerId,
+    );
+    if (!revealed) throw new Error('Revealed winner hand is missing');
+    const afterHandPeaks = after.statistics.handPeaks;
+    if (!afterHandPeaks) throw new Error('Hand peak statistics are missing');
+    expect(afterHandPeaks.players).toContainEqual({
+      playerId: context.winnerId,
+      handType: revealed.handType,
+      bestFiveCards: revealed.bestFiveCards,
+    });
+    expect(afterHandPeaks.global).toMatchObject({
+      playerIds: [context.winnerId],
+      bestFiveCards: revealed.bestFiveCards,
+    });
+    runtime.dispose();
+  });
+
+  it('does not add a folded player who reveals after a multi-player showdown', () => {
+    const runtime = new GameRuntime();
+    const context = reachShowdownWithFoldedPlayerReady(runtime);
+
+    expect(
+      context.send(context.folded.playerId, {
+        type: 'game.show-hole-cards',
+      }),
+    ).toMatchObject({ status: 'accepted' });
+
+    const after = runtime.snapshot(context.host.roomId, context.host.playerId)!;
+    expect(
+      after.game?.settlement?.revealedHandResults?.some(
+        ({ playerId }) => playerId === context.folded.playerId,
+      ),
+    ).toBe(true);
+    expect(
+      after.statistics.handPeaks?.players.some(
+        ({ playerId }) => playerId === context.folded.playerId,
+      ),
+    ).toBe(false);
     runtime.dispose();
   });
 
@@ -869,6 +1035,12 @@ describe('GameRuntime', () => {
     const facts: StatisticsFactEvent[] = [];
     const store: StatisticsFactStorePort = {
       saveSummary: (_roomId, _sequence, summary) => summaries.push(summary),
+      updateSummary: (_roomId, summary) => {
+        const index = summaries.findIndex(
+          ({ handId }) => handId === summary.handId,
+        );
+        if (index >= 0) summaries[index] = summary;
+      },
       saveFacts: (_roomId, stored: readonly StoredStatisticsFact[]) =>
         facts.push(...stored.map(({ event }) => event)),
       loadSummaries: () => summaries,
@@ -918,6 +1090,12 @@ describe('GameRuntime', () => {
     const facts: StatisticsFactEvent[] = [];
     const store: StatisticsFactStorePort = {
       saveSummary: (_roomId, _sequence, summary) => summaries.push(summary),
+      updateSummary: (_roomId, summary) => {
+        const index = summaries.findIndex(
+          ({ handId }) => handId === summary.handId,
+        );
+        if (index >= 0) summaries[index] = summary;
+      },
       saveFacts: (_roomId, stored: readonly StoredStatisticsFact[]) =>
         facts.push(...stored.map(({ event }) => event)),
       loadSummaries: () => summaries,

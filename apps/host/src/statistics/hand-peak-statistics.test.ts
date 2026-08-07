@@ -75,6 +75,43 @@ describe('reduceHandPeakStatistics', () => {
     ]);
   });
 
+  it('includes an uncontested hand after the player voluntarily reveals', () => {
+    const revealed: HandSummaryEvent = {
+      ...summary,
+      handId: 'revealed-uncontested-hand',
+      reason: 'uncontested',
+      revealedHoleCards: {
+        a: ['As', 'Ks'],
+        b: ['Qc', 'Qd'],
+      },
+      evaluatedHands: {
+        a: {
+          rank: [HAND_CATEGORY.STRAIGHT_FLUSH, 14, 13, 12, 11, 10],
+          bestFiveCards: ['As', 'Ks', 'Qs', 'Js', 'Ts'],
+        },
+        b: {
+          rank: [HAND_CATEGORY.FOUR_OF_A_KIND, 12, 14, 13, 11, 10],
+          bestFiveCards: ['Qc', 'Qd', 'Qs', 'Qh', 'As'],
+        },
+      },
+    };
+
+    const result = reduceHandPeakStatistics(['a', 'b'], [revealed]);
+
+    expect(result.global).toMatchObject({
+      playerIds: ['a'],
+      bestFiveCards: ['As', 'Ks', 'Qs', 'Js', 'Ts'],
+    });
+    expect(result.players.a?.bestFiveCards).toEqual([
+      'As',
+      'Ks',
+      'Qs',
+      'Js',
+      'Ts',
+    ]);
+    expect(result.players.b).toBeNull();
+  });
+
   it('marks summaries without evaluated hands as legacy coverage gaps', () => {
     const { evaluatedHands: _evaluatedHands, ...legacy } = summary;
     expect(reduceHandPeakStatistics(['a'], [legacy]).hasLegacyCoverageGap).toBe(

@@ -31,6 +31,7 @@ export interface StatisticsFactStorePort {
     summary: HandSummaryEvent,
     createdAtMs: number,
   ): void;
+  updateSummary(roomId: string, summary: HandSummaryEvent): void;
   saveFacts(
     roomId: string,
     facts: readonly StoredStatisticsFact[],

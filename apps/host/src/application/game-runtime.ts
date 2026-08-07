@@ -37,7 +37,14 @@ import {
 } from './session-authenticator.js';
 import { projectPlayerSnapshot } from './snapshot-projector.js';
 import { createStatisticsView } from './statistics-view.js';
-import type { HandSummaryEvent } from '@texas-holdem/poker-core';
+import {
+  calculateBlindLevel,
+  findBestAvailableFiveCardHand,
+  formatCard,
+  type HandSummaryEvent,
+  type ShowdownSettledHand,
+  type UncontestedSettledHand,
+} from '@texas-holdem/poker-core';
 import type { RoomRecoveryState } from './persistence-ports.js';
 import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
 import type { ChipRequestBook } from '../domain/chip-requests.js';
@@ -74,9 +81,18 @@ export class GameRuntime implements RoomSessionBootstrapService {
     (roomId, playerId) => this.snapshot(roomId, playerId),
   );
 
-  readonly #roomHandler = new RoomCommandHandler(this.rooms, {
-    next: () => Math.random(),
-  });
+  readonly #roomHandler = new RoomCommandHandler(
+    this.rooms,
+    {
+      next: () => Math.random(),
+    },
+    (roomId, room) =>
+      calculateBlindLevel(
+        room.settings.smallBlind,
+        this.#completedHands.get(roomId) ?? 0,
+        room.settings.blindGrowth,
+      ).bigBlind,
+  );
   readonly #summaries = new Map<string, HandSummaryEvent[]>();
   readonly #facts = new Map<string, StoredStatisticsFact[]>();
   readonly #gameHandler = new GameCommandHandler(
@@ -172,6 +188,9 @@ export class GameRuntime implements RoomSessionBootstrapService {
     if (response.status !== 'accepted') return response;
     const command = input as ClientCommand;
     const afterCommand = this.rooms.get(command.roomId);
+    if (command.type === 'game.show-hole-cards') {
+      this.recordVoluntaryHoleCardReveal(command.roomId, command.playerId);
+    }
     if (
       previousRoom?.phase === 'playing' &&
       afterCommand?.phase === 'hand-ready'
@@ -476,6 +495,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     const rebuilt = rebuildStatistics(
       {
         saveSummary: () => undefined,
+        updateSummary: () => undefined,
         saveFacts: () => undefined,
         loadSummaries: () => summaries,
         loadFacts: () => facts.map(({ event }) => event),
@@ -678,6 +698,63 @@ export class GameRuntime implements RoomSessionBootstrapService {
     this.#summaries.set(room, summaries);
   }
 
+  private recordVoluntaryHoleCardReveal(
+    roomId: string,
+    playerId: string,
+  ): void {
+    const hand = this.#roomHandler.getCurrentHand(roomId);
+    if (!hand || !('settlement' in hand)) return;
+    const settledHand = hand as ShowdownSettledHand | UncontestedSettledHand;
+    const player = hand.players.find(
+      (candidate) => candidate.playerId === playerId,
+    );
+    const availableCards = player
+      ? [...hand.communityCards, ...player.holeCards]
+      : [];
+    if (!player || availableCards.length < 5) return;
+
+    const summaries = this.#statisticsStore
+      ? this.#statisticsStore.loadSummaries(roomId)
+      : (this.#summaries.get(roomId) ?? []);
+    const summary = summaries.find(({ handId }) => handId === hand.handId);
+    if (!summary) return;
+
+    const best = findBestAvailableFiveCardHand(availableCards);
+    const shouldRecordHandPeak =
+      settledHand.settlement.reason === 'showdown'
+        ? playerId in settledHand.settlement.bestHands
+        : settledHand.settlement.winnerIds.includes(playerId);
+    const updatedSummary = Object.freeze({
+      ...summary,
+      revealedHoleCards: Object.freeze({
+        ...summary.revealedHoleCards,
+        [playerId]: Object.freeze(player.holeCards.map(formatCard)),
+      }),
+      ...(shouldRecordHandPeak
+        ? {
+            evaluatedHands: Object.freeze({
+              ...(summary.evaluatedHands ?? {}),
+              [playerId]: Object.freeze({
+                rank: best.rank,
+                bestFiveCards: Object.freeze(best.cards.map(formatCard)),
+              }),
+            }),
+          }
+        : {}),
+    });
+
+    if (this.#statisticsStore) {
+      this.#statisticsStore.updateSummary(roomId, updatedSummary);
+      return;
+    }
+    const inMemorySummaries = this.#summaries.get(roomId);
+    if (!inMemorySummaries) return;
+    const index = inMemorySummaries.findIndex(
+      ({ handId }) => handId === hand.handId,
+    );
+    if (index >= 0) inMemorySummaries[index] = updatedSummary;
+  }
+
   private recordPlayerAction(event: PlayerActionEvent): void {
     const facts = this.#facts.get(event.handId) ?? [];
     facts.push({ factId: randomUUID(), event });
@@ -692,19 +769,17 @@ export class GameRuntime implements RoomSessionBootstrapService {
     const ready = this.#roomHandler.getHandReady(roomId);
     if (!room || !ready || room.phase !== 'hand-ready') return false;
     const completedHands = this.#completedHands.get(roomId) ?? 0;
-    const growth = room.settings.blindGrowth;
-    const growthSteps = growth.enabled
-      ? Math.floor(completedHands / growth.intervalHands)
-      : 0;
-    const smallBlind = Math.max(
-      1,
-      Math.floor(room.settings.smallBlind * growth.multiplier ** growthSteps),
+    const blindLevel = calculateBlindLevel(
+      room.settings.smallBlind,
+      completedHands,
+      room.settings.blindGrowth,
     );
     const started = this.#roomHandler.startNextHandIfReady(roomId, {
       handId: randomUUID(),
       nowMs: Date.now(),
       deadlineElapsed,
-      smallBlind,
+      smallBlind: blindLevel.smallBlind,
+      bigBlind: blindLevel.bigBlind,
     });
     if (!started) return false;
     const timer = this.#handReadyTimers.get(roomId);

@@ -81,6 +81,28 @@ export class SqliteStatisticsStore implements StatisticsFactStorePort {
       );
   }
 
+  updateSummary(roomId: string, summary: HandSummaryEvent): void {
+    const payload = JSON.stringify(summary);
+    this.database
+      .prepare(
+        `
+        UPDATE hand_summaries
+        SET summary_json = ?
+        WHERE room_id = ? AND hand_id = ?
+      `,
+      )
+      .run(payload, roomId, summary.handId);
+    this.database
+      .prepare(
+        `
+        UPDATE events
+        SET payload_json = ?
+        WHERE room_id = ? AND event_id = ?
+      `,
+      )
+      .run(payload, roomId, `statistics-summary-${summary.handId}`);
+  }
+
   saveFacts(
     roomId: string,
     facts: readonly StoredStatisticsFact[],
