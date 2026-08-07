@@ -56,4 +56,29 @@ describe('distributeDivisiblePots', () => {
       ),
     ).toThrow('Pot 0 requires odd-chip distribution');
   });
+
+  it('refunds an unmatched folded contribution without selecting a winner', () => {
+    const result = distributeDivisiblePots(
+      [
+        {
+          amount: 100,
+          contributorIds: ['a', 'b'],
+          eligiblePlayerIds: ['a'],
+        },
+        {
+          amount: 100,
+          contributorIds: ['b'],
+          eligiblePlayerIds: [],
+          unmatchedPlayerId: 'b',
+        },
+      ],
+      { a: [HAND_CATEGORY.ONE_PAIR, 14, 10, 9, 8] },
+    );
+    expect(result.payouts).toEqual({ a: 100, b: 100 });
+    expect(result.awards[1]).toMatchObject({
+      winnerIds: [],
+      refundedPlayerId: 'b',
+      equalShare: 100,
+    });
+  });
 });

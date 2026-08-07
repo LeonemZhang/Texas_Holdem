@@ -4,6 +4,8 @@ export interface Pot {
   readonly amount: number;
   readonly contributorIds: readonly string[];
   readonly eligiblePlayerIds: readonly string[];
+  /** A single contributor's excess is returned, not won, even if folded. */
+  readonly unmatchedPlayerId?: string;
 }
 
 export function buildPots(
@@ -15,14 +17,18 @@ export function buildPots(
       .map(({ playerId }) => playerId),
   );
   return Object.freeze(
-    buildContributionTiers(contributions).map((tier) =>
-      Object.freeze({
+    buildContributionTiers(contributions).map((tier) => {
+      const eligiblePlayerIds = tier.contributorIds.filter(
+        (playerId) => !folded.has(playerId),
+      );
+      const unmatchedPlayerId =
+        tier.contributorIds.length === 1 ? tier.contributorIds[0] : undefined;
+      return Object.freeze({
         amount: tier.amount,
         contributorIds: tier.contributorIds,
-        eligiblePlayerIds: Object.freeze(
-          tier.contributorIds.filter((playerId) => !folded.has(playerId)),
-        ),
-      }),
-    ),
+        eligiblePlayerIds: Object.freeze(eligiblePlayerIds),
+        ...(unmatchedPlayerId ? { unmatchedPlayerId } : {}),
+      });
+    }),
   );
 }

@@ -35,4 +35,46 @@ describe('buildPots', () => {
     expect(pots.reduce((sum, pot) => sum + pot.amount, 0)).toBe(270);
     expect(pots[2]?.eligiblePlayerIds).toEqual(['c']);
   });
+
+  it('marks an unmatched all-in layer as a refund instead of a won side pot', () => {
+    const pots = buildPots([
+      { playerId: 'a', amount: 100, folded: false },
+      { playerId: 'b', amount: 200, folded: false },
+    ]);
+
+    expect(pots).toEqual([
+      {
+        amount: 200,
+        contributorIds: ['a', 'b'],
+        eligiblePlayerIds: ['a', 'b'],
+      },
+      {
+        amount: 100,
+        contributorIds: ['b'],
+        eligiblePlayerIds: ['b'],
+        unmatchedPlayerId: 'b',
+      },
+    ]);
+  });
+
+  it('marks an unmatched folded layer as a refund too', () => {
+    expect(
+      buildPots([
+        { playerId: 'a', amount: 100, folded: false },
+        { playerId: 'b', amount: 200, folded: true },
+      ]),
+    ).toEqual([
+      {
+        amount: 200,
+        contributorIds: ['a', 'b'],
+        eligiblePlayerIds: ['a'],
+      },
+      {
+        amount: 100,
+        contributorIds: ['b'],
+        eligiblePlayerIds: [],
+        unmatchedPlayerId: 'b',
+      },
+    ]);
+  });
 });
