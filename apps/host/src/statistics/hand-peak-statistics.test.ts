@@ -47,6 +47,34 @@ describe('reduceHandPeakStatistics', () => {
     ]);
   });
 
+  it('excludes evaluated hands from uncontested wins', () => {
+    const uncontested: HandSummaryEvent = {
+      ...summary,
+      handId: 'uncontested-hand',
+      reason: 'uncontested',
+      evaluatedHands: {
+        a: {
+          rank: [HAND_CATEGORY.STRAIGHT_FLUSH, 14, 13, 12, 11, 10],
+          bestFiveCards: ['As', 'Ks', 'Qs', 'Js', 'Ts'],
+        },
+      },
+    };
+
+    const result = reduceHandPeakStatistics(['a', 'b'], [uncontested, summary]);
+
+    expect(result.global).toMatchObject({
+      playerIds: ['a'],
+      bestFiveCards: ['As', 'Ks', 'Qs', 'Js', '9s'],
+    });
+    expect(result.players.a?.bestFiveCards).toEqual([
+      'As',
+      'Ks',
+      'Qs',
+      'Js',
+      '9s',
+    ]);
+  });
+
   it('marks summaries without evaluated hands as legacy coverage gaps', () => {
     const { evaluatedHands: _evaluatedHands, ...legacy } = summary;
     expect(reduceHandPeakStatistics(['a'], [legacy]).hasLegacyCoverageGap).toBe(

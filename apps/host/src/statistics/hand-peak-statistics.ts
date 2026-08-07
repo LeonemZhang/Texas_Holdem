@@ -27,6 +27,7 @@ export function reduceHandPeakStatistics(
   );
   let hasLegacyCoverageGap = false;
   for (const summary of summaries) {
+    if (summary.reason === 'uncontested') continue;
     if (!summary.evaluatedHands) {
       hasLegacyCoverageGap = true;
       continue;
