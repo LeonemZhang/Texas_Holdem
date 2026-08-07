@@ -9,6 +9,25 @@ const players = [
 ];
 
 describe('HostControls', () => {
+  it('shows the room link and copyable QR code in the game management drawer', () => {
+    render(
+      <HostControls
+        isHost
+        hostPlayerId="host"
+        phase="playing"
+        players={players}
+        joinUrl="http://10.126.126.1:32100/?room=room-1"
+        onCommand={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
+    expect(
+      screen.getByRole('button', { name: '复制邀请链接' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTitle('加入房间二维码')).toBeInTheDocument();
+  });
+
   it('supports a room-controlled drawer state', () => {
     const onOpenChange = vi.fn();
     render(

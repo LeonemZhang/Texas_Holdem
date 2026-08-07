@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { ModalDialog } from './ModalDialog.js';
+import { RoomInviteShare } from './RoomInviteShare.js';
 import { UtilityPanelHeader } from './UtilityPanel.js';
 
 export type HostControlIntent =
@@ -18,6 +19,7 @@ export interface HostControlsProps {
   readonly isHost: boolean;
   readonly hostPlayerId: string;
   readonly phase: 'lobby' | 'playing' | 'hand-ready' | 'paused' | 'closed';
+  readonly joinUrl?: string;
   readonly players: readonly HostControlPlayer[];
   readonly presentation?: 'inline' | 'drawer';
   readonly open?: boolean;
@@ -29,6 +31,7 @@ export function HostControls({
   isHost,
   hostPlayerId,
   phase,
+  joinUrl,
   players,
   presentation = 'inline',
   open: controlledOpen,
@@ -82,6 +85,12 @@ export function HostControls({
       )}
       {open ? (
         <div id="host-controls-content" className="host-controls__actions">
+          {joinUrl ? (
+            <RoomInviteShare
+              joinUrl={joinUrl}
+              className="host-controls__invite"
+            />
+          ) : null}
           <div
             className="host-controls__game-actions"
             role="group"

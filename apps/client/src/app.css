@@ -114,6 +114,11 @@
   gap: 0.9rem;
 }
 
+.modal-dialog--room-settings {
+  width: min(100%, 56rem);
+  max-height: calc(100dvh - 2rem);
+}
+
 .modal-dialog h2,
 .modal-dialog p {
   margin: 0;
@@ -243,9 +248,9 @@
 }
 
 body:has(.lobby) .lobby__players {
-  grid-template-rows: repeat(5, 72px);
+  grid-template-rows: repeat(var(--lobby-seat-rows, 5), 72px);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-flow: column;
+  grid-auto-flow: row;
   align-content: start;
   gap: 0.65rem;
 }
@@ -1050,6 +1055,34 @@ body:has(.poker-table-page) .game-room-shell {
   align-items: center;
   min-width: 0;
   gap: 0.65rem;
+}
+
+.room-invite__details {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.65rem;
+}
+
+.room-invite__details code {
+  min-width: 0;
+  overflow: hidden;
+  color: #a7f3d0;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-settings-editor {
+  padding: 0.85rem;
+}
+
+.room-settings-editor .room-form__grid {
+  margin: 0.75rem 0;
+}
+
+.room-settings-editor .room-form__advanced {
+  margin-bottom: 0.75rem;
 }
 
 .lobby__invite span {
@@ -2629,6 +2662,38 @@ body:has(.poker-table-page) .poker-table-controls {
   border: 1px solid rgb(251 191 36 / 24%);
   border-radius: 1rem;
   background: rgb(120 53 15 / 12%);
+}
+
+.host-controls__invite {
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.7rem;
+  border: 1px solid rgb(251 191 36 / 28%);
+  border-radius: 0.8rem;
+  background: rgb(69 26 3 / 16%);
+  gap: 0.7rem;
+}
+
+.host-controls__invite .copyable-qr-code {
+  flex: 0 0 auto;
+}
+
+.host-controls__invite .copyable-qr-code :is(svg, canvas) {
+  padding: 0.25rem;
+  border-radius: 0.35rem;
+  background: #fff;
+}
+
+.host-controls__invite .room-invite__details {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.host-controls__invite .room-invite__details span {
+  color: #fde68a;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .host-controls h2,
@@ -4263,12 +4328,24 @@ body:has(.lobby) .lobby__seat-area .lobby__players {
 body:has(.lobby) .lobby__seat-action {
   display: flex;
   grid-column: 1;
-  grid-row: 2;
   align-self: start;
   align-items: center;
   margin-top: -0.35rem;
   gap: 0.4rem;
   justify-content: flex-start;
+}
+
+body:has(.lobby) .lobby__seat-controls {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+body:has(.lobby) .lobby__seat-controls .room-settings-editor {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 body:has(.lobby) .lobby__start-control {
@@ -4572,9 +4649,9 @@ body:has(.room-closed) .room-closed {
 }
 
 body:has(.lobby) .lobby__players {
-  grid-template-rows: repeat(5, 72px);
+  grid-template-rows: repeat(var(--lobby-seat-rows, 5), 72px);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-flow: column;
+  grid-auto-flow: row;
   align-content: start;
   gap: 0.65rem;
 }
@@ -4702,6 +4779,15 @@ body:has(.lobby) .lobby-player--drop-target {
   .lobby__seat-controls {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  body:has(.lobby) .lobby__seat-action {
+    flex-wrap: wrap;
+  }
+
+  body:has(.lobby) .lobby__seat-action .lobby__seat-hint {
+    flex: 1 1 100%;
+    white-space: normal;
   }
 }
 

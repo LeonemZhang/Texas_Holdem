@@ -252,6 +252,15 @@ function streetPotHistory(hand: StartedHandState) {
 }
 
 function totalPotAmount(hand: StartedHandState): number {
+  if (isShowdownSettledHand(hand)) {
+    const pots = hand.settlement.pots;
+    if (pots) {
+      return pots.reduce(
+        (total, pot) => total + (pot.unmatchedPlayerId ? 0 : pot.amount),
+        0,
+      );
+    }
+  }
   return hand.players.reduce(
     (total, player) => total + player.totalCommitted,
     0,
@@ -302,6 +311,16 @@ export function projectPlayerSnapshot(
       initialChips: input.room.settings.initialChips,
       smallBlind: input.room.settings.smallBlind,
       bigBlind: input.room.settings.bigBlind,
+      settings: {
+        roomName: input.room.settings.roomName,
+        maxPlayers: input.room.settings.maxPlayers,
+        initialChips: input.room.settings.initialChips,
+        smallBlind: input.room.settings.smallBlind,
+        actionTimeoutSeconds: input.room.settings.actionTimeoutSeconds,
+        handReadyTimeoutSeconds: input.room.settings.handReadyTimeoutSeconds,
+        blindGrowth: input.room.settings.blindGrowth,
+        zeroChipPolicy: input.room.settings.zeroChipPolicy,
+      },
       completedHands: input.completedHands ?? 0,
       players: input.room.players.map((player) => ({
         playerId: player.playerId,

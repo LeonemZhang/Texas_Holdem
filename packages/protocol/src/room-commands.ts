@@ -42,6 +42,12 @@ export const SetLobbyReadyCommandSchema = z.object({
   ready: z.boolean(),
 });
 
+export const UpdateRoomSettingsCommandSchema = z.object({
+  ...CommandIdentityShape,
+  type: z.literal('room.update-settings'),
+  settings: RoomSettingsSchema,
+});
+
 export const StartFirstHandCommandSchema = z.object({
   ...CommandIdentityShape,
   type: z.literal('room.start-first-hand'),
@@ -72,6 +78,7 @@ export const RoomCommandSchema = z.discriminatedUnion('type', [
   CreateRoomCommandSchema,
   JoinRoomCommandSchema,
   SetLobbyReadyCommandSchema,
+  UpdateRoomSettingsCommandSchema,
   StartFirstHandCommandSchema,
   PauseRoomCommandSchema,
   ResumeRoomCommandSchema,
@@ -86,6 +93,9 @@ export type RoomSettingsMessage = z.infer<typeof RoomSettingsSchema>;
 export type CreateRoomCommand = z.infer<typeof CreateRoomCommandSchema>;
 export type JoinRoomCommand = z.infer<typeof JoinRoomCommandSchema>;
 export type SetLobbyReadyCommand = z.infer<typeof SetLobbyReadyCommandSchema>;
+export type UpdateRoomSettingsCommand = z.infer<
+  typeof UpdateRoomSettingsCommandSchema
+>;
 export type StartFirstHandCommand = z.infer<typeof StartFirstHandCommandSchema>;
 export type ReseatPlayerCommand = z.infer<typeof ReseatPlayerCommandSchema>;
 export type ShuffleSeatsCommand = z.infer<typeof ShuffleSeatsCommandSchema>;

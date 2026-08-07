@@ -3,15 +3,18 @@ import { createPortal } from 'react-dom';
 
 interface ModalAction {
   readonly label: string;
-  readonly onClick: () => void;
+  readonly onClick?: () => void;
   readonly disabled?: boolean;
   readonly className?: string;
+  readonly type?: 'button' | 'submit';
+  readonly form?: string;
 }
 
 export interface ModalDialogProps {
   readonly title: string;
   readonly children: ReactNode;
   readonly confirmAction: ModalAction;
+  readonly className?: string;
   readonly cancelLabel?: string;
   readonly secondaryAction?: ModalAction;
   readonly onCancel: () => void;
@@ -22,6 +25,7 @@ export function ModalDialog({
   title,
   children,
   confirmAction,
+  className,
   cancelLabel = '取消',
   secondaryAction,
   onCancel,
@@ -75,7 +79,7 @@ export function ModalDialog({
     <div className="modal-backdrop">
       <div
         ref={dialogRef}
-        className="modal-dialog"
+        className={`modal-dialog${className ? ` ${className}` : ''}`}
         role={role}
         aria-modal="true"
         aria-labelledby={titleId}
@@ -106,7 +110,8 @@ export function ModalDialog({
           </button>
           <button
             className={`modal-dialog__confirm ${confirmAction.className ?? 'button button--primary'}`}
-            type="button"
+            type={confirmAction.type ?? 'button'}
+            form={confirmAction.form}
             disabled={confirmAction.disabled}
             onClick={confirmAction.onClick}
           >

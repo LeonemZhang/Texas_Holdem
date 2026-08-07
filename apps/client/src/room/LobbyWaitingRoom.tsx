@@ -1,7 +1,16 @@
-import { type DragEvent, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type DragEvent,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 
-import { CopyableQRCode } from './CopyableQRCode.js';
+import type { RoomSettingsMessage } from '@texas-holdem/protocol';
+
 import { ModalDialog } from './ModalDialog.js';
+import { RoomInviteShare } from './RoomInviteShare.js';
+import { RoomSettingsEditor } from './RoomSettingsEditor.js';
 
 export interface LobbyPlayerView {
   readonly playerId: string;
@@ -17,7 +26,9 @@ export interface LobbyWaitingRoomProps {
   readonly currentPlayerId: string;
   readonly players: readonly LobbyPlayerView[];
   readonly joinUrl?: string;
+  readonly settings?: RoomSettingsMessage;
   readonly onSetReady: (ready: boolean) => void;
+  readonly onUpdateSettings?: (settings: RoomSettingsMessage) => void;
   readonly onStartFirstHand: () => void;
   readonly onRemovePlayer?: (playerId: string) => void;
   readonly onCloseRoom?: () => void;
@@ -30,8 +41,10 @@ export function LobbyWaitingRoom({
   currentPlayerId,
   players,
   joinUrl,
+  settings,
   onSetReady,
   onStartFirstHand,
+  onUpdateSettings,
   onRemovePlayer,
   onCloseRoom,
   onReseatPlayer,
@@ -43,7 +56,8 @@ export function LobbyWaitingRoom({
   const draggedPlayerIdRef = useRef<string | null>(null);
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const [dropSeatIndex, setDropSeatIndex] = useState<number | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsFormId = useId();
   const currentPlayer = players.find(
     ({ playerId }) => playerId === currentPlayerId,
   );
@@ -68,16 +82,7 @@ export function LobbyWaitingRoom({
   const shuffleDisabled =
     seatedPlayers.length === 0 ||
     (seatedPlayers.length === 1 && seatedPlayers[0]?.seatIndex === 0);
-
-  const copyInvite = async () => {
-    if (!joinUrl) return;
-    try {
-      await navigator.clipboard.writeText(joinUrl);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
+  const seatCount = settings?.maxPlayers ?? 10;
 
   const clearSeatDrag = () => {
     draggedPlayerIdRef.current = null;
@@ -139,24 +144,20 @@ export function LobbyWaitingRoom({
       </header>
 
       {currentPlayer?.isHost && joinUrl ? (
-        <section className="lobby__invite" aria-label="房间邀请">
-          <div>
-            <span>邀请朋友加入</span>
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={copyInvite}
-            >
-              {copied ? '已复制邀请链接' : '复制邀请链接'}
-            </button>
-          </div>
-          <CopyableQRCode value={joinUrl} size={58} title="加入房间二维码" />
-        </section>
+        <RoomInviteShare joinUrl={joinUrl} className="lobby__invite" />
       ) : null}
 
       <div className="lobby__seat-area">
-        <ol className="lobby__players" aria-label="房间座位">
-          {Array.from({ length: 10 }, (_, seatIndex) => {
+        <ol
+          className="lobby__players"
+          aria-label="房间座位"
+          style={
+            {
+              '--lobby-seat-rows': Math.ceil(seatCount / 2),
+            } as CSSProperties
+          }
+        >
+          {Array.from({ length: seatCount }, (_, seatIndex) => {
             const player = playerBySeat.get(seatIndex);
             if (!player) {
               return (
@@ -215,20 +216,55 @@ export function LobbyWaitingRoom({
           })}
         </ol>
         {isHost ? (
-          <div className="lobby__seat-action">
-            <button
-              className="button button--secondary"
-              type="button"
-              disabled={shuffleDisabled}
-              onClick={() => onShuffleSeats?.()}
-            >
-              随机打乱
-            </button>
-            <span className="lobby__seat-hint">
-              {seatsAreCompact
-                ? '拖动玩家卡片交换座位'
-                : '请先随机打乱以整理座位'}
-            </span>
+          <div className="lobby__seat-controls">
+            <div className="lobby__seat-action">
+              {settings ? (
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  aria-expanded={settingsOpen}
+                  onClick={() => setSettingsOpen((open) => !open)}
+                >
+                  {settingsOpen ? '收起房间配置' : '修改房间配置'}
+                </button>
+              ) : null}
+              <button
+                className="button button--secondary"
+                type="button"
+                disabled={shuffleDisabled}
+                onClick={() => onShuffleSeats?.()}
+              >
+                随机打乱
+              </button>
+              <span className="lobby__seat-hint">
+                {seatsAreCompact
+                  ? '拖动玩家卡片交换座位'
+                  : '请先随机打乱以整理座位'}
+              </span>
+            </div>
+            {settings && settingsOpen ? (
+              <ModalDialog
+                title="修改房间配置"
+                className="modal-dialog--room-settings"
+                confirmAction={{
+                  label: '保存房间配置',
+                  type: 'submit',
+                  form: settingsFormId,
+                }}
+                onCancel={() => setSettingsOpen(false)}
+              >
+                <RoomSettingsEditor
+                  key={`${settings.roomName}-${settings.initialChips}-${settings.smallBlind}-${settings.maxPlayers}-${settings.actionTimeoutSeconds}-${settings.handReadyTimeoutSeconds}-${settings.blindGrowth.enabled}-${settings.blindGrowth.intervalHands}-${settings.blindGrowth.multiplier}-${settings.zeroChipPolicy}`}
+                  settings={settings}
+                  formId={settingsFormId}
+                  showSubmitButton={false}
+                  onSubmit={(nextSettings) => {
+                    onUpdateSettings?.(nextSettings);
+                    setSettingsOpen(false);
+                  }}
+                />
+              </ModalDialog>
+            ) : null}
           </div>
         ) : null}
       </div>

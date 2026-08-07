@@ -32,6 +32,35 @@ function createCommand() {
 }
 
 describe('RoomCommandHandler', () => {
+  it('maps the host lobby room-settings update command', () => {
+    const rooms = new InMemoryRoomRegistry();
+    const handler = new RoomCommandHandler(rooms, random);
+    handler.handle(createCommand(), null);
+    const room = rooms.get('room-1');
+
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'update-settings',
+        type: 'room.update-settings',
+        settings: {
+          ...createCommand().settings,
+          roomName: 'Updated friends',
+          initialChips: 250,
+          smallBlind: 5,
+        },
+      },
+      room,
+    );
+
+    expect(rooms.get('room-1')?.settings).toMatchObject({
+      roomName: 'Updated friends',
+      initialChips: 250,
+      smallBlind: 5,
+      bigBlind: 10,
+    });
+  });
+
   it('maps create, join, lobby readiness, first-hand start, pause and resume', () => {
     const rooms = new InMemoryRoomRegistry();
     const handler = new RoomCommandHandler(rooms, random);

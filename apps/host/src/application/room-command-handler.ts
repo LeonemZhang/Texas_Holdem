@@ -45,6 +45,7 @@ import {
 import { startFirstHand } from '../domain/start-first-hand.js';
 import { startNextRoomHand } from '../domain/start-next-hand.js';
 import { syncLiveChipBalances } from './live-chip-balances.js';
+import { updateRoomSettings } from '../domain/update-room-settings.js';
 import type {
   ClientCommand,
   CommandHandler,
@@ -312,6 +313,13 @@ export class RoomCommandHandler {
       case 'room.set-lobby-ready':
         return this.accepted(
           setLobbyReady(room, command.playerId, command.ready),
+        );
+      case 'room.update-settings':
+        return this.accepted(
+          updateRoomSettings(room, command.playerId, {
+            ...command.settings,
+            blind: blindSetting(command.settings.smallBlind),
+          }),
         );
       case 'room.reseat-player':
         return this.accepted(

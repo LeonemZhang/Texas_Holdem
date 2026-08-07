@@ -8,6 +8,7 @@ import {
   StateVersionSchema,
   TimestampMsSchema,
 } from './primitives.js';
+import { RoomSettingsSchema } from './room-commands.js';
 
 const CardCodeSchema = z.string().regex(/^[2-9TJQKA][cdhs]$/);
 export const HandTypeSchema = z.enum([
@@ -100,6 +101,7 @@ export const PlayerSnapshotSchema = z.object({
     initialChips: AmountSchema,
     smallBlind: AmountSchema,
     bigBlind: AmountSchema,
+    settings: RoomSettingsSchema.optional(),
     completedHands: AmountSchema,
     players: z.array(PublicPlayerSchema).max(10),
   }),

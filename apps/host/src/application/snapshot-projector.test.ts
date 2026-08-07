@@ -67,6 +67,16 @@ describe('projectPlayerSnapshot', () => {
     expect(hostSnapshot.game?.streetPots).toEqual([
       { street: 'preflop', amount: 3 },
     ]);
+    expect(hostSnapshot.room.settings).toEqual({
+      roomName: 'Friends',
+      maxPlayers: 10,
+      initialChips: 100,
+      smallBlind: 1,
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    });
     expect(hostSnapshot.room.players).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -198,6 +208,52 @@ describe('projectPlayerSnapshot', () => {
       host: 99,
       bob: -2,
     });
+  });
+
+  it('excludes an unmatched all-in layer from the settled total pot', () => {
+    const started = startedRoom();
+    const settled = {
+      ...started.hand,
+      settlement: {
+        reason: 'showdown',
+        winnerIds: ['host'],
+        payouts: { host: 200, bob: 100 },
+        revealedHoleCards: {},
+        pots: [
+          {
+            amount: 200,
+            contributorIds: ['host', 'bob'],
+            eligiblePlayerIds: ['host', 'bob'],
+          },
+          {
+            amount: 100,
+            contributorIds: ['bob'],
+            eligiblePlayerIds: ['bob'],
+            unmatchedPlayerId: 'bob',
+          },
+        ],
+        awards: [
+          { potIndex: 0, winnerIds: ['host'], equalShare: 200 },
+          {
+            potIndex: 1,
+            winnerIds: [],
+            equalShare: 100,
+            oddChipWinnerIds: [],
+            refundedPlayerId: 'bob',
+          },
+        ],
+        bestHands: {},
+      },
+    } as unknown as ShowdownSettledHand;
+
+    const snapshot = projectPlayerSnapshot({
+      room: started.room,
+      viewerPlayerId: 'host',
+      sequence: 2,
+      hand: settled,
+    });
+
+    expect(snapshot.game?.totalPot).toBe(200);
   });
 
   it('projects the current best hand type after five cards are available', () => {

@@ -23,6 +23,110 @@ const players = (allReady = false): LobbyPlayerView[] => [
 ];
 
 describe('LobbyWaitingRoom', () => {
+  it('lets the host open and submit the lobby room settings editor', () => {
+    const onUpdateSettings = vi.fn();
+    render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={players(true)}
+        settings={{
+          roomName: '朋友局',
+          maxPlayers: 10,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        }}
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+        onUpdateSettings={onUpdateSettings}
+      />,
+    );
+
+    const seatActions = screen
+      .getByRole('button', { name: '修改房间配置' })
+      .closest('.lobby__seat-action') as HTMLElement;
+    expect(
+      within(seatActions!)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['修改房间配置', '随机打乱']);
+    fireEvent.click(screen.getByRole('button', { name: '修改房间配置' }));
+    const settingsDialog = screen.getByRole('dialog', {
+      name: '修改房间配置',
+    });
+    expect(settingsDialog).toHaveClass('modal-dialog--room-settings');
+    expect(settingsDialog).toContainElement(screen.getByLabelText('初始筹码'));
+    fireEvent.change(screen.getByLabelText('初始筹码'), {
+      target: { value: '250' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存房间配置' }));
+
+    expect(onUpdateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ initialChips: 250 }),
+    );
+    expect(
+      screen.queryByRole('dialog', { name: '修改房间配置' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows only the configured number of seats in a row-first two-column layout', () => {
+    const fivePlayers = [
+      ...players(true),
+      {
+        playerId: 'carol',
+        nickname: 'Carol',
+        seatIndex: 2,
+        isHost: false,
+        ready: true,
+        connected: true,
+      },
+      {
+        playerId: 'dave',
+        nickname: 'Dave',
+        seatIndex: 3,
+        isHost: false,
+        ready: true,
+        connected: true,
+      },
+      {
+        playerId: 'erin',
+        nickname: 'Erin',
+        seatIndex: 4,
+        isHost: false,
+        ready: true,
+        connected: true,
+      },
+    ];
+    render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={fivePlayers}
+        settings={{
+          roomName: '朋友局',
+          maxPlayers: 5,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        }}
+        onSetReady={vi.fn()}
+        onStartFirstHand={vi.fn()}
+      />,
+    );
+
+    const seatMap = screen.getByRole('list', { name: '房间座位' });
+    expect(within(seatMap).getAllByRole('listitem')).toHaveLength(5);
+    expect(seatMap.getAttribute('style')).toContain('--lobby-seat-rows: 3');
+    expect(within(seatMap).getByText('Erin')).toBeInTheDocument();
+  });
+
   it('lets the host copy the invitation QR code', () => {
     render(
       <LobbyWaitingRoom
@@ -124,7 +228,7 @@ describe('LobbyWaitingRoom', () => {
     expect(onSetReady).toHaveBeenCalledWith(true);
   });
 
-  it('keeps a fixed ten-seat map and preserves physical seat numbers', () => {
+  it('keeps a ten-seat map by default and preserves physical seat numbers', () => {
     const nonCompactPlayers = players(true);
     nonCompactPlayers[1] = { ...nonCompactPlayers[1]!, seatIndex: 6 };
     render(

@@ -25,6 +25,16 @@ const snapshot: PlayerSnapshot = {
     initialChips: 100,
     smallBlind: 1,
     bigBlind: 2,
+    settings: {
+      roomName: 'Friends',
+      maxPlayers: 10,
+      initialChips: 100,
+      smallBlind: 1,
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    },
     completedHands: 0,
     players: [
       {
@@ -455,6 +465,20 @@ describe('GameRoom', () => {
       screen.queryByRole('button', { name: '退出房间' }),
     ).not.toBeInTheDocument();
     expect(screen.getByTitle('加入房间二维码')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '修改房间配置' }));
+    fireEvent.change(screen.getByLabelText('初始筹码'), {
+      target: { value: '250' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存房间配置' }));
+    await waitFor(() =>
+      expect(sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'room.update-settings',
+          expectedVersion: 2,
+          settings: expect.objectContaining({ initialChips: 250 }),
+        }),
+      ),
+    );
     fireEvent.click(screen.getByRole('button', { name: '移出' }));
     fireEvent.click(screen.getByRole('button', { name: '确认移出' }));
     await waitFor(() =>

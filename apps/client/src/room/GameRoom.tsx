@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PROTOCOL_VERSION,
   type PlayerSnapshot,
+  type RoomSettingsMessage,
   type RoomSessionResponse,
 } from '@texas-holdem/protocol';
 
@@ -436,8 +437,14 @@ export function GameRoom({
               connected: player.status !== 'disconnected',
             }))}
           {...(own?.isHost ? { joinUrl: session.joinUrl } : {})}
+          {...(snapshot.room.settings
+            ? { settings: snapshot.room.settings }
+            : {})}
           onSetReady={(ready) =>
             void send({ type: 'room.set-lobby-ready', ready })
+          }
+          onUpdateSettings={(settings: RoomSettingsMessage) =>
+            void send({ type: 'room.update-settings', settings })
           }
           onStartFirstHand={() =>
             void send({
@@ -750,6 +757,7 @@ export function GameRoom({
                 ''
               }
               phase={snapshot.room.phase}
+              joinUrl={session.joinUrl}
               players={snapshot.room.players.filter(
                 ({ status }) => !['left', 'removed'].includes(status),
               )}

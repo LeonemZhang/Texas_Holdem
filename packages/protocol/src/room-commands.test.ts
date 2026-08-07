@@ -15,6 +15,20 @@ describe('RoomCommandSchema', () => {
   it.each([
     { ...identity, type: 'room.join', nickname: 'Bob' },
     { ...identity, type: 'room.set-lobby-ready', ready: true },
+    {
+      ...identity,
+      type: 'room.update-settings',
+      settings: {
+        roomName: 'Updated friends table',
+        maxPlayers: 6,
+        initialChips: 200,
+        smallBlind: 5,
+        actionTimeoutSeconds: 45,
+        handReadyTimeoutSeconds: 30,
+        blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
+        zeroChipPolicy: 'eliminate',
+      },
+    },
     { ...identity, type: 'room.start-first-hand', handId: 'hand-1' },
     { ...identity, type: 'room.pause' },
     { ...identity, type: 'room.resume' },
