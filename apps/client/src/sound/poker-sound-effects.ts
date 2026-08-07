@@ -9,7 +9,14 @@ const TURN_CLOCK_VOLUME_MULTIPLIER = 10;
 type PlayerActionSound = 'fold' | 'check' | 'call' | 'raise' | 'all-in';
 
 export type PokerSoundCue =
-  'deal' | 'ready' | 'turn-self' | 'turn-other' | PlayerActionSound;
+  | 'deal'
+  | 'ready'
+  | 'turn-self'
+  | 'turn-other'
+  | 'settlement-win'
+  | 'settlement-loss'
+  | 'settlement-tie'
+  | PlayerActionSound;
 
 const actionSoundByStatistic = {
   fold: 'fold',
@@ -49,6 +56,23 @@ function turnCue(snapshot: PlayerSnapshot): PokerSoundCue | null {
   return actorId === snapshot.playerId ? 'turn-self' : 'turn-other';
 }
 
+function settlementCue(
+  previous: PlayerSnapshot,
+  next: PlayerSnapshot,
+): Extract<
+  PokerSoundCue,
+  'settlement-win' | 'settlement-loss' | 'settlement-tie'
+> | null {
+  const settlement = next.game?.settlement;
+  if (!settlement || previous.game?.settlement) return null;
+
+  const netChange = settlement.netChanges[next.playerId];
+  if (netChange === undefined) return null;
+  if (netChange > 0) return 'settlement-win';
+  if (netChange < 0) return 'settlement-loss';
+  return 'settlement-tie';
+}
+
 /**
  * Derives audible state changes from authoritative snapshots. The initial
  * snapshot deliberately produces no cue, so reconnecting never replays a
@@ -67,15 +91,20 @@ export function pokerSoundCues(
     return cue ? ['deal', cue] : ['deal'];
   }
 
+  const cues: PokerSoundCue[] = [];
+  const newSettlement = Boolean(
+    next.game?.settlement && !previous.game?.settlement,
+  );
+  const settlement = settlementCue(previous, next);
+  if (settlement) cues.push(settlement);
   if (
+    !newSettlement &&
     next.handReady !== null &&
     previous.handReady === null &&
     next.handReady.ownChoice === 'pending'
   ) {
-    return ['ready'];
+    cues.push('ready');
   }
-
-  const cues: PokerSoundCue[] = [];
   const action = changedAction(previous, next);
   if (action) cues.push(action);
   if (previous.game?.currentActorId !== next.game?.currentActorId) {
@@ -194,6 +223,19 @@ export class PokerSoundEffects {
         return;
       case 'turn-other':
         this.tone(context, 262, start, 0.1, 0.035);
+        return;
+      case 'settlement-win':
+        [660, 784, 1_048].forEach((frequency, index) =>
+          this.tone(context, frequency, start + index * 0.08, 0.14, 0.06),
+        );
+        return;
+      case 'settlement-loss':
+        this.tone(context, 440, start, 0.14, 0.045, 'triangle', 330);
+        this.tone(context, 330, start + 0.12, 0.18, 0.04, 'triangle', 220);
+        return;
+      case 'settlement-tie':
+        this.tone(context, 520, start, 0.08, 0.045, 'triangle');
+        this.tone(context, 520, start + 0.1, 0.08, 0.04, 'triangle');
         return;
       case 'fold':
         this.tone(context, 360, start, 0.13, 0.055, 'sawtooth', 150);

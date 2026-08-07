@@ -111,6 +111,40 @@ describe('poker sound effects', () => {
   });
 
   it.each([
+    [20, 'settlement-win'],
+    [-20, 'settlement-loss'],
+    [0, 'settlement-tie'],
+  ] as const)(
+    'plays the local settlement cue for a net change of %s',
+    (netChange, sound) => {
+      const previous = snapshot();
+      const next = snapshot({
+        sequence: 2,
+        game: {
+          ...previous.game!,
+          settlement: {
+            reason: 'showdown',
+            winnerIds: ['alice'],
+            payouts: { alice: 100 + netChange },
+            netChanges: { alice: netChange },
+            showdownResults: [],
+            revealedHandResults: [],
+            voluntaryRevealedHoleCards: {},
+          },
+        },
+        handReady: {
+          deadlineMs: 30_000,
+          ownChoice: 'pending',
+          pendingRequests: [],
+        },
+      });
+
+      expect(pokerSoundCues(previous, next)).toEqual([sound]);
+      expect(pokerSoundCues(next, { ...next, sequence: 3 })).toEqual([]);
+    },
+  );
+
+  it.each([
     ['fold', 'fold'],
     ['check', 'check'],
     ['call', 'call'],
