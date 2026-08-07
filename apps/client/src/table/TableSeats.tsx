@@ -64,6 +64,22 @@ const actionLabels = {
   allIn: '全押',
 } as const;
 
+const TABLE_SEAT_COUNT = 10;
+
+function clockwiseDistance(fromSeatIndex: number, toSeatIndex: number): number {
+  return (toSeatIndex - fromSeatIndex + TABLE_SEAT_COUNT) % TABLE_SEAT_COUNT;
+}
+
+function compareClockwiseFrom(
+  left: TableSeatPlayer,
+  right: TableSeatPlayer,
+  centerSeatIndex: number,
+): number {
+  const leftDistance = clockwiseDistance(centerSeatIndex, left.seatIndex);
+  const rightDistance = clockwiseDistance(centerSeatIndex, right.seatIndex);
+  return leftDistance - rightDistance || left.seatIndex - right.seatIndex;
+}
+
 function positionFor(index: number, count: number): CSSProperties {
   const angle = (Math.PI / 2 + (index * Math.PI * 2) / count) % (Math.PI * 2);
   return {
@@ -161,14 +177,14 @@ export function TableSeats({
   actionRoundKey = null,
 }: TableSeatsProps) {
   const listRef = useRef<HTMLOListElement>(null);
+  const ownSeatIndex =
+    players.find((player) => player.playerId === ownPlayerId)?.seatIndex ?? 0;
   const desktopPlayers = useMemo(
     () =>
-      [...players].sort((left, right) => {
-        if (left.playerId === ownPlayerId) return -1;
-        if (right.playerId === ownPlayerId) return 1;
-        return left.seatIndex - right.seatIndex;
-      }),
-    [ownPlayerId, players],
+      [...players].sort((left, right) =>
+        compareClockwiseFrom(left, right, ownSeatIndex),
+      ),
+    [ownSeatIndex, players],
   );
   const orderedPlayers = useMemo(
     () =>
@@ -178,9 +194,9 @@ export function TableSeats({
         }
         if (left.actionOrder != null) return -1;
         if (right.actionOrder != null) return 1;
-        return left.seatIndex - right.seatIndex;
+        return compareClockwiseFrom(left, right, ownSeatIndex);
       }),
-    [players],
+    [ownSeatIndex, players],
   );
   const currentActor = orderedPlayers.find((player) => player.isCurrentActor);
   const stablePosition = new Map(

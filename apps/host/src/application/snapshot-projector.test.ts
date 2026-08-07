@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatCard,
   parseCard,
+  applyHandAction,
   type ShowdownSettledHand,
   type UncontestedSettledHand,
 } from '@texas-holdem/poker-core';
@@ -161,6 +162,29 @@ describe('projectPlayerSnapshot', () => {
 
     expect(actor.game?.legalActions).not.toBeNull();
     expect(other.game?.legalActions).toBeNull();
+  });
+
+  it('does not assign an action order to a player who has already folded', () => {
+    const started = startedRoom();
+    const folded = applyHandAction(
+      started.hand,
+      started.hand.betting.currentActorId!,
+      { type: 'fold' },
+    );
+    const nextActorId = folded.betting.currentActorId!;
+    const snapshot = projectPlayerSnapshot({
+      room: started.room,
+      viewerPlayerId: nextActorId,
+      sequence: 2,
+      hand: folded,
+    });
+
+    expect(
+      snapshot.room.players.find(({ playerId }) => playerId !== nextActorId),
+    ).toMatchObject({ actionOrder: null });
+    expect(
+      snapshot.room.players.find(({ playerId }) => playerId === nextActorId),
+    ).toMatchObject({ actionOrder: 1 });
   });
 
   it('publishes only settled showdown contender cards to every viewer', () => {

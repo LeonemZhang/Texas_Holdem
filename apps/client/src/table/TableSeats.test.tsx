@@ -50,6 +50,26 @@ describe('TableSeats', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(count);
   });
 
+  it('centers the own seat and lays out physical seats clockwise around it', () => {
+    const { container } = render(
+      <TableSeats players={makePlayers(4)} ownPlayerId="p2" />,
+    );
+    const seatPosition = (playerId: string) => {
+      const seat = container.querySelector<HTMLElement>(
+        `[data-player-id="${playerId}"]`,
+      );
+      return {
+        left: Math.round(Number.parseFloat(seat?.style.left ?? '') * 1e6) / 1e6,
+        top: Math.round(Number.parseFloat(seat?.style.top ?? '') * 1e6) / 1e6,
+      };
+    };
+
+    expect(seatPosition('p2')).toEqual({ left: 50, top: 84 });
+    expect(seatPosition('p3')).toEqual({ left: 9, top: 50 });
+    expect(seatPosition('p0')).toEqual({ left: 50, top: 16 });
+    expect(seatPosition('p1')).toEqual({ left: 91, top: 50 });
+  });
+
   it('distinguishes acting, disconnected, all-in and folded seats', () => {
     const { container } = render(
       <TableSeats players={makePlayers(4)} ownPlayerId="p0" />,

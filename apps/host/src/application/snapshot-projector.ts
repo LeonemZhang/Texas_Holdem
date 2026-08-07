@@ -226,12 +226,19 @@ function actionOrderByPlayerId(
   hand: StartedHandState | null,
 ): ReadonlyMap<string, number> {
   if (!hand) return new Map();
+  const activePlayerIds = new Set(
+    hand.betting.players
+      .filter(({ status }) => status === 'active')
+      .map(({ playerId }) => playerId),
+  );
   return new Map(
     actionOrderForStreet(
       hand.players.map(({ playerId, seatIndex }) => ({
         playerId,
         index: seatIndex,
-        status: 'active' as const,
+        status: activePlayerIds.has(playerId)
+          ? ('active' as const)
+          : ('sitting-out' as const),
       })),
       hand.positions,
       hand.street,
