@@ -46,6 +46,25 @@ describe('validateRoomSettings', () => {
     });
   });
 
+  it('accepts step growth with a cap', () => {
+    const settings = validateRoomSettings({
+      ...validInput(),
+      blind: { kind: 'custom', smallBlind: 5 },
+      blindGrowth: {
+        enabled: true,
+        intervalHands: 10,
+        mode: 'increment',
+        increment: 5,
+        maxSmallBlind: 100,
+      },
+    });
+    expect(settings.blindGrowth).toMatchObject({
+      mode: 'increment',
+      increment: 5,
+      maxSmallBlind: 100,
+    });
+  });
+
   it.each([1, 11])('rejects a %s-player room boundary', (maxPlayers) => {
     expect(() => validateRoomSettings({ ...validInput(), maxPlayers })).toThrow(
       'Maximum players must be between 2 and 10',
@@ -65,6 +84,30 @@ describe('validateRoomSettings', () => {
         blindGrowth: { enabled: true, intervalHands: 5, multiplier: 1 },
       }),
     ).toThrow('Blind growth multiplier must be greater than one');
+    expect(() =>
+      validateRoomSettings({
+        ...validInput(),
+        blind: { kind: 'custom', smallBlind: 5 },
+        blindGrowth: {
+          enabled: true,
+          intervalHands: 5,
+          mode: 'increment',
+          increment: 0,
+        },
+      }),
+    ).toThrow('Blind growth increment must be a positive safe integer');
+    expect(() =>
+      validateRoomSettings({
+        ...validInput(),
+        blind: { kind: 'custom', smallBlind: 5 },
+        blindGrowth: {
+          enabled: true,
+          intervalHands: 5,
+          mode: 'increment',
+          increment: 4,
+        },
+      }),
+    ).toThrow('at least the small blind');
     expect(() =>
       validateRoomSettings({ ...validInput(), roomName: ' ' }),
     ).toThrow('Room name cannot be empty');

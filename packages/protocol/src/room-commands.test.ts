@@ -66,6 +66,57 @@ describe('RoomCommandSchema', () => {
     ).toBe(true);
   });
 
+  it('parses step growth and a small-blind cap', () => {
+    const result = RoomCommandSchema.safeParse({
+      ...identity,
+      type: 'room.create',
+      hostNickname: 'Alice',
+      settings: {
+        roomName: 'Friends',
+        maxPlayers: 10,
+        initialChips: 2_000,
+        smallBlind: 5,
+        actionTimeoutSeconds: 30,
+        handReadyTimeoutSeconds: 30,
+        blindGrowth: {
+          enabled: true,
+          intervalHands: 10,
+          mode: 'increment',
+          increment: 5,
+          maxSmallBlind: 100,
+        },
+        zeroChipPolicy: 'request-chips',
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a step below the base small blind and a lower cap', () => {
+    expect(
+      RoomCommandSchema.safeParse({
+        ...identity,
+        type: 'room.create',
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 2_000,
+          smallBlind: 5,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: {
+            enabled: true,
+            intervalHands: 10,
+            mode: 'increment',
+            increment: 4,
+            maxSmallBlind: 4,
+          },
+          zeroChipPolicy: 'request-chips',
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it.each(['commandId', 'roomId', 'playerId', 'expectedVersion'])(
     'rejects a command missing %s',
     (field) => {

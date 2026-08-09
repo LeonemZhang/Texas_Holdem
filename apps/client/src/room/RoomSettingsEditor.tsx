@@ -6,6 +6,13 @@ import {
 } from '@texas-holdem/protocol';
 
 const blindOptions = [1, 5, 10, 25, 50, 100] as const;
+type BlindGrowthSelection = 'none' | 'multiplier' | 'increment';
+
+function clampToMinimum(value: number, minimum: number): number {
+  return Number.isFinite(value)
+    ? Math.max(minimum, Math.trunc(value))
+    : minimum;
+}
 
 export interface RoomSettingsEditorProps {
   readonly settings: RoomSettingsMessage;
@@ -26,12 +33,43 @@ export function RoomSettingsEditor({
       ? 'preset'
       : 'custom',
   );
+  const [blindGrowthMode, setBlindGrowthMode] = useState<BlindGrowthSelection>(
+    settings.blindGrowth.enabled
+      ? (settings.blindGrowth.mode ?? 'multiplier')
+      : 'none',
+  );
+  const [blindGrowthIncrement, setBlindGrowthIncrement] = useState(
+    clampToMinimum(
+      settings.blindGrowth.increment ?? settings.smallBlind,
+      settings.smallBlind,
+    ),
+  );
+  const [maxSmallBlind, setMaxSmallBlind] = useState<number | null>(
+    settings.blindGrowth.maxSmallBlind === undefined ||
+      settings.blindGrowth.maxSmallBlind === null
+      ? null
+      : clampToMinimum(settings.blindGrowth.maxSmallBlind, settings.smallBlind),
+  );
   const [error, setError] = useState<string | null>(null);
   const isPreset = blindMode === 'preset';
+  const updateSmallBlind = (nextSmallBlind: number) => {
+    const normalizedSmallBlind = clampToMinimum(nextSmallBlind, 1);
+    setSmallBlind(normalizedSmallBlind);
+    setBlindGrowthIncrement((current) =>
+      current < normalizedSmallBlind ? normalizedSmallBlind : current,
+    );
+    setMaxSmallBlind((current) =>
+      current !== null && current < normalizedSmallBlind
+        ? normalizedSmallBlind
+        : current,
+    );
+  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const selection = blindGrowthMode;
+    const mode = selection === 'increment' ? 'increment' : 'multiplier';
     const parsed = RoomSettingsSchema.safeParse({
       roomName: String(form.get('roomName') ?? ''),
       maxPlayers: Number(form.get('maxPlayers')),
@@ -40,9 +78,13 @@ export function RoomSettingsEditor({
       actionTimeoutSeconds: Number(form.get('actionTimeoutSeconds')),
       handReadyTimeoutSeconds: Number(form.get('handReadyTimeoutSeconds')),
       blindGrowth: {
-        enabled: form.get('blindGrowthEnabled') === 'on',
+        enabled: selection !== 'none',
         intervalHands: Number(form.get('blindGrowthIntervalHands')),
-        multiplier: Number(form.get('blindGrowthMultiplier')),
+        mode,
+        ...(mode === 'increment'
+          ? { increment: blindGrowthIncrement }
+          : { multiplier: Number(form.get('blindGrowthMultiplier')) }),
+        maxSmallBlind,
       },
       zeroChipPolicy: form.get('zeroChipPolicy'),
     });
@@ -96,7 +138,7 @@ export function RoomSettingsEditor({
                 return;
               }
               setBlindMode('preset');
-              setSmallBlind(Number(event.target.value));
+              updateSmallBlind(Number(event.target.value));
             }}
           >
             {blindOptions.map((blind) => (
@@ -113,7 +155,7 @@ export function RoomSettingsEditor({
               min="1"
               step="1"
               value={smallBlind}
-              onChange={(event) => setSmallBlind(Number(event.target.value))}
+              onChange={(event) => updateSmallBlind(Number(event.target.value))}
             />
           ) : null}
         </label>
@@ -151,35 +193,114 @@ export function RoomSettingsEditor({
           </label>
           <fieldset className="room-form__growth">
             <legend>按手数增长盲注</legend>
-            <label className="room-form__checkbox">
-              <input
-                name="blindGrowthEnabled"
-                type="checkbox"
-                defaultChecked={settings.blindGrowth.enabled}
-              />
-              启用增长
-            </label>
-            <label>
-              每多少手
-              <input
-                name="blindGrowthIntervalHands"
-                type="number"
-                min="1"
-                step="1"
-                defaultValue={settings.blindGrowth.intervalHands}
-              />
-            </label>
-            <label>
-              增长倍率
-              <select
-                name="blindGrowthMultiplier"
-                defaultValue={String(settings.blindGrowth.multiplier)}
+            <input
+              type="hidden"
+              name="blindGrowthMode"
+              value={blindGrowthMode}
+            />
+            <div
+              className="room-form__growth-tabs"
+              role="tablist"
+              aria-label="盲注增长模式"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={blindGrowthMode === 'none'}
+                className="room-form__growth-tab"
+                onClick={() => setBlindGrowthMode('none')}
               >
-                <option value="1.5">× 1.5</option>
-                <option value="2">× 2</option>
-                <option value="3">× 3</option>
-              </select>
-            </label>
+                不增长
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={blindGrowthMode === 'multiplier'}
+                className="room-form__growth-tab"
+                onClick={() => setBlindGrowthMode('multiplier')}
+              >
+                倍率增长
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={blindGrowthMode === 'increment'}
+                className="room-form__growth-tab"
+                onClick={() => setBlindGrowthMode('increment')}
+              >
+                步长增长
+              </button>
+            </div>
+            <div className="room-form__growth-values">
+              <label>
+                每多少手
+                <input
+                  name="blindGrowthIntervalHands"
+                  type="number"
+                  min="1"
+                  step="1"
+                  defaultValue={settings.blindGrowth.intervalHands}
+                />
+              </label>
+              {blindGrowthMode === 'increment' ? (
+                <label>
+                  增长步长（小盲）
+                  <input
+                    name="blindGrowthIncrement"
+                    type="number"
+                    min={smallBlind}
+                    step="1"
+                    value={blindGrowthIncrement}
+                    onChange={(event) =>
+                      setBlindGrowthIncrement(
+                        clampToMinimum(Number(event.target.value), smallBlind),
+                      )
+                    }
+                  />
+                </label>
+              ) : (
+                <label>
+                  增长倍率
+                  <select
+                    name="blindGrowthMultiplier"
+                    defaultValue={String(settings.blindGrowth.multiplier ?? 2)}
+                  >
+                    <option value="1.5">× 1.5</option>
+                    <option value="2">× 2</option>
+                    <option value="3">× 3</option>
+                  </select>
+                </label>
+              )}
+              <label>
+                小盲上限（可选）
+                <input
+                  name="blindGrowthMaxSmallBlind"
+                  type="number"
+                  min={smallBlind}
+                  step="1"
+                  value={maxSmallBlind ?? ''}
+                  placeholder="不设上限"
+                  onChange={(event) => {
+                    const value = event.target.value.trim();
+                    setMaxSmallBlind(
+                      value === ''
+                        ? null
+                        : clampToMinimum(Number(value), smallBlind),
+                    );
+                  }}
+                />
+              </label>
+              <label>
+                大盲上限
+                <input
+                  aria-label="大盲上限"
+                  value={
+                    maxSmallBlind === null ? '不设上限' : maxSmallBlind * 2
+                  }
+                  readOnly
+                />
+              </label>
+            </div>
           </fieldset>
           <label>
             筹码耗尽时

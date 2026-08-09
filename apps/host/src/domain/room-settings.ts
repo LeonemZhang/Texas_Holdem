@@ -7,6 +7,15 @@ export type BlindSetting =
 
 export type ZeroChipPolicy = 'request-chips' | 'eliminate';
 
+export interface BlindGrowthConfig {
+  readonly enabled: boolean;
+  readonly intervalHands: number;
+  readonly mode?: 'multiplier' | 'increment' | undefined;
+  readonly multiplier?: number | undefined;
+  readonly increment?: number | undefined;
+  readonly maxSmallBlind?: number | null | undefined;
+}
+
 export interface RoomSettingsInput {
   readonly roomName: string;
   readonly maxPlayers: number;
@@ -14,11 +23,7 @@ export interface RoomSettingsInput {
   readonly blind: BlindSetting;
   readonly actionTimeoutSeconds: number;
   readonly handReadyTimeoutSeconds: number;
-  readonly blindGrowth: {
-    readonly enabled: boolean;
-    readonly intervalHands: number;
-    readonly multiplier: number;
-  };
+  readonly blindGrowth: BlindGrowthConfig;
   readonly zeroChipPolicy: ZeroChipPolicy;
 }
 
@@ -63,11 +68,46 @@ export function validateRoomSettings(input: RoomSettingsInput): RoomSettings {
     input.blindGrowth.intervalHands,
     'Blind growth interval',
   );
-  if (
-    !Number.isFinite(input.blindGrowth.multiplier) ||
-    input.blindGrowth.multiplier <= 1
-  ) {
-    throw new RangeError('Blind growth multiplier must be greater than one');
+  const growthMode = input.blindGrowth.mode ?? 'multiplier';
+  if (growthMode !== 'multiplier' && growthMode !== 'increment') {
+    throw new RangeError(`Unknown blind growth mode: ${String(growthMode)}`);
+  }
+  if (growthMode === 'multiplier') {
+    if (
+      !Number.isFinite(input.blindGrowth.multiplier) ||
+      input.blindGrowth.multiplier! <= 1
+    ) {
+      throw new RangeError('Blind growth multiplier must be greater than one');
+    }
+  } else {
+    if (input.blindGrowth.increment === undefined) {
+      throw new RangeError('Blind growth increment is required');
+    }
+    assertPositiveSafeInteger(
+      input.blindGrowth.increment,
+      'Blind growth increment',
+    );
+    if (input.blindGrowth.increment < input.blind.smallBlind) {
+      throw new RangeError(
+        'Blind growth increment must be at least the small blind',
+      );
+    }
+  }
+  if (input.blindGrowth.increment !== undefined) {
+    assertPositiveSafeInteger(
+      input.blindGrowth.increment,
+      'Blind growth increment',
+    );
+  }
+  const maxSmallBlind = input.blindGrowth.maxSmallBlind;
+  if (maxSmallBlind !== undefined && maxSmallBlind !== null) {
+    assertPositiveSafeInteger(maxSmallBlind, 'Maximum small blind');
+    if (maxSmallBlind < input.blind.smallBlind) {
+      throw new RangeError(
+        'Maximum small blind must be at least the small blind',
+      );
+    }
+    assertPositiveSafeInteger(maxSmallBlind * 2, 'Maximum big blind');
   }
   if (!['request-chips', 'eliminate'].includes(input.zeroChipPolicy)) {
     throw new RangeError('Unknown zero-chip policy');

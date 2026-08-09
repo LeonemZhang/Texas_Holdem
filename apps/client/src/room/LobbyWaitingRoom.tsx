@@ -254,7 +254,7 @@ export function LobbyWaitingRoom({
                 onCancel={() => setSettingsOpen(false)}
               >
                 <RoomSettingsEditor
-                  key={`${settings.roomName}-${settings.initialChips}-${settings.smallBlind}-${settings.maxPlayers}-${settings.actionTimeoutSeconds}-${settings.handReadyTimeoutSeconds}-${settings.blindGrowth.enabled}-${settings.blindGrowth.intervalHands}-${settings.blindGrowth.multiplier}-${settings.zeroChipPolicy}`}
+                  key={`${settings.roomName}-${settings.initialChips}-${settings.smallBlind}-${settings.maxPlayers}-${settings.actionTimeoutSeconds}-${settings.handReadyTimeoutSeconds}-${settings.blindGrowth.enabled}-${settings.blindGrowth.intervalHands}-${settings.blindGrowth.mode ?? 'multiplier'}-${settings.blindGrowth.multiplier ?? ''}-${settings.blindGrowth.increment ?? ''}-${settings.blindGrowth.maxSmallBlind ?? ''}-${settings.zeroChipPolicy}`}
                   settings={settings}
                   formId={settingsFormId}
                   showSubmitButton={false}

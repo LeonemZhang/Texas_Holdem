@@ -8,20 +8,61 @@ import {
 
 const CommandIdentityShape = CommandIdentitySchema.shape;
 
-export const RoomSettingsSchema = z.object({
-  roomName: z.string().trim().min(1),
-  maxPlayers: z.number().int().min(2).max(10).safe(),
-  initialChips: PositiveAmountSchema,
-  smallBlind: PositiveAmountSchema,
-  actionTimeoutSeconds: z.number().int().positive().safe(),
-  handReadyTimeoutSeconds: z.number().int().positive().safe(),
-  blindGrowth: z.object({
-    enabled: z.boolean(),
-    intervalHands: z.number().int().positive().safe(),
-    multiplier: z.number().finite().gt(1),
-  }),
-  zeroChipPolicy: z.enum(['request-chips', 'eliminate']),
-});
+export const RoomSettingsSchema = z
+  .object({
+    roomName: z.string().trim().min(1),
+    maxPlayers: z.number().int().min(2).max(10).safe(),
+    initialChips: PositiveAmountSchema,
+    smallBlind: PositiveAmountSchema,
+    actionTimeoutSeconds: z.number().int().positive().safe(),
+    handReadyTimeoutSeconds: z.number().int().positive().safe(),
+    blindGrowth: z.object({
+      enabled: z.boolean(),
+      intervalHands: z.number().int().positive().safe(),
+      mode: z.enum(['multiplier', 'increment']).optional(),
+      multiplier: z.number().finite().gt(1).optional(),
+      increment: PositiveAmountSchema.optional(),
+      maxSmallBlind: PositiveAmountSchema.nullable().optional(),
+    }),
+    zeroChipPolicy: z.enum(['request-chips', 'eliminate']),
+  })
+  .superRefine((settings, context) => {
+    const growth = settings.blindGrowth;
+    const mode = growth.mode ?? 'multiplier';
+    if (mode === 'multiplier' && growth.multiplier === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['blindGrowth', 'multiplier'],
+        message: 'Multiplier is required for multiplier growth',
+      });
+    }
+    if (mode === 'increment') {
+      if (growth.increment === undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['blindGrowth', 'increment'],
+          message: 'Increment is required for step growth',
+        });
+      } else if (growth.increment < settings.smallBlind) {
+        context.addIssue({
+          code: 'custom',
+          path: ['blindGrowth', 'increment'],
+          message: 'Increment must be at least the small blind',
+        });
+      }
+    }
+    if (
+      growth.maxSmallBlind !== undefined &&
+      growth.maxSmallBlind !== null &&
+      growth.maxSmallBlind < settings.smallBlind
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['blindGrowth', 'maxSmallBlind'],
+        message: 'Maximum small blind must be at least the small blind',
+      });
+    }
+  });
 
 export const CreateRoomCommandSchema = z.object({
   ...CommandIdentityShape,
