@@ -5,6 +5,9 @@ const TURN_CLOCK_PERIOD_MS = 2_000;
 const TURN_CLOCK_TICK_DURATION_MS = 160;
 const TURN_CLOCK_TOCK_DURATION_MS = 100;
 const TURN_CLOCK_VOLUME_MULTIPLIER = 10;
+const SETTLEMENT_WIN_NOTE_INTERVAL_SEC = 0.13;
+const SETTLEMENT_WIN_NOTE_DURATION_SEC = 0.18;
+const SETTLEMENT_WIN_FINAL_NOTE_DURATION_SEC = 0.96;
 
 type PlayerActionSound = 'fold' | 'check' | 'call' | 'raise' | 'all-in';
 
@@ -224,18 +227,29 @@ export class PokerSoundEffects {
       case 'turn-other':
         this.tone(context, 262, start, 0.1, 0.035);
         return;
-      case 'settlement-win':
-        [660, 784, 1_048].forEach((frequency, index) =>
-          this.tone(context, frequency, start + index * 0.08, 0.14, 0.06),
+      case 'settlement-win': {
+        const frequencies = [660, 784, 1_048, 660, 784, 1_048, 660, 784, 1_048];
+        frequencies.forEach((frequency, index) =>
+          this.tone(
+            context,
+            frequency,
+            start + index * SETTLEMENT_WIN_NOTE_INTERVAL_SEC,
+            index === frequencies.length - 1
+              ? SETTLEMENT_WIN_FINAL_NOTE_DURATION_SEC
+              : SETTLEMENT_WIN_NOTE_DURATION_SEC,
+            0.035,
+          ),
         );
         return;
+      }
       case 'settlement-loss':
-        this.tone(context, 440, start, 0.14, 0.045, 'triangle', 330);
-        this.tone(context, 330, start + 0.12, 0.18, 0.04, 'triangle', 220);
+        this.tone(context, 440, start, 0.4, 0.04, 'triangle', 392);
+        this.tone(context, 330, start + 0.4, 0.4, 0.035, 'triangle', 294);
+        this.tone(context, 220, start + 0.8, 1.2, 0.03, 'triangle', 165);
         return;
       case 'settlement-tie':
-        this.tone(context, 520, start, 0.08, 0.045, 'triangle');
-        this.tone(context, 520, start + 0.1, 0.08, 0.04, 'triangle');
+        this.tone(context, 390, start, 0.45, 0.035, 'triangle', 494);
+        this.tone(context, 390, start + 0.45, 1.55, 0.03, 'triangle', 294);
         return;
       case 'fold':
         this.tone(context, 360, start, 0.13, 0.055, 'sawtooth', 150);

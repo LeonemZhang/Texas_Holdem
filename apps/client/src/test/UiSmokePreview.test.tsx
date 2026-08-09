@@ -22,6 +22,14 @@ describe('UiSmokePreview', () => {
     expect(screen.getByText('本局最高牌型')).toBeInTheDocument();
   });
 
+  it('renders the settlement sound preview', () => {
+    render(<UiSmokePreview page="sound" />);
+
+    expect(
+      screen.getByRole('button', { name: '试听持平音效' }),
+    ).toBeInTheDocument();
+  });
+
   it('opens the nickname dialog when the discovery preview joins a room', () => {
     render(<UiSmokePreview page="room-discovery" />);
 

@@ -1,5 +1,5 @@
-import { PageShell } from '@texas-holdem/ui';
-import { useState } from 'react';
+﻿import { PageShell } from '@texas-holdem/ui';
+import { useEffect, useMemo, useState } from 'react';
 
 import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
 
@@ -29,6 +29,10 @@ import { PokerTableLayout } from '../table/PokerTableLayout';
 import { PotChipFlights } from '../table/PotChipFlights';
 import { TableSeats } from '../table/TableSeats';
 import type { RuntimeAdapter } from '../runtime';
+import {
+  PokerSoundEffects,
+  type PokerSoundCue,
+} from '../sound/poker-sound-effects';
 
 const noop = () => undefined;
 const previewHostService = {
@@ -241,6 +245,7 @@ export const uiSmokePreviewPages = [
   'ready-waiting',
   'settlement',
   'settlement-waiting',
+  'sound',
   'table-chip',
   'table-host',
   'table-statistics',
@@ -262,6 +267,41 @@ type TablePreviewPage = Extract<
   | 'table-host'
   | 'table-statistics'
 >;
+
+const soundPreviewCues = [
+  { cue: 'settlement-win', label: '试听赢音效' },
+  { cue: 'settlement-loss', label: '试听输音效' },
+  { cue: 'settlement-tie', label: '试听持平音效' },
+] as const satisfies readonly { cue: PokerSoundCue; label: string }[];
+
+function SoundPreview() {
+  const soundEffects = useMemo(() => new PokerSoundEffects(), []);
+
+  useEffect(() => {
+    soundEffects.enableOnFirstInteraction();
+    return () => soundEffects.dispose();
+  }, [soundEffects]);
+
+  return (
+    <PageShell title="音效试听" subtitle="仅开发预览可用">
+      <section className="home-data-page" aria-label="结算音效试听">
+        <div className="home-data-page__toolbar">
+          {soundPreviewCues.map(({ cue, label }) => (
+            <button
+              className="button button--secondary"
+              key={cue}
+              type="button"
+              onClick={() => soundEffects.play([cue])}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p>点击按钮后即可重复试听对应的结算音效。</p>
+      </section>
+    </PageShell>
+  );
+}
 
 function previewPanel(page: TablePreviewPage): TableUtilityPanel | null {
   if (page === 'table-chip') return 'chip-exchange';
@@ -654,6 +694,10 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
 
   if (isTablePreviewPage(page)) {
     return <TablePreview page={page} />;
+  }
+
+  if (page === 'sound') {
+    return <SoundPreview />;
   }
 
   if (page === 'statistics') {
