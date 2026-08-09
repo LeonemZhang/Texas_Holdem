@@ -220,9 +220,9 @@
 }
 
 .hand-ready-card__settlement-heading {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
 }
 
@@ -239,6 +239,7 @@
   background: rgb(13 148 136 / 16%);
   font: inherit;
   font-weight: 900;
+  justify-self: end;
 }
 
 .lobby__heading-actions {
@@ -2318,6 +2319,23 @@ body:has(.poker-table-page) .poker-table-controls {
   gap: 0.3rem;
 }
 
+.hand-ready-card__settlement-title {
+  min-width: 0;
+  overflow: hidden;
+  justify-self: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hand-ready-card__settlement-outcome {
+  flex: 0 0 auto;
+  font-size: clamp(1.1rem, 2.8vw, 1.4rem);
+  justify-self: center;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .hand-ready-card__settlement-community-cards {
   display: flex;
   align-items: center;
@@ -2392,6 +2410,10 @@ body:has(.poker-table-page) .poker-table-controls {
 
 .hand-ready-card__net-change--negative {
   color: #fda4af;
+}
+
+.hand-ready-card__net-change--tie {
+  color: #ccfbf1;
 }
 
 .hand-ready-card__settlement-cards {

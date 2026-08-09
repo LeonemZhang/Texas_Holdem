@@ -186,6 +186,7 @@ describe('HandReadyOverlay', () => {
 
   it('shows the settlement summary until the next round starts', () => {
     const props = {
+      ownPlayerId: 'alice',
       deadlineMs: 30_000,
       nowMs: 5_000,
       ownChoice: 'pending' as const,
@@ -227,9 +228,10 @@ describe('HandReadyOverlay', () => {
     expect(
       screen.getByRole('alertdialog', { name: '本局结算' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Alice').parentElement).toHaveTextContent(
-      'Alice· 1,240 筹码赢得 240 筹码',
+    expect(screen.getByText('我').parentElement).toHaveTextContent(
+      '我· 1,240 筹码赢得 240 筹码',
     );
+    expect(screen.queryByText('Alice')).toBeNull();
     expect(screen.getByText('Bob').parentElement).toHaveTextContent(
       'Bob· 760 筹码输掉 240 筹码',
     );
@@ -244,20 +246,18 @@ describe('HandReadyOverlay', () => {
     expect(screen.getByLabelText('本局结算玩家牌型')).toHaveTextContent(
       'Bob· 760 筹码输掉 240 筹码底牌未摊牌',
     );
-    expect(screen.getByLabelText('Alice 的底牌')).toHaveTextContent('底牌A♠K♦');
+    expect(screen.getByLabelText('我 的底牌')).toHaveTextContent('底牌A♠K♦');
     expect(screen.getByLabelText('本局公共牌')).toHaveTextContent(
       '公共牌2♣10♦J♥Q♠A♣',
     );
     expect(screen.getByLabelText('本局结算底池')).toHaveTextContent(
       '总池240翻牌前40翻牌200',
     );
-    expect(screen.getByLabelText('Alice 的一对')).toHaveTextContent(
+    expect(screen.getByLabelText('我 的一对')).toHaveTextContent(
       '一对A♠A♦A♣K♠Q♦',
     );
     expect(screen.queryByText('最大牌')).toBeNull();
-    expect(
-      screen.getByLabelText('Alice 的最佳第 1 张牌 A♠'),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('我 的最佳第 1 张牌 A♠')).toBeInTheDocument();
     expect(screen.getByLabelText('Bob 的底牌')).toHaveTextContent('底牌');
     expect(screen.getAllByLabelText(/Bob 的第 .* 张底牌，未公开/)).toHaveLength(
       2,
@@ -283,11 +283,64 @@ describe('HandReadyOverlay', () => {
         }}
       />,
     );
-    expect(screen.getByText('Alice').parentElement).toHaveTextContent(
-      'Alice· 1,250 筹码赢得 240 筹码',
+    expect(screen.getByText('我').parentElement).toHaveTextContent(
+      '我· 1,250 筹码赢得 240 筹码',
     );
     rerender(<HandReadyOverlay {...props} complete />);
     expect(screen.queryByRole('alertdialog', { name: '本局结算' })).toBeNull();
+  });
+
+  it('puts my settlement row first and shows my result', () => {
+    const makeSettlement = (ownNetChange: number) => ({
+      handId: `hand-${ownNetChange}`,
+      reason: 'showdown' as const,
+      players: [
+        {
+          playerId: 'bob',
+          nickname: 'Bob',
+          chips: 80,
+          netChange: -ownNetChange,
+        },
+        {
+          playerId: 'alice',
+          nickname: 'Alice',
+          chips: 120,
+          netChange: ownNetChange,
+        },
+      ],
+    });
+    const props = {
+      ownPlayerId: 'alice',
+      deadlineMs: 30_000,
+      nowMs: 5_000,
+      ownChoice: 'pending' as const,
+      pendingRequests: [],
+      complete: false,
+      ownChips: 100,
+      onChoose: vi.fn(),
+    };
+    const { rerender } = render(
+      <HandReadyOverlay {...props} settlement={makeSettlement(20)} />,
+    );
+
+    expect(screen.getByText('胜利')).toHaveClass(
+      'hand-ready-card__net-change--positive',
+    );
+    const players = within(
+      screen.getByLabelText('本局结算玩家牌型'),
+    ).getAllByRole('listitem');
+    expect(players[0]).toHaveTextContent('我');
+    expect(players[1]).toHaveTextContent('Bob');
+
+    rerender(<HandReadyOverlay {...props} settlement={makeSettlement(-20)} />);
+    expect(screen.getByText('失败')).toHaveClass(
+      'hand-ready-card__net-change--negative',
+    );
+
+    rerender(<HandReadyOverlay {...props} settlement={makeSettlement(0)} />);
+    expect(screen.getByText('平局')).toHaveClass(
+      'hand-ready-card__net-change--tie',
+    );
   });
 
   it('collapses settlement from its mobile detail button and restores it', () => {

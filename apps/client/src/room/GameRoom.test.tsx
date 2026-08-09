@@ -766,6 +766,8 @@ describe('GameRoom', () => {
     );
 
     const settlementPlayers = await screen.findByLabelText('本局结算玩家牌型');
+    const settlementRows = within(settlementPlayers).getAllByRole('listitem');
+    expect(settlementRows[0]).toHaveTextContent('我');
     expect(screen.queryByLabelText('公共牌牌面')).toBeNull();
     expect(screen.queryByLabelText('本局底池')).toBeNull();
     expect(screen.queryByLabelText('我的底牌')).toBeNull();
@@ -778,14 +780,14 @@ describe('GameRoom', () => {
       within(settlementPlayers).getAllByLabelText(/Alice 的最佳第 .* 张牌/),
     ).toHaveLength(5);
     expect(
-      within(settlementPlayers).getAllByLabelText(/Bob 的第 .* 张底牌，未公开/),
+      within(settlementPlayers).getAllByLabelText(/我 的第 .* 张底牌，未公开/),
     ).toHaveLength(2);
     expect(
       within(settlementPlayers).getByText('Alice').parentElement,
     ).toHaveTextContent('Alice· 100 筹码赢得 20 筹码');
     expect(
-      within(settlementPlayers).getByText('Bob').parentElement,
-    ).toHaveTextContent('Bob· 100 筹码输掉 20 筹码');
+      within(settlementPlayers).getByText('我').parentElement,
+    ).toHaveTextContent('我· 100 筹码输掉 20 筹码');
     const showdownButton = await screen.findByRole('button', { name: '摊牌' });
     expect(showdownButton.closest('.hand-ready-card__actions')).not.toBeNull();
     expect(showdownButton.closest('.table-seat')).toBeNull();
@@ -798,16 +800,12 @@ describe('GameRoom', () => {
         }),
       ),
     );
-    fireEvent.click(
-      document.querySelector('.hand-ready-card__settlement-collapse')!,
-    );
-    expect(document.querySelector('.community-cards')).toBeInTheDocument();
-    expect(document.querySelector('.street-pot-history')).toBeInTheDocument();
-    expect(document.querySelector('.hole-cards')).toBeInTheDocument();
-    expect(document.querySelector('.hole-cards__hand-type')).toBeInTheDocument();
-    fireEvent.click(
-      document.querySelector('.hand-ready-card__settlement-expand')!,
-    );
+    fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
+    expect(screen.getByLabelText('公共牌牌面')).toBeInTheDocument();
+    expect(screen.getByLabelText('本局底池')).toBeInTheDocument();
+    expect(screen.getByLabelText('我的底牌')).toBeInTheDocument();
+    expect(screen.getByLabelText('当前最大牌型：一对')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /结算详情/ }));
     fireEvent.click(await screen.findByRole('button', { name: '筹码交换' }));
     fireEvent.click(await screen.findByRole('button', { name: '发起请求' }));
     fireEvent.click(screen.getByRole('button', { name: /^确认$/ }));
@@ -836,7 +834,7 @@ describe('GameRoom', () => {
       screen.getByText('+1', { selector: '.statistics-positive' }),
     ).toBeInTheDocument();
     expect(
-      within(document.querySelector('.statistics-ranking')!).getByText('3'),
+      within(screen.getByLabelText('筹码排名')).getByText('3'),
     ).toBeInTheDocument();
     expect(screen.getByText('1 / 0 / 0 / 0 / 0')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
@@ -877,12 +875,12 @@ describe('GameRoom', () => {
       expect(screen.queryByRole('button', { name: '摊牌' })).toBeNull(),
     );
     expect(
-      within(screen.getByLabelText('本局结算玩家牌型')).getByText('Bob')
+      within(screen.getByLabelText('本局结算玩家牌型')).getByText('我')
         .parentElement,
-    ).toHaveTextContent('Bob· 1,250 筹码输掉 20 筹码');
+    ).toHaveTextContent('我· 1,250 筹码输掉 20 筹码');
     expect(
       within(screen.getByLabelText('本局结算玩家牌型')).getByLabelText(
-        'Bob 的一对',
+        '我 的一对',
       ),
     ).toBeInTheDocument();
   });

@@ -11,6 +11,7 @@ export interface HandReadyRequestView {
 }
 
 export interface HandReadyOverlayProps {
+  readonly ownPlayerId?: string;
   readonly deadlineMs: number;
   readonly ownChoice: 'pending' | 'ready' | 'sitting-out';
   readonly pendingRequests: readonly HandReadyRequestView[];
@@ -138,7 +139,16 @@ function useCurrentTime(fixedNowMs?: number) {
   return fixedNowMs ?? liveNowMs;
 }
 
+function settlementNetChangeClassName(netChange: number) {
+  return netChange > 0
+    ? 'hand-ready-card__net-change--positive'
+    : netChange < 0
+      ? 'hand-ready-card__net-change--negative'
+      : 'hand-ready-card__net-change--tie';
+}
+
 export function HandReadyOverlay({
+  ownPlayerId,
   deadlineMs,
   ownChoice,
   pendingRequests,
@@ -157,6 +167,35 @@ export function HandReadyOverlay({
   const currentTime = useCurrentTime(nowMs);
   const [settlementCollapsed, setSettlementCollapsed] = useState(false);
   const settlementCommunityCards = settlement?.communityCards ?? [];
+  const ownSettlementNetChange =
+    settlement?.players.find((player) => player.playerId === ownPlayerId)
+      ?.netChange ?? 0;
+  const settlementOutcome =
+    ownSettlementNetChange > 0
+      ? 'win'
+      : ownSettlementNetChange < 0
+        ? 'loss'
+        : 'tie';
+  const settlementOutcomeLabel =
+    settlementOutcome === 'win'
+      ? '胜利'
+      : settlementOutcome === 'loss'
+        ? '失败'
+        : '平局';
+  const settlementOutcomeClassName = settlementNetChangeClassName(
+    ownSettlementNetChange,
+  );
+  const settlementPlayers = [
+    ...(settlement?.players.filter(
+      (player) => player.playerId === ownPlayerId,
+    ) ?? []),
+    ...(settlement?.players.filter(
+      (player) => player.playerId !== ownPlayerId,
+    ) ?? []),
+  ].map((player) => ({
+    ...player,
+    displayName: player.playerId === ownPlayerId ? '我' : player.nickname,
+  }));
   const secondsLeft = Math.max(
     0,
     Math.ceil((deadlineMs - currentTime) / 1_000),
@@ -286,8 +325,13 @@ export function HandReadyOverlay({
             aria-label="本局结算"
           >
             <div className="hand-ready-card__settlement-heading">
-              <strong>
+              <strong className="hand-ready-card__settlement-title">
                 本局结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
+              </strong>
+              <strong
+                className={`hand-ready-card__settlement-outcome ${settlementOutcomeClassName}`}
+              >
+                {settlementOutcomeLabel}
               </strong>
               <button
                 className="hand-ready-card__settlement-collapse"
@@ -339,21 +383,15 @@ export function HandReadyOverlay({
               className="hand-ready-card__showdown-results"
               aria-label="本局结算玩家牌型"
             >
-              {settlement.players.map((player) => (
+              {settlementPlayers.map((player) => (
                 <li key={player.playerId}>
                   <div className="hand-ready-card__showdown-summary">
-                    <strong>{player.nickname}</strong>
+                    <strong>{player.displayName}</strong>
                     <span className="hand-ready-card__player-chips">
                       · {player.chips.toLocaleString('zh-CN')} 筹码
                     </span>
                     <span
-                      className={
-                        player.netChange > 0
-                          ? 'hand-ready-card__net-change--positive'
-                          : player.netChange < 0
-                            ? 'hand-ready-card__net-change--negative'
-                            : undefined
-                      }
+                      className={settlementNetChangeClassName(player.netChange)}
                     >
                       {player.netChange > 0
                         ? `赢得 ${player.netChange.toLocaleString('zh-CN')} 筹码`
@@ -363,14 +401,14 @@ export function HandReadyOverlay({
                     </span>
                   </div>
                   <div className="hand-ready-card__settlement-cards">
-                    <div aria-label={`${player.nickname} 的底牌`}>
+                    <div aria-label={`${player.displayName} 的底牌`}>
                       <span className="hand-ready-card__card-label">底牌</span>
                       {player.holeCards ? (
                         player.holeCards.map((card, index) => (
                           <PlayingCard
                             code={card}
                             key={`${card}-${index}`}
-                            label={`${player.nickname} 的第 ${index + 1} 张底牌`}
+                            label={`${player.displayName} 的第 ${index + 1} 张底牌`}
                           />
                         ))
                       ) : player.voluntarilyRevealedHoleCards ? (
@@ -379,7 +417,7 @@ export function HandReadyOverlay({
                             <PlayingCard
                               code={card}
                               key={`${card}-${index}`}
-                              label={`${player.nickname} 的公开第 ${index + 1} 张底牌`}
+                              label={`${player.displayName} 的公开第 ${index + 1} 张底牌`}
                             />
                           ),
                         )
@@ -387,18 +425,18 @@ export function HandReadyOverlay({
                         <>
                           <PlayingCard
                             code={null}
-                            label={`${player.nickname} 的第 1 张底牌`}
+                            label={`${player.displayName} 的第 1 张底牌`}
                           />
                           <PlayingCard
                             code={null}
-                            label={`${player.nickname} 的第 2 张底牌`}
+                            label={`${player.displayName} 的第 2 张底牌`}
                           />
                         </>
                       )}
                     </div>
                     {player.bestFiveCards ? (
                       <div
-                        aria-label={`${player.nickname} 的${player.handType ?? '牌型'}`}
+                        aria-label={`${player.displayName} 的${player.handType ?? '牌型'}`}
                       >
                         <span className="hand-ready-card__card-label">
                           {player.handType ?? '牌型'}
@@ -410,7 +448,7 @@ export function HandReadyOverlay({
                           <PlayingCard
                             code={card}
                             key={`${card}-${index}`}
-                            label={`${player.nickname} 的最佳第 ${index + 1} 张牌`}
+                            label={`${player.displayName} 的最佳第 ${index + 1} 张牌`}
                           />
                         ))}
                       </div>

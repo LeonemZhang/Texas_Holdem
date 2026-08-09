@@ -1,4 +1,4 @@
-﻿import { PageShell } from '@texas-holdem/ui';
+import { PageShell } from '@texas-holdem/ui';
 import { useEffect, useMemo, useState } from 'react';
 
 import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
@@ -449,6 +449,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
         tableOverlay={
           handReady ? (
             <HandReadyOverlay
+              ownPlayerId={tablePlayers[0]!.playerId}
               deadlineMs={waitingReady ? Date.now() : Date.now() + 30_000}
               ownChoice={waitingReady ? 'sitting-out' : 'pending'}
               pendingRequests={

@@ -697,6 +697,7 @@ export function GameRoom({
         tableOverlay={
           snapshot.handReady ? (
             <HandReadyOverlay
+              ownPlayerId={session.playerId}
               deadlineMs={snapshot.handReady.deadlineMs}
               ownChoice={snapshot.handReady.ownChoice}
               ownChips={own?.chips ?? 0}
