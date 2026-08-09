@@ -2,6 +2,7 @@ import {
   advanceAfterCompletedBetting,
   applyHandAction,
   createHandSummary,
+  isContender,
   isBettingRoundComplete,
   settleShowdown,
   settleUncontestedHand,
@@ -27,6 +28,43 @@ import type {
 export interface GameCommandHandlerHooks {
   readonly onPlayerAction?: (event: PlayerActionEvent) => void;
   readonly onHandSettled?: (summary: HandSummaryEvent) => void;
+}
+
+type CompletedBettingTransition =
+  | {
+      readonly type: 'settle-uncontested';
+      readonly hand: StartedHandState;
+    }
+  | {
+      readonly type: 'settle-showdown';
+      readonly hand: StartedHandState;
+    }
+  | {
+      readonly type: 'continue';
+      readonly hand: StartedHandState;
+    };
+
+function transitionAfterCompletedBetting(
+  hand: StartedHandState,
+): CompletedBettingTransition {
+  if (!isBettingRoundComplete(hand.betting)) {
+    throw new RangeError('Betting round is not complete');
+  }
+  const contenders = hand.players.filter(isContender);
+  if (contenders.length === 1) {
+    return { type: 'settle-uncontested', hand };
+  }
+  if (contenders.length < 2) {
+    throw new RangeError('A completed betting round has no contenders');
+  }
+  if (hand.street === 'river') {
+    return { type: 'settle-showdown', hand };
+  }
+  const progressed = advanceAfterCompletedBetting(hand);
+  return progressed.street === 'river' &&
+    isBettingRoundComplete(progressed.betting)
+    ? { type: 'settle-showdown', hand: progressed }
+    : { type: 'continue', hand: progressed };
 }
 
 function toBettingAction(command: BettingCommand): BettingAction {
@@ -91,30 +129,24 @@ export class GameCommandHandler {
       street: hand.street,
     } satisfies PlayerActionEvent);
     if (isBettingRoundComplete(nextHand.betting)) {
-      const contenders = nextHand.players.filter(
-        ({ status }) => status !== 'folded',
-      );
-      if (contenders.length === 1) {
-        return this.settle(nextHand, room, settleUncontestedHand(nextHand));
+      const transition = transitionAfterCompletedBetting(nextHand);
+      if (transition.type === 'settle-uncontested') {
+        return this.settle(
+          transition.hand,
+          room,
+          settleUncontestedHand(transition.hand),
+        );
       }
-      if (nextHand.street === 'river') {
-        return this.settle(nextHand, room, settleShowdown(nextHand));
+      if (transition.type === 'settle-showdown') {
+        return this.settle(
+          transition.hand,
+          room,
+          settleShowdown(transition.hand),
+        );
       }
-      nextHand = advanceAfterCompletedBetting(nextHand);
-      if (
-        nextHand.street === 'river' &&
-        isBettingRoundComplete(nextHand.betting)
-      ) {
-        return this.settle(nextHand, room, settleShowdown(nextHand));
-      }
+      nextHand = transition.hand;
     }
-    this.runtime.replaceCurrentHand(room.roomId, nextHand);
-    const nextRoom = syncLiveChipBalances(
-      freezeRoom({ ...room, version: room.version + 1 }),
-      nextHand,
-    );
-    this.rooms.save(nextRoom);
-    return { stateVersion: nextRoom.version, sequence: 0 };
+    return this.savePlayingHand(room, nextHand);
   }
 
   resolveAutomatic(room: RoomState): CommandHandlerResult | null {
@@ -127,15 +159,35 @@ export class GameCommandHandler {
     ) {
       return null;
     }
-    const contenders = hand.players.filter(({ status }) => status !== 'folded');
-    if (contenders.length === 1) {
-      return this.settle(hand, room, settleUncontestedHand(hand));
+    const transition = transitionAfterCompletedBetting(hand);
+    if (transition.type === 'settle-uncontested') {
+      return this.settle(
+        transition.hand,
+        room,
+        settleUncontestedHand(transition.hand),
+      );
     }
-    if (hand.street === 'river') {
-      return this.settle(hand, room, settleShowdown(hand));
+    if (transition.type === 'settle-showdown') {
+      return this.settle(
+        transition.hand,
+        room,
+        settleShowdown(transition.hand),
+      );
     }
-    const progressed = advanceAfterCompletedBetting(hand);
-    return this.settle(progressed, room, settleShowdown(progressed));
+    return this.savePlayingHand(room, transition.hand);
+  }
+
+  private savePlayingHand(
+    room: RoomState,
+    hand: StartedHandState,
+  ): CommandHandlerResult {
+    this.runtime.replaceCurrentHand(room.roomId, hand);
+    const nextRoom = syncLiveChipBalances(
+      freezeRoom({ ...room, version: room.version + 1 }),
+      hand,
+    );
+    this.rooms.save(nextRoom);
+    return { stateVersion: nextRoom.version, sequence: 0 };
   }
 
   private settle(

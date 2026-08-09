@@ -5,7 +5,7 @@ import {
 } from './basic-actions.js';
 import { applyRaiseTo } from './raise.js';
 import { isRaiseReopenedFor } from './reopen.js';
-import type { BettingRoundState } from './state.js';
+import { isContender, type BettingRoundState } from './state.js';
 
 export type BettingAction =
   | BasicBettingAction
@@ -78,7 +78,7 @@ export function legalBettingActions(
 }
 
 export function isBettingRoundComplete(state: BettingRoundState): boolean {
-  const contenders = state.players.filter(({ status }) => status !== 'folded');
+  const contenders = state.players.filter(isContender);
   if (contenders.length <= 1) return true;
   return (
     state.pendingPlayerIds.length === 0 &&

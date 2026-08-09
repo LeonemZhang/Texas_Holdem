@@ -9,6 +9,10 @@ export interface BettingPlayer {
   readonly actedAtBet: number | null;
 }
 
+export function isContender(player: Pick<BettingPlayer, 'status'>): boolean {
+  return player.status === 'active' || player.status === 'all-in';
+}
+
 export interface BettingRoundState {
   readonly players: readonly BettingPlayer[];
   readonly currentBet: number;

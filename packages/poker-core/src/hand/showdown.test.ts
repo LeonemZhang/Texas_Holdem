@@ -386,7 +386,7 @@ describe('settleShowdown', () => {
     ).toBe(600);
   });
 
-  it('accumulates multi-street contributions and refunds C uncalled 100', () => {
+  it('runs out after sequential all-ins and refunds C uncalled 100', () => {
     let hand = startHand({
       handId: 'multi-street-all-in',
       participants: [
@@ -409,22 +409,13 @@ describe('settleShowdown', () => {
     ]);
 
     hand = applyHandAction(hand, 'b', { type: 'allIn' });
-    hand = applyHandAction(hand, 'c', { type: 'call' });
-    hand = advanceAfterCompletedBetting(hand);
-    expect(hand.street).toBe('turn');
-    expect(hand.completedStreetPots).toEqual([
-      { street: 'preflop', amount: 300 },
-      { street: 'flop', amount: 200 },
-    ]);
-
     hand = applyHandAction(hand, 'c', { type: 'allIn' });
-    while (hand.street !== 'river') {
-      hand = advanceAfterCompletedBetting(hand);
-    }
+    hand = advanceAfterCompletedBetting(hand);
+    expect(hand.street).toBe('river');
     expect(hand.completedStreetPots).toEqual([
       { street: 'preflop', amount: 300 },
-      { street: 'flop', amount: 200 },
-      { street: 'turn', amount: 100 },
+      { street: 'flop', amount: 300 },
+      { street: 'turn', amount: 0 },
     ]);
 
     const holeCards = [

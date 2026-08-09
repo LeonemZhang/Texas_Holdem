@@ -20,7 +20,7 @@ const identity = {
   expectedVersion: 0,
 };
 
-function playingRoom() {
+function playingRoom(extraPlayerIds: readonly string[] = []) {
   const rooms = new InMemoryRoomRegistry();
   const runtime = new RoomCommandHandler(rooms, { next: () => 0.5 });
   runtime.handle(
@@ -41,18 +41,20 @@ function playingRoom() {
     },
     null,
   );
-  const room = rooms.get('room-1')!;
-  runtime.handle(
-    {
-      ...identity,
-      commandId: 'join',
-      playerId: 'bob',
-      type: 'room.join',
-      nickname: 'Bob',
-    },
-    room,
-  );
-  for (const playerId of ['host', 'bob']) {
+  const playerIds = ['host', 'bob', ...extraPlayerIds];
+  for (const [index, playerId] of playerIds.slice(1).entries()) {
+    runtime.handle(
+      {
+        ...identity,
+        commandId: `join-${playerId}`,
+        playerId,
+        type: 'room.join',
+        nickname: index === 0 ? 'Bob' : `Player ${index + 2}`,
+      },
+      rooms.get('room-1'),
+    );
+  }
+  for (const playerId of playerIds) {
     runtime.handle(
       {
         ...identity,
@@ -95,6 +97,52 @@ describe('GameCommandHandler', () => {
     );
 
     handler.resolveAutomatic(rooms.get('room-1')!);
+
+    expect(runtime.getCurrentHand('room-1')?.street).toBe('river');
+    expect(runtime.getCurrentHand('room-1')?.communityCards).toHaveLength(5);
+    expect(rooms.get('room-1')?.phase).toBe('hand-ready');
+  });
+
+  it('runs out after the betting round closes with one funded contender', () => {
+    const { rooms, runtime } = playingRoom(['carol']);
+    const handler = new GameCommandHandler(rooms, runtime, () => 5_000);
+    runtime.replaceCurrentHand(
+      'room-1',
+      startHand({
+        handId: 'hand-1',
+        participants: [
+          { playerId: 'host', seatIndex: 0, stack: 100 },
+          { playerId: 'bob', seatIndex: 1, stack: 500 },
+          { playerId: 'carol', seatIndex: 2, stack: 800 },
+        ],
+        previousButtonIndex: null,
+        smallBlind: 1,
+        randomSource: { next: () => 0.5 },
+      }),
+    );
+
+    handler.handle(
+      { ...identity, commandId: 'host-all-in', type: 'game.all-in' },
+      rooms.get('room-1'),
+    );
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'bob-call',
+        playerId: 'bob',
+        type: 'game.call',
+      },
+      rooms.get('room-1'),
+    );
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'carol-fold',
+        playerId: 'carol',
+        type: 'game.fold',
+      },
+      rooms.get('room-1'),
+    );
 
     expect(runtime.getCurrentHand('room-1')?.street).toBe('river');
     expect(runtime.getCurrentHand('room-1')?.communityCards).toHaveLength(5);

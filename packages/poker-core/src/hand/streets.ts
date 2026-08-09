@@ -1,5 +1,10 @@
 import { isBettingRoundComplete } from '../betting/betting-round.js';
-import { createBettingRound } from '../betting/state.js';
+import {
+  createBettingRound,
+  freezeBettingState,
+  isContender,
+  type BettingPlayer,
+} from '../betting/state.js';
 import { actionOrderForStreet } from '../seating/positions.js';
 import type { Seat } from '../seating/seats.js';
 import type {
@@ -12,6 +17,22 @@ function streetPotAmount(state: StartedHandState): number {
   return state.players.reduce(
     (total, player) => total + player.streetCommitted,
     0,
+  );
+}
+
+type BettingCompetitionPlayer = Pick<BettingPlayer, 'status' | 'stack'>;
+
+/**
+ * Returns whether at least two players can still put chips into a future
+ * betting decision. Callers must first establish that the current street is
+ * closed; this function intentionally does not inspect betting-round
+ * pending state.
+ */
+export function hasFurtherBettingCompetition(
+  players: readonly BettingCompetitionPlayer[],
+): boolean {
+  return (
+    players.filter(isContender).filter(({ stack }) => stack > 0).length >= 2
   );
 }
 
@@ -29,6 +50,7 @@ function completedStreetPots(
 function dealStreet(
   state: StartedHandState,
   street: Exclude<HandStreet, 'preflop'>,
+  closeBettingRound = false,
 ): StartedHandState {
   const cardCount = street === 'flop' ? 3 : 1;
   const dealt = state.deck.slice(
@@ -54,6 +76,13 @@ function dealStreet(
     state.bigBlind,
     firstActor?.playerId,
   );
+  const nextBetting = closeBettingRound
+    ? freezeBettingState({
+        ...betting,
+        currentActorId: null,
+        pendingPlayerIds: [],
+      })
+    : betting;
   return Object.freeze({
     ...state,
     street,
@@ -61,8 +90,22 @@ function dealStreet(
     communityCards: Object.freeze([...state.communityCards, ...dealt]),
     deckCursor: state.deckCursor + cardCount,
     completedStreetPots: completedStreetPots(state),
-    betting,
+    betting: nextBetting,
   });
+}
+
+function runoutToRiver(state: StartedHandState): StartedHandState {
+  let next = state;
+  while (next.street !== 'river') {
+    const nextStreet =
+      next.street === 'preflop'
+        ? 'flop'
+        : next.street === 'flop'
+          ? 'turn'
+          : 'river';
+    next = dealStreet(next, nextStreet, true);
+  }
+  return next;
 }
 
 export function advanceToFlop(state: StartedHandState): StartedHandState {
@@ -74,7 +117,7 @@ export function advanceToFlop(state: StartedHandState): StartedHandState {
   if (!isBettingRoundComplete(state.betting)) {
     throw new RangeError('Betting round is not complete');
   }
-  if (state.players.filter(({ status }) => status !== 'folded').length <= 1) {
+  if (state.players.filter(isContender).length <= 1) {
     throw new RangeError(
       'An uncontested hand must settle without dealing the flop',
     );
@@ -93,15 +136,19 @@ export function advanceAfterCompletedBetting(
       'River betting advances to settlement, not another street',
     );
   }
+  if (state.players.filter(isContender).length <= 1) {
+    throw new RangeError(
+      'An uncontested hand must settle without advancing the street',
+    );
+  }
+  if (!hasFurtherBettingCompetition(state.players)) {
+    return runoutToRiver(state);
+  }
   const nextStreet =
     state.street === 'preflop'
       ? 'flop'
       : state.street === 'flop'
         ? 'turn'
         : 'river';
-  const next = dealStreet(state, nextStreet);
-  if (next.betting.currentActorId === null && next.street !== 'river') {
-    return advanceAfterCompletedBetting(next);
-  }
-  return next;
+  return dealStreet(state, nextStreet);
 }
