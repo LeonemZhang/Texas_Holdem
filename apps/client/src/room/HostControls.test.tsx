@@ -138,6 +138,6 @@ describe('HostControls', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
     expect(screen.getByRole('button', { name: '踢出 Bob' })).toBeDisabled();
-    expect(screen.getByText('每手结束后可移除')).toBeInTheDocument();
+    expect(screen.getByText('每局结束后可移除')).toBeInTheDocument();
   });
 });

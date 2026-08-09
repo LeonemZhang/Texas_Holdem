@@ -18,7 +18,7 @@ describe('HandReadyOverlay', () => {
         onChoose={onChoose}
       />,
     );
-    expect(screen.queryByText('下一手准备')).toBeNull();
+    expect(screen.queryByText('下一局准备')).toBeNull();
     expect(screen.getByLabelText('剩余 30 秒')).toHaveTextContent('30s');
     fireEvent.click(screen.getByRole('button', { name: '就绪' }));
     fireEvent.click(screen.getByRole('button', { name: '暂不参与' }));
@@ -148,7 +148,7 @@ describe('HandReadyOverlay', () => {
     expect(screen.getByLabelText('等待至少两名玩家就绪')).toHaveTextContent(
       '等待就绪',
     );
-    fireEvent.click(screen.getByRole('button', { name: '加入下一手' }));
+    fireEvent.click(screen.getByRole('button', { name: '加入下一局' }));
     expect(onChoose).toHaveBeenCalledWith('ready');
   });
 
@@ -225,7 +225,7 @@ describe('HandReadyOverlay', () => {
       <HandReadyOverlay {...props} complete={false} />,
     );
     expect(
-      screen.getByRole('alertdialog', { name: '本手结算' }),
+      screen.getByRole('alertdialog', { name: '本局结算' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Alice').parentElement).toHaveTextContent(
       'Alice· 1,240 筹码赢得 240 筹码',
@@ -241,14 +241,14 @@ describe('HandReadyOverlay', () => {
     ).toEqual(['就绪', '摊牌', '暂不参与']);
     fireEvent.click(within(actions).getByRole('button', { name: '摊牌' }));
     expect(props.onShowHoleCards).toHaveBeenCalledOnce();
-    expect(screen.getByLabelText('本手结算玩家牌型')).toHaveTextContent(
+    expect(screen.getByLabelText('本局结算玩家牌型')).toHaveTextContent(
       'Bob· 760 筹码输掉 240 筹码底牌未摊牌',
     );
     expect(screen.getByLabelText('Alice 的底牌')).toHaveTextContent('底牌A♠K♦');
-    expect(screen.getByLabelText('本手公共牌')).toHaveTextContent(
+    expect(screen.getByLabelText('本局公共牌')).toHaveTextContent(
       '公共牌2♣10♦J♥Q♠A♣',
     );
-    expect(screen.getByLabelText('本手结算底池')).toHaveTextContent(
+    expect(screen.getByLabelText('本局结算底池')).toHaveTextContent(
       '总池240翻牌前40翻牌200',
     );
     expect(screen.getByLabelText('Alice 的一对')).toHaveTextContent(
@@ -268,7 +268,7 @@ describe('HandReadyOverlay', () => {
     ).toBeInTheDocument();
     expect(
       screen
-        .getByLabelText('本手公共牌')
+        .getByLabelText('本局公共牌')
         .querySelector('.hand-ready-card__card-label'),
     ).toHaveTextContent('公共牌');
     rerender(
@@ -287,7 +287,7 @@ describe('HandReadyOverlay', () => {
       'Alice· 1,250 筹码赢得 240 筹码',
     );
     rerender(<HandReadyOverlay {...props} complete />);
-    expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
+    expect(screen.queryByRole('alertdialog', { name: '本局结算' })).toBeNull();
   });
 
   it('collapses settlement from its mobile detail button and restores it', () => {
@@ -322,7 +322,7 @@ describe('HandReadyOverlay', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
-    expect(screen.queryByRole('alertdialog', { name: '本手结算' })).toBeNull();
+    expect(screen.queryByRole('alertdialog', { name: '本局结算' })).toBeNull();
     expect(screen.queryByRole('button', { name: '就绪' })).toBeNull();
     const expand = screen.getByRole('button', {
       name: '结算详情 · 23s',
@@ -332,7 +332,7 @@ describe('HandReadyOverlay', () => {
     );
     fireEvent.click(expand);
     expect(
-      screen.getByRole('alertdialog', { name: '本手结算' }),
+      screen.getByRole('alertdialog', { name: '本局结算' }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
@@ -343,7 +343,7 @@ describe('HandReadyOverlay', () => {
       />,
     );
     expect(
-      screen.getByRole('alertdialog', { name: '本手结算' }),
+      screen.getByRole('alertdialog', { name: '本局结算' }),
     ).toBeInTheDocument();
   });
 
@@ -374,7 +374,7 @@ describe('HandReadyOverlay', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
     expect(
-      screen.queryByRole('alertdialog', { name: '本手结算' }),
+      screen.queryByRole('alertdialog', { name: '本局结算' }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: '结算详情 · 23s' }),
@@ -413,11 +413,11 @@ describe('HandReadyOverlay', () => {
       />,
     );
 
-    expect(screen.getByLabelText('本手公共牌')).toHaveTextContent(
+    expect(screen.getByLabelText('本局公共牌')).toHaveTextContent(
       '公共牌A♠K♦Q♥J♣',
     );
-    expect(screen.getAllByLabelText(/本手第 .* 张公共牌/)).toHaveLength(4);
-    expect(screen.queryByLabelText('本手第 5 张公共牌')).toBeNull();
+    expect(screen.getAllByLabelText(/本局第 .* 张公共牌/)).toHaveLength(4);
+    expect(screen.queryByLabelText('本局第 5 张公共牌')).toBeNull();
     expect(screen.getAllByLabelText(/的第 .* 张底牌，未公开/)).toHaveLength(4);
   });
 

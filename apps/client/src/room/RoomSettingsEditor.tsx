@@ -182,7 +182,7 @@ export function RoomSettingsEditor({
             />
           </label>
           <label>
-            每手准备秒数
+            每局准备秒数
             <input
               name="handReadyTimeoutSeconds"
               type="number"
@@ -192,7 +192,7 @@ export function RoomSettingsEditor({
             />
           </label>
           <fieldset className="room-form__growth">
-            <legend>按手数增长盲注</legend>
+            <legend>按局数增长盲注</legend>
             <input
               type="hidden"
               name="blindGrowthMode"

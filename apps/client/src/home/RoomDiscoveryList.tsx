@@ -21,7 +21,7 @@ export interface RoomDiscoveryListProps {
 const phaseLabel: Record<RoomDiscoveryResponse['phase'], string> = {
   lobby: '等待中',
   playing: '对局中',
-  'hand-ready': '手牌准备',
+  'hand-ready': '牌局准备',
   paused: '已暂停',
 };
 

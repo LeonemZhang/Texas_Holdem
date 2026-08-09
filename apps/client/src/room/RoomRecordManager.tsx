@@ -251,7 +251,7 @@ export function RoomRecordManager({
               </div>
               <p>
                 房主 {record.hostNickname} · {record.playerCount} 人 · 已完成{' '}
-                {record.completedHands} 手
+                {record.completedHands} 局
               </p>
               <small>
                 最近活动：{new Date(record.lastActiveAt).toLocaleString()}
@@ -342,7 +342,7 @@ export function RoomRecordManager({
               <>
                 {statisticsTarget.roomName} ·{' '}
                 {statusLabels[statisticsTarget.status]} · 已完成{' '}
-                {statisticsTarget.completedHands} 手 · 最近活动{' '}
+                {statisticsTarget.completedHands} 局 · 最近活动{' '}
                 {new Date(statisticsTarget.lastActiveAt).toLocaleString()}
               </>
             }

@@ -82,7 +82,7 @@ export function CardsAndPots({
         ))}
       </div>
 
-      <dl className="street-pot-history" aria-label="本手底池">
+      <dl className="street-pot-history" aria-label="本局底池">
         <div className="street-pot-history__total" data-pot-target>
           <dt>总池</dt>
           <dd>{totalPot.toLocaleString('zh-CN')}</dd>

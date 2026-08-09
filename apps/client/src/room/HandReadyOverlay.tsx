@@ -226,7 +226,7 @@ export function HandReadyOverlay({
               {ownChoice === 'ready'
                 ? '已就绪'
                 : ownChoice === 'sitting-out'
-                  ? '加入下一手'
+                  ? '加入下一局'
                   : '就绪'}
             </button>
             {settlement && onShowHoleCards ? (
@@ -283,11 +283,11 @@ export function HandReadyOverlay({
           <section
             className="hand-ready-card__settlement"
             role="alertdialog"
-            aria-label="本手结算"
+            aria-label="本局结算"
           >
             <div className="hand-ready-card__settlement-heading">
               <strong>
-                本手结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
+                本局结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
               </strong>
               <button
                 className="hand-ready-card__settlement-collapse"
@@ -300,12 +300,12 @@ export function HandReadyOverlay({
             </div>
             <section
               className="hand-ready-card__settlement-table-summary"
-              aria-label="本手牌面与底池"
+              aria-label="本局牌面与底池"
             >
               {settlementCommunityCards.length > 0 ? (
                 <div
                   className="hand-ready-card__settlement-community-cards"
-                  aria-label="本手公共牌"
+                  aria-label="本局公共牌"
                 >
                   <span className="hand-ready-card__card-label">公共牌</span>
                   <div className="hand-ready-card__card-row">
@@ -313,7 +313,7 @@ export function HandReadyOverlay({
                       <PlayingCard
                         code={card}
                         key={`${card}-${index}`}
-                        label={`本手第 ${index + 1} 张公共牌`}
+                        label={`本局第 ${index + 1} 张公共牌`}
                       />
                     ))}
                   </div>
@@ -321,7 +321,7 @@ export function HandReadyOverlay({
               ) : null}
               <dl
                 className="hand-ready-card__settlement-pots"
-                aria-label="本手结算底池"
+                aria-label="本局结算底池"
               >
                 <div>
                   <dt>总池</dt>
@@ -337,7 +337,7 @@ export function HandReadyOverlay({
             </section>
             <ul
               className="hand-ready-card__showdown-results"
-              aria-label="本手结算玩家牌型"
+              aria-label="本局结算玩家牌型"
             >
               {settlement.players.map((player) => (
                 <li key={player.playerId}>

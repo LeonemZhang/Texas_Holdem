@@ -82,7 +82,7 @@ export function ConnectionHome({
             {desktop ? 'LAN · 私人赌桌' : '浏览器 · 加入牌桌'}
           </p>
           <h2 id="connection-heading">牌桌大厅</h2>
-          <p className="game-lobby__tagline">洗牌、落座，下一手就开局。</p>
+          <p className="game-lobby__tagline">洗牌、落座，下一局皇家同花顺！</p>
         </div>
         {desktop ? (
           <div className="connection-home__desktop-actions">
@@ -131,7 +131,7 @@ export function ConnectionHome({
             <p>
               房主 {runningRoomRecord.hostNickname} ·{' '}
               {runningRoomRecord.playerCount} 人 · 已完成{' '}
-              {runningRoomRecord.completedHands} 手
+              {runningRoomRecord.completedHands} 局
             </p>
             <small>
               最近活动：

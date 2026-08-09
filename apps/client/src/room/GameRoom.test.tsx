@@ -765,12 +765,12 @@ describe('GameRoom', () => {
       />,
     );
 
-    const settlementPlayers = await screen.findByLabelText('本手结算玩家牌型');
+    const settlementPlayers = await screen.findByLabelText('本局结算玩家牌型');
     expect(screen.queryByLabelText('公共牌牌面')).toBeNull();
-    expect(screen.queryByLabelText('本手底池')).toBeNull();
+    expect(screen.queryByLabelText('本局底池')).toBeNull();
     expect(screen.queryByLabelText('我的底牌')).toBeNull();
     expect(screen.queryByLabelText('摊牌玩家手牌')).toBeNull();
-    expect(screen.getByLabelText('本手牌面与底池')).toBeInTheDocument();
+    expect(screen.getByLabelText('本局牌面与底池')).toBeInTheDocument();
     expect(
       within(settlementPlayers).getByLabelText('Alice 的底牌'),
     ).toBeInTheDocument();
@@ -877,11 +877,11 @@ describe('GameRoom', () => {
       expect(screen.queryByRole('button', { name: '摊牌' })).toBeNull(),
     );
     expect(
-      within(screen.getByLabelText('本手结算玩家牌型')).getByText('Bob')
+      within(screen.getByLabelText('本局结算玩家牌型')).getByText('Bob')
         .parentElement,
     ).toHaveTextContent('Bob· 1,250 筹码输掉 20 筹码');
     expect(
-      within(screen.getByLabelText('本手结算玩家牌型')).getByLabelText(
+      within(screen.getByLabelText('本局结算玩家牌型')).getByLabelText(
         'Bob 的一对',
       ),
     ).toBeInTheDocument();

@@ -29,9 +29,9 @@ describe('CardsAndPots', () => {
         ]}
       />,
     );
-    expect(screen.getByLabelText('本手底池')).toHaveTextContent('总池460');
-    expect(screen.getByLabelText('本手底池')).toHaveTextContent('翻牌前300');
-    expect(screen.getByLabelText('本手底池')).toHaveTextContent('翻牌160');
+    expect(screen.getByLabelText('本局底池')).toHaveTextContent('总池460');
+    expect(screen.getByLabelText('本局底池')).toHaveTextContent('翻牌前300');
+    expect(screen.getByLabelText('本局底池')).toHaveTextContent('翻牌160');
     expect(screen.queryByText('主池')).not.toBeInTheDocument();
     expect(screen.queryByText('边池 1')).not.toBeInTheDocument();
     expect(screen.queryByText('待匹配')).not.toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('CardsAndPots', () => {
       />,
     );
     expect(screen.getByLabelText('公共牌牌面')).toBeInTheDocument();
-    expect(screen.getByLabelText('本手底池')).toBeInTheDocument();
+    expect(screen.getByLabelText('本局底池')).toBeInTheDocument();
     const ownHand = screen.getByLabelText('我的底牌');
     expect(ownHand).toBeInTheDocument();
     expect(screen.getByLabelText('当前最大牌型：顺子')).toHaveTextContent(

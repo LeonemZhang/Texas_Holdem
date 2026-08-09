@@ -104,7 +104,7 @@ describe('RoomRecordManager', () => {
 
     expect(await screen.findByText('周末牌局')).toBeInTheDocument();
     expect(screen.getByText('可恢复')).toBeInTheDocument();
-    expect(screen.getByText(/3 人 · 已完成 7 手/)).toBeInTheDocument();
+    expect(screen.getByText(/3 人 · 已完成 7 局/)).toBeInTheDocument();
     const recoverButton = screen.getByRole('button', { name: '恢复对局' });
     const statisticsButton = screen.getByRole('button', { name: '查看统计' });
     expect(

@@ -70,10 +70,10 @@ const titleRules: Record<string, string> = {
   'all-in-king': '全押次数最多。',
   'unlucky-player': '进入 1 对 1 摊牌后落败次数最多。',
   'pot-harvester': '累计赢得底池筹码最多。',
-  'double-up-master': '单手净盈利最高。',
+  'double-up-master': '单局净盈利最高。',
   'bluff-king': '未进入摊牌便赢得底池次数最多。',
   'river-killer': '河牌完成反超并获胜次数最多。',
-  'tight-player': '至少参与 10 手后，翻牌前弃牌比例最高。',
+  'tight-player': '至少参与 10 局后，翻牌前弃牌比例最高。',
 };
 const handTypeNames: Record<string, string> = {
   'high-card': '高牌',

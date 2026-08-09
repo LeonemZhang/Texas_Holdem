@@ -131,7 +131,7 @@ export function HostControls({
             <header>
               <div>
                 <h3 id="host-controls-player-removal-title">玩家管理</h3>
-                {!canRemovePlayer ? <p>每手结束后可移除</p> : null}
+                {!canRemovePlayer ? <p>每局结束后可移除</p> : null}
               </div>
             </header>
             <ul aria-label="房间玩家列表">
