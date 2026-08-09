@@ -3839,8 +3839,22 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   .cards-and-pots {
+    --mobile-table-card-width: 16.2vw;
+
     transform: none;
     gap: 0.3rem;
+  }
+
+  .community-cards {
+    width: 85vw;
+    max-width: 100%;
+    gap: 1vw;
+  }
+
+  .community-cards .playing-card,
+  .hole-cards__cards .playing-card {
+    width: var(--mobile-table-card-width);
+    font-size: clamp(1rem, 4.25vw, 1.35rem);
   }
 
   .street-pot-history {
