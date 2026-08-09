@@ -679,6 +679,7 @@ describe('GameRoom', () => {
         totalPot: 0,
         streetPots: [],
         ownHoleCards: ['2c', '3d'],
+        ownHandType: 'one-pair',
         showdownHoleCards: { host: ['Ac', 'Ks'] },
         legalActions: null,
         settlement: {
@@ -797,6 +798,16 @@ describe('GameRoom', () => {
         }),
       ),
     );
+    fireEvent.click(
+      document.querySelector('.hand-ready-card__settlement-collapse')!,
+    );
+    expect(document.querySelector('.community-cards')).toBeInTheDocument();
+    expect(document.querySelector('.street-pot-history')).toBeInTheDocument();
+    expect(document.querySelector('.hole-cards')).toBeInTheDocument();
+    expect(document.querySelector('.hole-cards__hand-type')).toBeInTheDocument();
+    fireEvent.click(
+      document.querySelector('.hand-ready-card__settlement-expand')!,
+    );
     fireEvent.click(await screen.findByRole('button', { name: '筹码交换' }));
     fireEvent.click(await screen.findByRole('button', { name: '发起请求' }));
     fireEvent.click(screen.getByRole('button', { name: /^确认$/ }));
@@ -824,7 +835,9 @@ describe('GameRoom', () => {
     expect(
       screen.getByText('+1', { selector: '.statistics-positive' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(
+      within(document.querySelector('.statistics-ranking')!).getByText('3'),
+    ).toBeInTheDocument();
     expect(screen.getByText('1 / 0 / 0 / 0 / 0')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(

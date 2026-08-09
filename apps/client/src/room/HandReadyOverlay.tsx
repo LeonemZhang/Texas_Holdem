@@ -23,6 +23,7 @@ export interface HandReadyOverlayProps {
   readonly requestToReview?: HandReadyRequestView | null;
   readonly onApproveRequest?: (requestId: string) => void;
   readonly onRejectRequest?: (requestId: string) => void;
+  readonly onSettlementCollapsedChange?: (collapsed: boolean) => void;
   readonly settlement?: {
     readonly handId: string;
     readonly reason: 'uncontested' | 'showdown';
@@ -150,6 +151,7 @@ export function HandReadyOverlay({
   requestToReview = null,
   onApproveRequest,
   onRejectRequest,
+  onSettlementCollapsedChange,
   settlement = null,
 }: HandReadyOverlayProps) {
   const currentTime = useCurrentTime(nowMs);
@@ -162,10 +164,12 @@ export function HandReadyOverlay({
 
   useEffect(() => {
     setSettlementCollapsed(false);
-  }, [settlement?.handId]);
+    onSettlementCollapsedChange?.(false);
+  }, [onSettlementCollapsedChange, settlement?.handId]);
 
   const collapseSettlement = () => {
     setSettlementCollapsed(true);
+    onSettlementCollapsedChange?.(true);
   };
 
   if (complete) return null;
@@ -179,7 +183,10 @@ export function HandReadyOverlay({
         <button
           className="hand-ready-card__settlement-expand"
           type="button"
-          onClick={() => setSettlementCollapsed(false)}
+          onClick={() => {
+            setSettlementCollapsed(false);
+            onSettlementCollapsedChange?.(false);
+          }}
         >
           结算详情 · {secondsLeft}s
         </button>

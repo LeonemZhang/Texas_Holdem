@@ -133,6 +133,7 @@ export function GameRoom({
   const [error, setError] = useState<string | null>(null);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
   const [statisticsCollapsed, setStatisticsCollapsed] = useState(false);
+  const [settlementCollapsed, setSettlementCollapsed] = useState(false);
   const [activeUtilityPanel, setActiveUtilityPanel] =
     useState<ActiveUtilityPanel>(null);
   const [sending, setSending] = useState(false);
@@ -145,6 +146,13 @@ export function GameRoom({
   const onExitedRef = useRef(onExited);
   const lastUtilityTrigger = useRef<HTMLButtonElement | null>(null);
   const soundEffects = useMemo(() => new PokerSoundEffects(), []);
+  const settlementHandId = snapshot?.game?.settlement
+    ? snapshot.game.handId
+    : null;
+
+  useEffect(() => {
+    setSettlementCollapsed(false);
+  }, [settlementHandId]);
 
   const openUtilityPanel = useCallback(
     (panel: Exclude<ActiveUtilityPanel, null>, trigger: HTMLButtonElement) => {
@@ -660,7 +668,7 @@ export function GameRoom({
           />
         }
         communityCards={
-          gameSettlement ? null : (
+          !gameSettlement || settlementCollapsed ? (
             <CardsAndPots
               communityCards={game?.communityCards ?? []}
               totalPot={game?.totalPot ?? 0}
@@ -673,7 +681,7 @@ export function GameRoom({
                   : null
               }
             />
-          )
+          ) : null
         }
         actionTimer={
           snapshot.room.phase !== 'paused' &&
@@ -720,6 +728,7 @@ export function GameRoom({
               onRejectRequest={(requestId) =>
                 sendChipIntent({ type: 'reject', requestId })
               }
+              onSettlementCollapsedChange={setSettlementCollapsed}
               settlement={settlementView}
             />
           ) : null
