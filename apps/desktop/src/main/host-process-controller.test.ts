@@ -8,6 +8,8 @@ import {
   type SpawnHostProcessInput,
 } from './host-process-controller';
 
+const isPortAvailable = async () => true;
+
 function fakeProcess() {
   let exitListener: ((code: number) => void) | null = null;
   let messageListener: ((message: unknown) => void) | null = null;
@@ -53,6 +55,7 @@ describe('HostProcessController', () => {
       dataDirectory,
       staticDirectory: 'client-dist',
       spawn,
+      isPortAvailable,
       healthCheck,
       delay: async () => undefined,
     });
@@ -81,6 +84,7 @@ describe('HostProcessController', () => {
       dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-reuse`),
       staticDirectory: 'client-dist',
       spawn,
+      isPortAvailable,
       healthCheck: async () => true,
     });
     const input = { port: 32_100, advertisedAddress: '10.126.126.1' };
@@ -94,6 +98,23 @@ describe('HostProcessController', () => {
     ).rejects.toThrow('another address');
   });
 
+  it('does not spawn a second host when another local process already owns the port', async () => {
+    const spawn = vi.fn();
+    const portAvailable = vi.fn(async () => false);
+    const controller = new HostProcessController({
+      dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-occupied`),
+      staticDirectory: 'client-dist',
+      spawn,
+      isPortAvailable: portAvailable,
+    });
+
+    await expect(
+      controller.start({ port: 32_100, advertisedAddress: '10.126.126.1' }),
+    ).rejects.toThrow('Host service port is already in use');
+    expect(portAvailable).toHaveBeenCalledWith(32_100);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it('starts record management without a LAN listener or health check', async () => {
     const child = fakeProcess();
     const spawn = readySpawn(child);
@@ -102,6 +123,7 @@ describe('HostProcessController', () => {
       dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-records-only`),
       staticDirectory: 'client-dist',
       spawn,
+      isPortAvailable,
       healthCheck,
       delay: async () => undefined,
     });
@@ -121,6 +143,7 @@ describe('HostProcessController', () => {
       dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-foreign`),
       staticDirectory: 'client-dist',
       spawn: () => child.process,
+      isPortAvailable,
       healthCheck: async () => true,
       delay: async () => undefined,
       readinessAttempts: 1,
@@ -138,6 +161,7 @@ describe('HostProcessController', () => {
       dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-exit`),
       staticDirectory: 'client-dist',
       spawn: readySpawn(child),
+      isPortAvailable,
       healthCheck: async () => true,
     });
     const listener = vi.fn();
@@ -153,6 +177,7 @@ describe('HostProcessController', () => {
       dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-stop`),
       staticDirectory: 'client-dist',
       spawn: readySpawn(child),
+      isPortAvailable,
       healthCheck: async () => true,
     });
     const listener = vi.fn();
@@ -183,6 +208,7 @@ describe('HostProcessController', () => {
       dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-switch`),
       staticDirectory: 'client-dist',
       spawn,
+      isPortAvailable,
       healthCheck: async () => true,
     });
     await controller.start({ port: 32_100, advertisedAddress: '10.126.126.1' });
@@ -204,6 +230,7 @@ describe('HostProcessController', () => {
       dataDirectory: join(tmpdir(), `texas-desktop-${Date.now()}-records`),
       staticDirectory: 'client-dist',
       spawn: readySpawn(child),
+      isPortAvailable,
       healthCheck: async () => true,
     });
     await controller.start({ port: 32_103, advertisedAddress: '127.0.0.1' });

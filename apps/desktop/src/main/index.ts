@@ -25,6 +25,7 @@ import { listDesktopNetworkInterfaces, scanLanRooms } from './network-services';
 import { isTrustedRendererUrl } from './trusted-renderer';
 import { createWindowOptions, showWindowMaximized } from './window-options';
 import { HostProcessController } from './host-process-controller';
+import { isTcpPortAvailable } from './host-port';
 import { WindowCloseCoordinator } from './window-close-coordinator';
 import {
   guardMainWindowNavigation,
@@ -270,6 +271,7 @@ void app.whenReady().then(async () => {
     staticDirectory: app.isPackaged
       ? join(process.resourcesPath, 'client')
       : join(__dirname, '../../../client/dist'),
+    isPortAvailable: isTcpPortAvailable,
     spawn: ({ env }) =>
       utilityProcess.fork(hostEntryPath, [], {
         env: { ...process.env, ...env, HOST_PARENT_PID: String(process.pid) },

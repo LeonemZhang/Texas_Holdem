@@ -64,6 +64,7 @@ export interface HostProcessControllerOptions {
   readonly dataDirectory: string;
   readonly staticDirectory: string;
   readonly spawn: (input: SpawnHostProcessInput) => HostSubprocess;
+  readonly isPortAvailable: (port: number) => Promise<boolean>;
   readonly healthCheck?: (url: string) => Promise<boolean>;
   readonly delay?: (milliseconds: number) => Promise<void>;
   readonly readinessAttempts?: number;
@@ -121,6 +122,9 @@ export class HostProcessController {
       } else {
         throw new Error('Host service is already running on another address');
       }
+    }
+    if (!(await this.options.isPortAvailable(input.port))) {
+      throw new Error('Host service port is already in use');
     }
     await mkdir(this.options.dataDirectory, { recursive: true });
     const joinUrl = `http://${input.advertisedAddress}:${input.port}`;
