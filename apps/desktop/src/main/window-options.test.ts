@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createWindowOptions, showWindowMaximized } from './window-options';
+import { createWindowOptions, showWindowed } from './window-options';
 
 describe('Electron window security', () => {
   it('keeps the renderer sandboxed and isolated', () => {
@@ -13,6 +13,7 @@ describe('Electron window security', () => {
     expect(options.icon).toBe('C:/app/resources/icon.ico');
     expect(options.width).toBe(1920);
     expect(options.height).toBe(1080);
+    expect(options.fullscreen).toBe(false);
     expect(options.minWidth).toBe(360);
     expect(options.webPreferences).toMatchObject({
       contextIsolation: true,
@@ -33,15 +34,14 @@ describe('Electron window security', () => {
     expect(options.height).toBe(728);
   });
 
-  it('maximizes the regular window before showing it', () => {
+  it('shows the regular window without maximizing it', () => {
     const calls: string[] = [];
     const window = {
-      maximize: vi.fn(() => calls.push('maximize')),
       show: vi.fn(() => calls.push('show')),
     };
 
-    showWindowMaximized(window);
+    showWindowed(window);
 
-    expect(calls).toEqual(['maximize', 'show']);
+    expect(calls).toEqual(['show']);
   });
 });

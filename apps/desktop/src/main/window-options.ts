@@ -1,7 +1,6 @@
 import type { BrowserWindowConstructorOptions } from 'electron';
 
-export interface MaximizableWindow {
-  maximize(): void;
+export interface ShowableWindow {
   show(): void;
 }
 
@@ -10,13 +9,12 @@ export interface WindowWorkAreaSize {
   readonly height: number;
 }
 
-const restoredWindowTarget = {
+const initialWindowTarget = {
   width: 1920,
   height: 1080,
 } as const;
 
-export function showWindowMaximized(window: MaximizableWindow): void {
-  window.maximize();
+export function showWindowed(window: ShowableWindow): void {
   window.show();
 }
 
@@ -28,10 +26,11 @@ export function createWindowOptions(
   return {
     title: 'Texas Holdem',
     icon: iconPath,
-    width: Math.min(restoredWindowTarget.width, workAreaSize.width),
-    height: Math.min(restoredWindowTarget.height, workAreaSize.height),
+    width: Math.min(initialWindowTarget.width, workAreaSize.width),
+    height: Math.min(initialWindowTarget.height, workAreaSize.height),
     minWidth: 360,
     minHeight: 700,
+    fullscreen: false,
     backgroundColor: '#04110e',
     show: false,
     webPreferences: {
