@@ -319,6 +319,49 @@ describe('host framework server', () => {
     });
   });
 
+  it('uses the incoming IPv4 host for player session join URLs', async () => {
+    const runtime = new GameRuntime();
+    activeHost = await createHostServer({
+      advertisedHost: '192.168.3.121',
+      roomSessionService: runtime,
+      roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
+    });
+    const payload = {
+      hostNickname: 'Alice',
+      settings: {
+        roomName: 'Friends',
+        maxPlayers: 10,
+        initialChips: 100,
+        smallBlind: 1,
+        actionTimeoutSeconds: 30,
+        handReadyTimeoutSeconds: 30,
+        blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+        zeroChipPolicy: 'request-chips',
+      },
+    };
+    const created = await activeHost.app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      headers: { host: '192.168.3.121:32100' },
+      payload,
+    });
+    const hostSession = created.json<{ roomId: string }>();
+
+    const joined = await activeHost.app.inject({
+      method: 'POST',
+      url: `/api/rooms/${hostSession.roomId}/join`,
+      headers: { host: '10.126.126.1:32100' },
+      payload: { nickname: 'Bob' },
+    });
+
+    expect(joined.statusCode).toBe(200);
+    expect(joined.json()).toMatchObject({
+      roomId: hostSession.roomId,
+      joinUrl: `http://10.126.126.1:32100/?room=${hostSession.roomId}`,
+      socketPath: '/socket.io',
+    });
+  });
+
   it('serves a built client directory when supplied', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'texas-holdem-client-'));
     await writeFile(join(directory, 'index.html'), '<h1>client smoke</h1>');

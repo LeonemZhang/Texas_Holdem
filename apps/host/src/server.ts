@@ -17,7 +17,7 @@ import {
 } from '@texas-holdem/protocol';
 import fastifyStatic from '@fastify/static';
 import fastifyCors from '@fastify/cors';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Server as SocketIOServer } from 'socket.io';
@@ -80,12 +80,37 @@ export async function createHostServer(
     }
   };
 
-  const connection = () => {
+  const isIpv4Host = (value: string): boolean => {
+    const parts = value.split('.');
+    return (
+      parts.length === 4 &&
+      parts.every((part) => {
+        const number = Number(part);
+        return /^\d{1,3}$/.test(part) && number >= 0 && number <= 255;
+      })
+    );
+  };
+
+  const hostFromHeader = (value: string | undefined): string | null => {
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+    try {
+      const hostname = new URL(`http://${trimmed}`).hostname;
+      return isIpv4Host(hostname) ? hostname : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const connection = (request?: FastifyRequest) => {
     const address = app.server.address();
     const actualPort =
       typeof address === 'object' && address ? address.port : options.port;
     const port = actualPort ?? 32_100;
-    const host = options.advertisedHost?.trim() || '127.0.0.1';
+    const advertisedHost = options.advertisedHost?.trim();
+    const host =
+      hostFromHeader(request?.headers.host) ??
+      (advertisedHost || '127.0.0.1');
     const urlHost = host.includes(':') ? `[${host}]` : host;
     return {
       host,
@@ -137,7 +162,7 @@ export async function createHostServer(
         try {
           const session = options.roomSessionService!.create(
             parsed.data,
-            connection().joinUrl,
+            connection(request).joinUrl,
           );
           publishRoomSnapshots(session.roomId);
           return session;
@@ -175,7 +200,7 @@ export async function createHostServer(
           const session = options.roomSessionService!.join(
             roomId,
             parsed.data,
-            connection().joinUrl,
+            connection(request).joinUrl,
           );
           publishRoomSnapshots(session.roomId);
           return session;
@@ -203,7 +228,7 @@ export async function createHostServer(
           const session = options.roomSessionService!.resume(
             roomId,
             parsed.data,
-            connection().joinUrl,
+            connection(request).joinUrl,
           );
           publishRoomSnapshots(session.roomId);
           return session;
