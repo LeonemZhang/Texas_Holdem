@@ -100,6 +100,18 @@ describe('TableSeats', () => {
     expect(seatPosition('p1')).toEqual({ left: 50, top: 10 });
   });
 
+  it.each([2, 3, 6, 7, 8, 9, 10])(
+    'anchors the own seat at the heads-up bottom for %i players',
+    (count) => {
+      const { container } = render(
+        <TableSeats players={makePlayers(count)} ownPlayerId="p0" />,
+      );
+      const ownSeat = container.querySelector<HTMLElement>('.table-seat--own');
+
+      expect(ownSeat?.style.top).toBe('87%');
+    },
+  );
+
   it('raises the upper ring for a full ten-player table', () => {
     const { container } = render(
       <TableSeats players={makePlayers(10)} ownPlayerId="p0" />,
@@ -114,14 +126,14 @@ describe('TableSeats', () => {
     expect(seatPosition('p4')).toBe(12);
     expect(seatPosition('p3')).toBe(34);
     expect(seatPosition('p7')).toBe(34);
-    expect(seatPosition('p0')).toBe(84);
+    expect(seatPosition('p0')).toBe(87);
   });
 
   it.each([
-    [6, [84, 70, 30, 10, 30, 70]],
-    [7, [84, 70, 43, 10, 10, 43, 70]],
-    [8, [84, 78, 50, 24, 10, 24, 50, 78]],
-    [9, [84, 73, 56, 30, 10, 10, 30, 56, 73]],
+    [6, [87, 70, 30, 10, 30, 70]],
+    [7, [87, 70, 43, 10, 10, 43, 70]],
+    [8, [87, 78, 50, 24, 10, 24, 50, 78]],
+    [9, [87, 73, 56, 30, 10, 10, 30, 56, 73]],
   ] as const)(
     'uses the screenshot spacing for %i players',
     (count, expectedTops) => {

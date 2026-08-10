@@ -82,6 +82,14 @@ const SAFE_MULTI_PLAYER_HORIZONTAL_OVERRIDES: Readonly<
   7: { 2: 11, 5: 89 },
   9: { 3: 17, 6: 83 },
 };
+const OWN_SEAT_BOTTOM_TOPS: Readonly<Record<number, number>> = {
+  3: 87,
+  6: 87,
+  7: 87,
+  8: 87,
+  9: 87,
+  10: 87,
+};
 
 function clockwiseDistance(fromSeatIndex: number, toSeatIndex: number): number {
   return (toSeatIndex - fromSeatIndex + TABLE_SEAT_COUNT) % TABLE_SEAT_COUNT;
@@ -97,7 +105,11 @@ function compareClockwiseFrom(
   return leftDistance - rightDistance || left.seatIndex - right.seatIndex;
 }
 
-function positionFor(index: number, count: number): CSSProperties {
+function positionFor(
+  index: number,
+  count: number,
+  isOwn = false,
+): CSSProperties {
   const explicitPositions =
     count === HEADS_UP_POSITIONS.length
       ? HEADS_UP_POSITIONS
@@ -115,9 +127,10 @@ function positionFor(index: number, count: number): CSSProperties {
   const angle = (Math.PI / 2 + (index * Math.PI * 2) / count) % (Math.PI * 2);
   const safeLeft = SAFE_MULTI_PLAYER_HORIZONTAL_OVERRIDES[count]?.[index];
   const safeTop = SAFE_MULTI_PLAYER_TOPS[count]?.[index];
+  const ownSeatBottomTop = isOwn ? OWN_SEAT_BOTTOM_TOPS[count] : undefined;
   return {
     left: `${safeLeft ?? 50 + Math.cos(angle) * 41}%`,
-    top: `${count === TEN_PLAYER_TOPS.length ? TEN_PLAYER_TOPS[index]! : (safeTop ?? 50 + Math.sin(angle) * 34)}%`,
+    top: `${ownSeatBottomTop ?? (count === TEN_PLAYER_TOPS.length ? TEN_PLAYER_TOPS[index]! : (safeTop ?? 50 + Math.sin(angle) * 34))}%`,
   };
 }
 
@@ -352,6 +365,7 @@ export function TableSeats({
           style={positionFor(
             stablePosition.get(ownPlayer.playerId) ?? 0,
             desktopPlayers.length,
+            true,
           )}
           aria-current={ownPlayer.isCurrentActor ? 'true' : undefined}
         >
