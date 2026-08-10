@@ -80,6 +80,7 @@ describe('GameRoom', () => {
           ...player,
           status: 'active' as const,
           streetCommitted: index === 0 ? 1 : 2,
+          totalCommitted: index === 0 ? 1 : 2,
         })),
       },
       game: {
@@ -105,7 +106,7 @@ describe('GameRoom', () => {
         ...previous.room,
         players: previous.room.players.map((player) =>
           player.playerId === 'host'
-            ? { ...player, streetCommitted: 20 }
+            ? { ...player, streetCommitted: 20, totalCommitted: 20 }
             : player,
         ),
       },
@@ -125,6 +126,139 @@ describe('GameRoom', () => {
         game: { ...next.game!, handId: 'hand-2', totalPot: 24 },
       }),
     ).toEqual([]);
+  });
+
+  it('creates a flight for a call that closes the street', () => {
+    const previous: PlayerSnapshot = {
+      ...snapshot,
+      sequence: 20,
+      room: {
+        ...snapshot.room,
+        phase: 'playing',
+        players: snapshot.room.players.map((player) => ({
+          ...player,
+          status: 'active' as const,
+          streetCommitted: player.playerId === 'host' ? 20 : 0,
+          totalCommitted: player.playerId === 'host' ? 20 : 0,
+        })),
+      },
+      game: {
+        handId: 'hand-call',
+        street: 'flop',
+        buttonPlayerId: 'host',
+        smallBlindPlayerId: 'host',
+        bigBlindPlayerId: 'bob',
+        currentActorId: 'bob',
+        actionDeadlineMs: null,
+        communityCards: ['2c', 'Td', 'Jh'],
+        ownHoleCards: ['As', 'Kd'],
+        showdownHoleCards: {},
+        totalPot: 20,
+        streetPots: [{ street: 'flop', amount: 20 }],
+        legalActions: null,
+      },
+    };
+    const next: PlayerSnapshot = {
+      ...previous,
+      sequence: 21,
+      room: {
+        ...previous.room,
+        players: previous.room.players.map((player) =>
+          player.playerId === 'bob'
+            ? {
+                ...player,
+                streetCommitted: 0,
+                totalCommitted: 20,
+                lastAction: 'call' as const,
+              }
+            : { ...player, streetCommitted: 0 },
+        ),
+      },
+      game: {
+        ...previous.game!,
+        street: 'turn',
+        currentActorId: 'host',
+        communityCards: ['2c', 'Td', 'Jh', '4s'],
+        totalPot: 40,
+        streetPots: [{ street: 'flop', amount: 40 }],
+      },
+    };
+
+    expect(potContributionFlights(previous, next)).toEqual([
+      { id: '21-bob', playerId: 'bob', amount: 20 },
+    ]);
+    expect(
+      potContributionFlights(previous, {
+        ...next,
+        room: { ...next.room, phase: 'hand-ready' },
+      }),
+    ).toEqual([{ id: '21-bob', playerId: 'bob', amount: 20 }]);
+  });
+
+  it('creates flights for call, raise, and all-in contributions', () => {
+    const actions = [
+      { action: 'call' as const, playerId: 'bob', amount: 20 },
+      { action: 'raiseTo' as const, playerId: 'host', amount: 30 },
+      { action: 'allIn' as const, playerId: 'bob', amount: 80 },
+    ];
+
+    for (const { action, playerId, amount } of actions) {
+      const previous: PlayerSnapshot = {
+        ...snapshot,
+        sequence: 30,
+        room: {
+          ...snapshot.room,
+          phase: 'playing',
+          players: snapshot.room.players.map((player) => ({
+            ...player,
+            status: 'active' as const,
+            streetCommitted: player.playerId === playerId ? 0 : 20,
+            totalCommitted: player.playerId === playerId ? 0 : 20,
+          })),
+        },
+        game: {
+          handId: `hand-${action}`,
+          street: 'flop',
+          buttonPlayerId: 'host',
+          smallBlindPlayerId: 'host',
+          bigBlindPlayerId: 'bob',
+          currentActorId: playerId,
+          actionDeadlineMs: null,
+          communityCards: ['2c', 'Td', 'Jh'],
+          ownHoleCards: ['As', 'Kd'],
+          showdownHoleCards: {},
+          totalPot: 20,
+          streetPots: [{ street: 'flop', amount: 20 }],
+          legalActions: null,
+        },
+      };
+      const next: PlayerSnapshot = {
+        ...previous,
+        sequence: 31,
+        room: {
+          ...previous.room,
+          players: previous.room.players.map((player) =>
+            player.playerId === playerId
+              ? {
+                  ...player,
+                  streetCommitted: amount,
+                  totalCommitted: amount,
+                  lastAction: action,
+                }
+              : player,
+          ),
+        },
+        game: {
+          ...previous.game!,
+          totalPot: 20 + amount,
+          streetPots: [{ street: 'flop', amount: 20 + amount }],
+        },
+      };
+
+      expect(potContributionFlights(previous, next)).toEqual([
+        { id: `31-${playerId}`, playerId, amount },
+      ]);
+    }
   });
 
   it('renders the authoritative lobby snapshot and sends ready with its version', async () => {

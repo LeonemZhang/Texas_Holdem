@@ -29,13 +29,32 @@ describe('CardsAndPots', () => {
         ]}
       />,
     );
-    expect(screen.getByLabelText('本局底池')).toHaveTextContent('总池460');
-    expect(screen.getByLabelText('本局底池')).toHaveTextContent('翻牌前300');
-    expect(screen.getByLabelText('本局底池')).toHaveTextContent('翻牌160');
+    const potSummary = screen.getByLabelText('本局底池');
+    expect(potSummary).toHaveTextContent('总池460');
+    expect(potSummary).toHaveTextContent('翻牌前300');
+    expect(potSummary).toHaveTextContent('翻牌160');
+    expect(potSummary.querySelector('[data-pot-target]')).toHaveTextContent(
+      '翻牌160',
+    );
     expect(screen.queryByText('主池')).not.toBeInTheDocument();
     expect(screen.queryByText('边池 1')).not.toBeInTheDocument();
     expect(screen.queryByText('待匹配')).not.toBeInTheDocument();
     expect(screen.getAllByLabelText(/未公开/)).toHaveLength(7);
+  });
+
+  it('falls back to the total pot when the current street has no statistic', () => {
+    render(
+      <CardsAndPots
+        communityCards={[]}
+        totalPot={300}
+        currentStreet="turn"
+        streetPots={[{ street: 'flop', amount: 300 }]}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText('本局底池').querySelector('[data-pot-target]'),
+    ).toHaveTextContent('总池300');
   });
 
   it('keeps own hole cards visible in the table center before showdown', () => {
@@ -50,6 +69,9 @@ describe('CardsAndPots', () => {
     );
     expect(screen.getByLabelText('公共牌牌面')).toBeInTheDocument();
     expect(screen.getByLabelText('本局底池')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('公共牌牌面').closest('.cards-and-pots__board'),
+    ).toContainElement(screen.getByLabelText('本局底池'));
     const ownHand = screen.getByLabelText('我的底牌');
     expect(ownHand).toBeInTheDocument();
     expect(screen.getByLabelText('当前最大牌型：顺子')).toHaveTextContent(

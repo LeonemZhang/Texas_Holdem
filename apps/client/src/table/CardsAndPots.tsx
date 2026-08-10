@@ -70,37 +70,50 @@ export function CardsAndPots({
   ownHandType = null,
   showdownHands = [],
 }: CardsAndPotsProps) {
+  const hasCurrentStreetPot = streetPots.some(
+    (pot) => pot.street === currentStreet,
+  );
   return (
     <div className="cards-and-pots">
-      <div className="community-cards" aria-label="公共牌牌面">
-        {Array.from({ length: 5 }, (_, index) => (
-          <PlayingCard
-            code={communityCards[index] ?? null}
-            key={index}
-            label={`第 ${index + 1} 张公共牌`}
-          />
-        ))}
-      </div>
-
-      <dl className="street-pot-history" aria-label="本局底池">
-        <div className="street-pot-history__total" data-pot-target>
-          <dt>总池</dt>
-          <dd>{totalPot.toLocaleString('zh-CN')}</dd>
+      <div className="cards-and-pots__board">
+        <div className="community-cards" aria-label="公共牌牌面">
+          {Array.from({ length: 5 }, (_, index) => (
+            <PlayingCard
+              code={communityCards[index] ?? null}
+              key={index}
+              label={`第 ${index + 1} 张公共牌`}
+            />
+          ))}
         </div>
-        {streetPots.map((pot) => (
-          <div
-            className={
-              pot.street === currentStreet
-                ? 'street-pot-history__street street-pot-history__street--current'
-                : 'street-pot-history__street'
-            }
-            key={pot.street}
-          >
-            <dt>{streetLabels[pot.street]}</dt>
-            <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
-          </div>
-        ))}
-      </dl>
+
+        <div className="cards-and-pots__pot-summary">
+          <dl className="street-pot-history" aria-label="本局底池">
+            <div
+              className="street-pot-history__total"
+              data-pot-target={hasCurrentStreetPot ? undefined : true}
+            >
+              <dt>总池</dt>
+              <dd>{totalPot.toLocaleString('zh-CN')}</dd>
+            </div>
+            {streetPots.map((pot) => (
+              <div
+                className={
+                  pot.street === currentStreet
+                    ? 'street-pot-history__street street-pot-history__street--current'
+                    : 'street-pot-history__street'
+                }
+                data-pot-target={
+                  pot.street === currentStreet ? true : undefined
+                }
+                key={pot.street}
+              >
+                <dt>{streetLabels[pot.street]}</dt>
+                <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
 
       {showdownHands.length > 0 ? (
         <ul className="showdown-hands" aria-label="摊牌玩家手牌">

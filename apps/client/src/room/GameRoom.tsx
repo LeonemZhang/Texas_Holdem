@@ -67,7 +67,7 @@ export function potContributionFlights(
     !nextGame ||
     previousGame.handId !== nextGame.handId ||
     previous?.room.phase !== 'playing' ||
-    next.room.phase !== 'playing' ||
+    !['playing', 'hand-ready'].includes(next.room.phase) ||
     nextGame.totalPot <= previousGame.totalPot
   ) {
     return [];
@@ -75,12 +75,12 @@ export function potContributionFlights(
   const previousCommitted = new Map(
     previous.room.players.map((player) => [
       player.playerId,
-      player.streetCommitted,
+      player.totalCommitted,
     ]),
   );
   return next.room.players.flatMap((player) => {
     const amount =
-      player.streetCommitted - (previousCommitted.get(player.playerId) ?? 0);
+      player.totalCommitted - (previousCommitted.get(player.playerId) ?? 0);
     return amount > 0
       ? [
           {

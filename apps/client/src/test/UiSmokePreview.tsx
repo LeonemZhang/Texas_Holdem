@@ -346,6 +346,12 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
       : tenPlayers
         ? '玩家 4'
         : 'Alice';
+  const flightAmount = useMemo(() => {
+    const amount = Number(
+      new URLSearchParams(window.location.search).get('chipAmount'),
+    );
+    return Number.isSafeInteger(amount) && amount > 0 ? amount : 40;
+  }, []);
   const isHost = page === 'table-host';
   const utilityPanel =
     activeUtilityPanel === 'chip-exchange' ? (
@@ -507,7 +513,9 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
         chipFlights={
           page === 'table-flights' ? (
             <PotChipFlights
-              flights={[{ id: 'preview-flight', playerId: 'bob', amount: 40 }]}
+              flights={[
+                { id: 'preview-flight', playerId: 'bob', amount: flightAmount },
+              ]}
               onFlightEnd={noop}
             />
           ) : null
