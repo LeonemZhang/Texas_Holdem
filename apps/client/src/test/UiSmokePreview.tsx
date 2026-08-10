@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
 
-import { ConnectionGuard } from '../connection/ConnectionGuard';
 import { ConnectionHome } from '../home/ConnectionHome';
 import { DiscoveryJoinDialog } from '../home/DiscoveryJoinDialog';
 import { NetworkDiagnostics } from '../home/NetworkDiagnostics';
@@ -457,7 +456,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
     ) : null;
 
   return (
-    <ConnectionGuard state={{ status: 'connected' }} onRetry={noop}>
+    <div className="game-room-shell">
       <PokerTableLayout
         roomName="朋友局"
         handLabel={
@@ -603,7 +602,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
           )
         }
       />
-    </ConnectionGuard>
+    </div>
   );
 }
 

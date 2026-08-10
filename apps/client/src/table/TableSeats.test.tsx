@@ -32,7 +32,8 @@ function mobileQueuePlayerIds(container: HTMLElement): string[] {
 
 function setElementMetric(
   element: Element,
-  property: 'clientWidth' | 'scrollWidth' | 'offsetLeft',
+  property:
+    'clientWidth' | 'scrollWidth' | 'scrollLeft' | 'offsetLeft' | 'offsetWidth',
   value: number,
 ) {
   Object.defineProperty(element, property, { configurable: true, value });
@@ -435,7 +436,19 @@ describe('TableSeats', () => {
       />,
     );
     const seats = container.querySelector<HTMLElement>('.table-seats__queue')!;
+    const actorCard = container.querySelector(
+      '[data-mobile-queue-player-id="p1"]',
+    )!;
+    const lastCard = container.querySelector(
+      '[data-mobile-queue-player-id="p3"]',
+    )!;
     const scrollTo = vi.fn();
+    setElementMetric(seats, 'clientWidth', 200);
+    setElementMetric(seats, 'scrollWidth', 300);
+    setElementMetric(actorCard, 'offsetLeft', 180);
+    setElementMetric(actorCard, 'offsetWidth', 60);
+    setElementMetric(lastCard, 'offsetLeft', 240);
+    setElementMetric(lastCard, 'offsetWidth', 60);
     Object.defineProperty(seats, 'scrollTo', {
       configurable: true,
       value: scrollTo,
@@ -472,13 +485,19 @@ describe('TableSeats', () => {
       clientWidth: 120,
       scrollWidth: 360,
       actorOffset: 160,
+      actorWidth: 60,
+      lastOffset: 300,
+      lastWidth: 60,
       expectedLeft: 160,
     },
     {
-      name: 'uses the natural maximum when remaining cards fit',
+      name: 'uses the minimum scroll when remaining cards fit',
       clientWidth: 200,
       scrollWidth: 300,
       actorOffset: 180,
+      actorWidth: 60,
+      lastOffset: 240,
+      lastWidth: 60,
       expectedLeft: 100,
     },
     {
@@ -486,10 +505,79 @@ describe('TableSeats', () => {
       clientWidth: 320,
       scrollWidth: 300,
       actorOffset: 180,
+      actorWidth: 60,
+      lastOffset: 240,
+      lastWidth: 60,
       expectedLeft: 0,
     },
-  ])('$name', ({ clientWidth, scrollWidth, actorOffset, expectedLeft }) => {
-    const players = makePlayers(4).map((player, index) => ({
+  ])(
+    '$name',
+    ({
+      clientWidth,
+      scrollWidth,
+      actorOffset,
+      actorWidth,
+      lastOffset,
+      lastWidth,
+      expectedLeft,
+    }) => {
+      const players = makePlayers(4).map((player, index) => ({
+        ...player,
+        actionOrder: index + 1,
+        isCurrentActor: player.playerId === 'p0',
+      }));
+      const { container, rerender } = render(
+        <TableSeats
+          actionRoundKey="hand-1:flop"
+          players={players}
+          ownPlayerId="p0"
+        />,
+      );
+      const seats = container.querySelector<HTMLElement>(
+        '.table-seats__queue',
+      )!;
+      const actorCard = container.querySelector(
+        '[data-mobile-queue-player-id="p2"]',
+      )!;
+      const lastCard = container.querySelector(
+        '[data-mobile-queue-player-id="p3"]',
+      )!;
+      const scrollTo = vi.fn();
+      setElementMetric(seats, 'clientWidth', clientWidth);
+      setElementMetric(seats, 'scrollWidth', scrollWidth);
+      setElementMetric(actorCard, 'offsetLeft', actorOffset);
+      setElementMetric(actorCard, 'offsetWidth', actorWidth);
+      setElementMetric(lastCard, 'offsetLeft', lastOffset);
+      setElementMetric(lastCard, 'offsetWidth', lastWidth);
+      Object.defineProperty(seats, 'scrollTo', {
+        configurable: true,
+        value: scrollTo,
+      });
+
+      rerender(
+        <TableSeats
+          actionRoundKey="hand-1:flop"
+          players={players.map((player) => ({
+            ...player,
+            isCurrentActor: player.playerId === 'p2',
+          }))}
+          ownPlayerId="p0"
+        />,
+      );
+
+      if (scrollWidth <= clientWidth) {
+        expect(scrollTo).not.toHaveBeenCalled();
+      } else {
+        expect(scrollTo).toHaveBeenLastCalledWith({
+          left: expectedLeft,
+          behavior: 'smooth',
+        });
+      }
+    },
+  );
+
+  it('does not scroll when the current actor is already visible', () => {
+    const players = makePlayers(5).map((player, index) => ({
       ...player,
       actionOrder: index + 1,
       isCurrentActor: player.playerId === 'p0',
@@ -505,10 +593,17 @@ describe('TableSeats', () => {
     const actorCard = container.querySelector(
       '[data-mobile-queue-player-id="p2"]',
     )!;
+    const lastCard = container.querySelector(
+      '[data-mobile-queue-player-id="p4"]',
+    )!;
     const scrollTo = vi.fn();
-    setElementMetric(seats, 'clientWidth', clientWidth);
-    setElementMetric(seats, 'scrollWidth', scrollWidth);
-    setElementMetric(actorCard, 'offsetLeft', actorOffset);
+    setElementMetric(seats, 'clientWidth', 200);
+    setElementMetric(seats, 'scrollWidth', 360);
+    setElementMetric(seats, 'scrollLeft', 100);
+    setElementMetric(actorCard, 'offsetLeft', 180);
+    setElementMetric(actorCard, 'offsetWidth', 60);
+    setElementMetric(lastCard, 'offsetLeft', 300);
+    setElementMetric(lastCard, 'offsetWidth', 60);
     Object.defineProperty(seats, 'scrollTo', {
       configurable: true,
       value: scrollTo,
@@ -525,10 +620,7 @@ describe('TableSeats', () => {
       />,
     );
 
-    expect(scrollTo).toHaveBeenLastCalledWith({
-      left: expectedLeft,
-      behavior: 'smooth',
-    });
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 
   it('keeps a permanently removed player on their seat as exited', () => {

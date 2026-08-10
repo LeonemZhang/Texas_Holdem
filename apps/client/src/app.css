@@ -3824,7 +3824,9 @@ body:has(.poker-table-page) .poker-table-controls {
   /* Keep the 16:9 canvas, but return vertical room from the action shell to
      the felt so the own seat has a stable gap above the controls. */
   body:has(.poker-table-page) .poker-table-controls {
-    padding-block: 0.35rem;
+    /* Trim only the top inset: the shell moves down while the raise bar's
+       lower edge remains anchored by the unchanged bottom inset. */
+    padding-block: 0 0.35rem;
   }
 
   .table-seat--own {
@@ -3901,7 +3903,7 @@ body:has(.poker-table-page) .poker-table-controls {
     --raise-bar-bottom-correction: calc(
       (2.25rem - var(--raise-fraction-height)) / 4
     );
-    --raise-bar-lift: 0.4rem;
+    --raise-bar-lift: 0.8rem;
 
     width: max-content;
     max-width: 100%;
@@ -3909,6 +3911,7 @@ body:has(.poker-table-page) .poker-table-controls {
     /* Keep the clear button and the other columns stable as the target grows. */
     grid-template-columns: minmax(0, var(--raise-info-width)) auto 6.5rem;
     grid-template-rows: repeat(5, auto);
+    row-gap: 0.10rem;
     align-items: start;
   }
 
@@ -3949,14 +3952,14 @@ body:has(.poker-table-page) .poker-table-controls {
   .raise-control__quick-chips--positive {
     grid-row: 2 / 4;
     transform: translateY(
-      calc(var(--raise-action-reflow) - var(--raise-chip-half-step))
+      calc(var(--raise-action-reflow) - var(--raise-chip-half-step) + 0.35rem)
     );
   }
 
   .raise-control__quick-chips--negative {
     grid-row: 4 / 6;
     transform: translateY(
-      calc(var(--raise-action-reflow) - var(--raise-chip-half-step))
+      calc(var(--raise-action-reflow) - var(--raise-chip-half-step) + 0.45rem)
     );
   }
 
@@ -3968,7 +3971,7 @@ body:has(.poker-table-page) .poker-table-controls {
     width: max-content;
     max-width: none;
     transform: translateY(
-      calc(var(--raise-action-reflow) - var(--raise-chip-half-step))
+      calc(var(--raise-action-reflow) - var(--raise-chip-half-step) + 0.40rem)
     );
   }
 
@@ -3978,7 +3981,7 @@ body:has(.poker-table-page) .poker-table-controls {
     align-self: stretch;
     width: 100%;
     transform: translateY(
-      calc(var(--raise-action-reflow) - var(--raise-chip-half-step))
+      calc(var(--raise-action-reflow) - var(--raise-chip-half-step) + 0.45rem)
     );
   }
 }
@@ -4437,12 +4440,6 @@ body:has(.poker-table-page) .poker-table-controls {
     display: none;
   }
 
-  .table-seats__queue::after {
-    content: '';
-    flex: 0 0
-      calc(100% - var(--mobile-seat-card-width) + var(--mobile-seat-gap));
-  }
-
   .table-seat {
     position: relative;
     top: auto !important;
@@ -4741,7 +4738,7 @@ body:has(.poker-table-page) .poker-table-controls {
     width: 100%;
     max-height: calc(100dvh - 9.5rem - env(safe-area-inset-top));
     padding: 0.65rem 0.65rem 0.75rem;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     overflow-y: auto;
     border: 1px solid rgb(251 191 36 / 42%);
     border-radius: 1rem 1rem 0 0;
@@ -4777,11 +4774,18 @@ body:has(.poker-table-page) .poker-table-controls {
     grid-row: auto;
   }
 
+  .raise-control__bar {
+    grid-column: 1;
+    grid-row: 3;
+    width: 100%;
+    min-width: 0;
+  }
+
   .raise-control__quick-chips {
     display: grid;
     grid-template-columns: repeat(7, minmax(44px, 1fr));
     justify-items: center;
-    gap: 0.2rem;
+    gap: 0;
   }
 
   .raise-control__confirm {
@@ -4789,11 +4793,17 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   .raise-control__clear {
-    grid-column: 1 / -1;
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    justify-self: end;
+    width: auto;
+    padding-inline: 0.75rem;
+    transform: translateY(1.6rem);
   }
 
   .poker-chip__disc {
-    width: 2.1rem;
+    width: 2.7rem;
   }
 
   .poker-table__overlay {
@@ -5833,7 +5843,7 @@ body:has(.lobby) .lobby-player--drop-target {
 @media (min-width: 600px) and (min-height: 821px) and (min-aspect-ratio: 5/6) {
   /* The taller canvas can lower the own seat without crowding the controls. */
   .table-seat--own {
-    --own-seat-desktop-drop: 0.8rem;
+    --own-seat-desktop-drop: -0.3rem;
     transform: translate(-50%, -50%) translateY(var(--own-seat-desktop-drop));
   }
 }

@@ -262,16 +262,37 @@ export function TableSeats({
     if (!queue || !currentActor) return;
 
     const alignCurrentActor = () => {
-      const actorCard = Array.from(
+      const queueCards = Array.from(
         queue.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
-      ).find(
+      );
+      const actorCard = queueCards.find(
         (element) =>
           element.dataset.mobileQueuePlayerId === currentActor.playerId,
       );
-      if (!actorCard) return;
+      const lastCard = queueCards.at(-1);
+      if (!actorCard || !lastCard || queue.clientWidth <= 0) return;
 
       const maxScrollLeft = Math.max(0, queue.scrollWidth - queue.clientWidth);
-      const targetScrollLeft = Math.min(actorCard.offsetLeft, maxScrollLeft);
+      if (maxScrollLeft <= 0) return;
+
+      const actorLeft = actorCard.offsetLeft;
+      const actorRight = actorLeft + actorCard.offsetWidth;
+      const viewportLeft = queue.scrollLeft;
+      const viewportRight = viewportLeft + queue.clientWidth;
+      const actorIsVisible =
+        actorLeft >= viewportLeft && actorRight <= viewportRight;
+      if (actorIsVisible) return;
+
+      const remainingRight = lastCard.offsetLeft + lastCard.offsetWidth;
+      const remainingWidth = remainingRight - actorLeft;
+      const targetScrollLeft = Math.min(
+        remainingWidth <= queue.clientWidth
+          ? Math.max(0, remainingRight - queue.clientWidth)
+          : actorLeft,
+        maxScrollLeft,
+      );
+      if (Math.abs(targetScrollLeft - queue.scrollLeft) < 1) return;
+
       if (queue.scrollTo) {
         queue.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
       } else {
@@ -281,7 +302,21 @@ export function TableSeats({
 
     alignCurrentActor();
     const retryId = window.setTimeout(alignCurrentActor, 0);
-    return () => window.clearTimeout(retryId);
+    const handleResize = () => alignCurrentActor();
+    window.addEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('resize', handleResize);
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(handleResize);
+    resizeObserver?.observe(queue);
+
+    return () => {
+      window.clearTimeout(retryId);
+      window.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      resizeObserver?.disconnect();
+    };
   }, [actionRoundKey, currentActor?.playerId]);
   const layout =
     desktopPlayers.length === 2
