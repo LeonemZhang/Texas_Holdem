@@ -167,10 +167,10 @@ describe('StatisticsPanel', () => {
       />,
     );
     fireEvent.click(screen.getByRole('tab', { name: '牌型记录' }));
-    expect(screen.getByText('本局最高牌型')).toBeInTheDocument();
+    expect(screen.getByText('最高牌型')).toBeInTheDocument();
     expect(screen.getByText('归属：Alice')).toBeInTheDocument();
-    expect(screen.getByLabelText('本局最高牌型第 1 张 2♠')).toBeInTheDocument();
-    expect(screen.getByLabelText('本局最高牌型第 4 张 K♥')).toBeInTheDocument();
+    expect(screen.getByLabelText('最高牌型第 1 张 2♠')).toBeInTheDocument();
+    expect(screen.getByLabelText('最高牌型第 4 张 K♥')).toBeInTheDocument();
     expect(
       screen.getByLabelText('Alice 的最高牌型第 1 张 9♥'),
     ).toBeInTheDocument();

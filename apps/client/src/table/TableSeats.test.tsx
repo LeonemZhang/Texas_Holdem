@@ -50,7 +50,7 @@ describe('TableSeats', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(count);
   });
 
-  it('centers the own seat and lays out physical seats clockwise around it', () => {
+  it('lays out four desktop seats as opposing top, bottom, left and right seats', () => {
     const { container } = render(
       <TableSeats players={makePlayers(4)} ownPlayerId="p2" />,
     );
@@ -64,11 +64,227 @@ describe('TableSeats', () => {
       };
     };
 
-    expect(seatPosition('p2')).toEqual({ left: 50, top: 84 });
-    expect(seatPosition('p3')).toEqual({ left: 9, top: 50 });
-    expect(seatPosition('p0')).toEqual({ left: 50, top: 16 });
-    expect(seatPosition('p1')).toEqual({ left: 91, top: 50 });
+    expect(seatPosition('p2')).toEqual({ left: 50, top: 86 });
+    expect(seatPosition('p3')).toEqual({ left: 18, top: 50 });
+    expect(seatPosition('p0')).toEqual({ left: 50, top: 10 });
+    expect(seatPosition('p1')).toEqual({ left: 82, top: 50 });
   });
+
+  it('keeps the own four-player seat centered along the bottom edge', () => {
+    const { container } = render(
+      <TableSeats players={makePlayers(4)} ownPlayerId="p0" />,
+    );
+    const ownSeat = container.querySelector<HTMLElement>(
+      '[data-player-id="p0"]',
+    );
+
+    expect(ownSeat?.style.left).toBe('50%');
+    expect(ownSeat?.style.top).toBe('86%');
+  });
+
+  it('places heads-up players directly opposite each other', () => {
+    const { container } = render(
+      <TableSeats players={makePlayers(2)} ownPlayerId="p0" />,
+    );
+    const seatPosition = (playerId: string) => {
+      const seat = container.querySelector<HTMLElement>(
+        `[data-player-id="${playerId}"]`,
+      );
+      return {
+        left: Math.round(Number.parseFloat(seat?.style.left ?? '') * 1e6) / 1e6,
+        top: Math.round(Number.parseFloat(seat?.style.top ?? '') * 1e6) / 1e6,
+      };
+    };
+
+    expect(seatPosition('p0')).toEqual({ left: 50, top: 87 });
+    expect(seatPosition('p1')).toEqual({ left: 50, top: 10 });
+  });
+
+  it('raises the upper ring for a full ten-player table', () => {
+    const { container } = render(
+      <TableSeats players={makePlayers(10)} ownPlayerId="p0" />,
+    );
+    const seatPosition = (playerId: string) =>
+      Number.parseFloat(
+        container.querySelector<HTMLElement>(`[data-player-id="${playerId}"]`)
+          ?.style.top ?? '',
+      );
+
+    expect(seatPosition('p5')).toBe(10);
+    expect(seatPosition('p4')).toBe(12);
+    expect(seatPosition('p3')).toBe(34);
+    expect(seatPosition('p7')).toBe(34);
+    expect(seatPosition('p0')).toBe(84);
+  });
+
+  it.each([
+    [6, [84, 70, 30, 10, 30, 70]],
+    [7, [84, 70, 43, 10, 10, 43, 70]],
+    [8, [84, 78, 50, 24, 10, 24, 50, 78]],
+    [9, [84, 73, 56, 30, 10, 10, 30, 56, 73]],
+  ] as const)(
+    'uses the screenshot spacing for %i players',
+    (count, expectedTops) => {
+      const { container } = render(
+        <TableSeats players={makePlayers(count)} ownPlayerId="p0" />,
+      );
+      const actualTops = Array.from(
+        container.querySelectorAll<HTMLElement>('[data-player-id]'),
+      )
+        .sort(
+          (left, right) =>
+            Number(left.dataset.seatPosition) -
+            Number(right.dataset.seatPosition),
+        )
+        .map((seat) => Number.parseFloat(seat.style.top));
+
+      expect(actualTops).toEqual(expectedTops);
+    },
+  );
+
+  it('moves the marked seven-player side seats outward while raising them', () => {
+    const { container } = render(
+      <TableSeats players={makePlayers(7)} ownPlayerId="p0" />,
+    );
+    const seatPosition = (playerId: string) => {
+      const seat = container.querySelector<HTMLElement>(
+        `[data-player-id="${playerId}"]`,
+      );
+      return {
+        left: Number.parseFloat(seat?.style.left ?? ''),
+        top: Number.parseFloat(seat?.style.top ?? ''),
+      };
+    };
+
+    expect(seatPosition('p2')).toEqual({ left: 11, top: 43 });
+    expect(seatPosition('p5')).toEqual({ left: 89, top: 43 });
+  });
+
+  it('moves the marked nine-player upper side seats toward the center', () => {
+    const { container } = render(
+      <TableSeats players={makePlayers(9)} ownPlayerId="p0" />,
+    );
+    const seatPosition = (playerId: string) => {
+      const seat = container.querySelector<HTMLElement>(
+        `[data-player-id="${playerId}"]`,
+      );
+      return {
+        left: Number.parseFloat(seat?.style.left ?? ''),
+        top: Number.parseFloat(seat?.style.top ?? ''),
+      };
+    };
+
+    expect(seatPosition('p3')).toEqual({ left: 17, top: 30 });
+    expect(seatPosition('p6')).toEqual({ left: 83, top: 30 });
+  });
+
+  it.each([
+    [6, [10]],
+    [7, [10, 10]],
+    [8, [10]],
+    [9, [10, 10]],
+  ] as const)(
+    'keeps the upper seats clear of the center stack for %i players',
+    (count, expectedTops) => {
+      const { container } = render(
+        <TableSeats players={makePlayers(count)} ownPlayerId="p0" />,
+      );
+      const topSeats = Array.from(
+        container.querySelectorAll<HTMLElement>(
+          '.table-seat[data-player-id]:not(.table-seat--own)',
+        ),
+      )
+        .map((seat) => Number.parseFloat(seat.style.top))
+        .filter((top) => top <= 10)
+        .sort((left, right) => left - right);
+
+      expect(topSeats).toEqual(expectedTops);
+    },
+  );
+
+  it.each([5, 6, 7, 8, 9, 10])(
+    'keeps %i desktop seats unique and stable when action order changes',
+    (count) => {
+      const initialPlayers = makePlayers(count).map((player, index) => ({
+        ...player,
+        actionOrder: count - index,
+        isCurrentActor: index === count - 1,
+      }));
+      const { container, rerender } = render(
+        <TableSeats players={initialPlayers} ownPlayerId="p0" />,
+      );
+      const seatElements = () =>
+        Array.from(
+          container.querySelectorAll<HTMLElement>(
+            '.table-seat[data-player-id]',
+          ),
+        );
+      const seatPosition = (playerId: string) => {
+        const seat = container.querySelector<HTMLElement>(
+          `[data-player-id="${playerId}"]`,
+        );
+        return {
+          left: Number.parseFloat(seat?.style.left ?? ''),
+          top: Number.parseFloat(seat?.style.top ?? ''),
+        };
+      };
+      const initialPositions = initialPlayers.map((player) => ({
+        playerId: player.playerId,
+        position: seatPosition(player.playerId),
+      }));
+
+      expect(
+        new Set(
+          initialPositions.map(
+            ({ position }) => `${position.left}:${position.top}`,
+          ),
+        ).size,
+      ).toBe(count);
+      expect(
+        initialPositions.every(
+          ({ position }) =>
+            position.left >= 0 &&
+            position.left <= 100 &&
+            position.top >= 0 &&
+            position.top <= 100,
+        ),
+      ).toBe(true);
+      const expectedInitialOrder = [...initialPlayers]
+        .sort((left, right) => left.actionOrder! - right.actionOrder!)
+        .map((player) => player.playerId);
+      expect(
+        seatElements()
+          .map((seat) => seat.dataset.playerId)
+          .sort()
+          .join(','),
+      ).toBe(expectedInitialOrder.sort().join(','));
+
+      const nextPlayers = initialPlayers.map((player, index) => ({
+        ...player,
+        actionOrder: index + 1,
+        isCurrentActor: index === 0,
+      }));
+      rerender(<TableSeats players={nextPlayers} ownPlayerId="p0" />);
+
+      expect(
+        initialPositions.map(({ playerId }) => ({
+          playerId,
+          position: seatPosition(playerId),
+        })),
+      ).toEqual(initialPositions);
+      expect(
+        seatElements()
+          .map((seat) => seat.dataset.playerId)
+          .sort()
+          .join(','),
+      ).toBe(
+        nextPlayers
+          .map((player) => player.playerId)
+          .sort()
+          .join(','),
+      );
+    },
+  );
 
   it('distinguishes acting, disconnected, all-in and folded seats', () => {
     const { container } = render(
@@ -91,6 +307,28 @@ describe('TableSeats', () => {
     expect(container.querySelector('.table-seat--folded')).toHaveTextContent(
       '已弃牌',
     );
+  });
+
+  it('keeps dealer and small-blind labels on one row for the same player', () => {
+    const { container } = render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[
+          {
+            ...makePlayers(2)[0]!,
+            isDealer: true,
+            isSmallBlind: true,
+          },
+          makePlayers(2)[1]!,
+        ]}
+      />,
+    );
+
+    expect(
+      container.querySelector(
+        '.table-seat__position-labels--dealer-small-blind',
+      ),
+    ).toHaveTextContent('庄家小盲');
   });
 
   it('keeps the round order while the actor advances without moving desktop seats', () => {
@@ -184,7 +422,7 @@ describe('TableSeats', () => {
         ownPlayerId="p0"
       />,
     );
-    const seats = screen.getByRole('list', { name: '4 人座位布局' });
+    const seats = container.querySelector<HTMLElement>('.table-seats__queue')!;
     const scrollTo = vi.fn();
     Object.defineProperty(seats, 'scrollTo', {
       configurable: true,
@@ -204,6 +442,16 @@ describe('TableSeats', () => {
 
     expect(mobileQueuePlayerIds(container)).toEqual(['p2', 'p0', 'p1', 'p3']);
     expect(scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the fixed own seat outside the scrolling queue', () => {
+    const { container } = render(
+      <TableSeats players={makePlayers(5)} ownPlayerId="p0" />,
+    );
+    const ownSeat = container.querySelector('.table-seat--own');
+
+    expect(ownSeat).toBeInTheDocument();
+    expect(ownSeat?.closest('.table-seats__queue')).toBeNull();
   });
 
   it.each([
@@ -241,7 +489,7 @@ describe('TableSeats', () => {
         ownPlayerId="p0"
       />,
     );
-    const seats = screen.getByRole('list', { name: '4 人座位布局' });
+    const seats = container.querySelector<HTMLElement>('.table-seats__queue')!;
     const actorCard = container.querySelector(
       '[data-mobile-queue-player-id="p2"]',
     )!;
@@ -370,6 +618,22 @@ describe('TableSeats', () => {
     expect(
       actingSeat?.querySelector('.table-seat__action-order--mobile'),
     ).toHaveTextContent('顺位 1');
+  });
+
+  it('shows the action label on the fixed own seat when it is the current actor', () => {
+    const { container } = render(
+      <TableSeats
+        ownPlayerId="p0"
+        players={[
+          { ...makePlayers(2)[0]!, isCurrentActor: true, actionOrder: 1 },
+        ]}
+      />,
+    );
+
+    const ownSeat = container.querySelector('[data-player-id="p0"]');
+    expect(
+      ownSeat?.querySelector('.table-seat__mobile-acting-order'),
+    ).toHaveTextContent('行动中 · 顺位 1');
   });
 
   it('shows settlement results without displaying hole cards on player seats', () => {

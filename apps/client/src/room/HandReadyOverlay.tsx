@@ -27,6 +27,8 @@ export interface HandReadyOverlayProps {
   readonly onSettlementCollapsedChange?: (collapsed: boolean) => void;
   readonly settlement?: {
     readonly handId: string;
+    /** The human-facing hand number for this settlement, not the opaque hand id. */
+    readonly handNumber: number;
     readonly reason: 'uncontested' | 'showdown';
     readonly communityCards?: readonly string[];
     readonly totalPot?: number;
@@ -182,6 +184,9 @@ export function HandReadyOverlay({
       : settlementOutcome === 'loss'
         ? '失败'
         : '平局';
+  const settlementTitle = settlement
+    ? `第 ${settlement.handNumber} 局结算`
+    : null;
   const settlementOutcomeClassName = settlementNetChangeClassName(
     ownSettlementNetChange,
   );
@@ -322,11 +327,12 @@ export function HandReadyOverlay({
           <section
             className="hand-ready-card__settlement"
             role="alertdialog"
-            aria-label="本局结算"
+            aria-label={settlementTitle ?? undefined}
           >
             <div className="hand-ready-card__settlement-heading">
               <strong className="hand-ready-card__settlement-title">
-                本局结算{settlement.reason === 'showdown' ? ' · 摊牌' : ''}
+                {settlementTitle}
+                {settlement.reason === 'showdown' ? ' · 摊牌' : ''}
               </strong>
               <strong
                 className={`hand-ready-card__settlement-outcome ${settlementOutcomeClassName}`}

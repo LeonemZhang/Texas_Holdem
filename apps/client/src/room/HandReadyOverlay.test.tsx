@@ -196,6 +196,7 @@ describe('HandReadyOverlay', () => {
       onShowHoleCards: vi.fn(),
       settlement: {
         handId: 'hand-1',
+        handNumber: 7,
         reason: 'showdown' as const,
         communityCards: ['2c', 'Td', 'Jh', 'Qs', 'Ac'],
         totalPot: 240,
@@ -226,8 +227,9 @@ describe('HandReadyOverlay', () => {
       <HandReadyOverlay {...props} complete={false} />,
     );
     expect(
-      screen.getByRole('alertdialog', { name: '本局结算' }),
+      screen.getByRole('alertdialog', { name: '第 7 局结算' }),
     ).toBeInTheDocument();
+    expect(screen.getByText('第 7 局结算 · 摊牌')).toBeInTheDocument();
     expect(screen.getByText('我').parentElement).toHaveTextContent(
       '我· 1,240 筹码赢得 240 筹码',
     );
@@ -287,12 +289,15 @@ describe('HandReadyOverlay', () => {
       '我· 1,250 筹码赢得 240 筹码',
     );
     rerender(<HandReadyOverlay {...props} complete />);
-    expect(screen.queryByRole('alertdialog', { name: '本局结算' })).toBeNull();
+    expect(
+      screen.queryByRole('alertdialog', { name: '第 7 局结算' }),
+    ).toBeNull();
   });
 
   it('puts my settlement row first and shows my result', () => {
     const makeSettlement = (ownNetChange: number) => ({
       handId: `hand-${ownNetChange}`,
+      handNumber: 8,
       reason: 'showdown' as const,
       players: [
         {
@@ -347,6 +352,7 @@ describe('HandReadyOverlay', () => {
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
     const settlement = {
       handId: 'hand-1',
+      handNumber: 9,
       reason: 'showdown' as const,
       communityCards: ['2c', 'Td', 'Jh', 'Qs', 'Ac'],
       players: [
@@ -375,7 +381,9 @@ describe('HandReadyOverlay', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
-    expect(screen.queryByRole('alertdialog', { name: '本局结算' })).toBeNull();
+    expect(
+      screen.queryByRole('alertdialog', { name: '第 9 局结算' }),
+    ).toBeNull();
     expect(screen.queryByRole('button', { name: '就绪' })).toBeNull();
     const expand = screen.getByRole('button', {
       name: '结算详情 · 23s',
@@ -385,7 +393,7 @@ describe('HandReadyOverlay', () => {
     );
     fireEvent.click(expand);
     expect(
-      screen.getByRole('alertdialog', { name: '本局结算' }),
+      screen.getByRole('alertdialog', { name: '第 9 局结算' }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
@@ -396,7 +404,7 @@ describe('HandReadyOverlay', () => {
       />,
     );
     expect(
-      screen.getByRole('alertdialog', { name: '本局结算' }),
+      screen.getByRole('alertdialog', { name: '第 9 局结算' }),
     ).toBeInTheDocument();
   });
 
@@ -412,6 +420,7 @@ describe('HandReadyOverlay', () => {
         onChoose={vi.fn()}
         settlement={{
           handId: 'hand-desktop',
+          handNumber: 10,
           reason: 'uncontested',
           players: [
             {
@@ -427,7 +436,7 @@ describe('HandReadyOverlay', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
     expect(
-      screen.queryByRole('alertdialog', { name: '本局结算' }),
+      screen.queryByRole('alertdialog', { name: '第 10 局结算' }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: '结算详情 · 23s' }),
@@ -446,6 +455,7 @@ describe('HandReadyOverlay', () => {
         onChoose={vi.fn()}
         settlement={{
           handId: 'hand-early-turn',
+          handNumber: 11,
           reason: 'uncontested',
           communityCards: ['As', 'Kd', 'Qh', 'Jc'],
           players: [
@@ -548,6 +558,7 @@ describe('HandReadyOverlay', () => {
         onChoose={vi.fn()}
         settlement={{
           handId: 'hand-1',
+          handNumber: 12,
           reason: 'uncontested',
           players: [
             {

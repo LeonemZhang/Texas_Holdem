@@ -900,6 +900,7 @@ describe('GameRoom', () => {
     );
 
     const settlementPlayers = await screen.findByLabelText('本局结算玩家牌型');
+    expect(screen.getByText('第 1 局结算 · 摊牌')).toBeInTheDocument();
     const settlementRows = within(settlementPlayers).getAllByRole('listitem');
     expect(settlementRows[0]).toHaveTextContent('我');
     expect(screen.queryByLabelText('公共牌牌面')).toBeNull();
@@ -939,6 +940,7 @@ describe('GameRoom', () => {
     expect(screen.getByLabelText('本局底池')).toBeInTheDocument();
     expect(screen.getByLabelText('我的底牌')).toBeInTheDocument();
     expect(screen.getByLabelText('当前最大牌型：一对')).toBeInTheDocument();
+    expect(screen.getByLabelText('行动操作区')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /结算详情/ }));
     fireEvent.click(await screen.findByRole('button', { name: '筹码交换' }));
     fireEvent.click(await screen.findByRole('button', { name: '发起请求' }));
@@ -1146,7 +1148,7 @@ describe('GameRoom', () => {
       await screen.findByLabelText(/Alice 行动剩余 \d+ 秒/),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('牌局进度')).toHaveTextContent(
-      '第 1 局 · 翻牌前 · 盲注：1/2 · 当前行动：Alice',
+      '第 1 局 · 翻牌前 · 盲注：1/2',
     );
     expect(screen.getByText('行动中')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '退出房间' }));

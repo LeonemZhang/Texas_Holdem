@@ -19,7 +19,7 @@ describe('UiSmokePreview', () => {
     cleanup();
     render(<UiSmokePreview page="statistics" />);
     fireEvent.click(screen.getByRole('tab', { name: '牌型记录' }));
-    expect(screen.getByText('本局最高牌型')).toBeInTheDocument();
+    expect(screen.getByText('最高牌型')).toBeInTheDocument();
   });
 
   it('renders the settlement sound preview', () => {
@@ -28,6 +28,46 @@ describe('UiSmokePreview', () => {
     expect(
       screen.getByRole('button', { name: '试听持平音效' }),
     ).toBeInTheDocument();
+  });
+
+  it.each([
+    ['table-6', ['3']],
+    ['table-7', ['3', '4']],
+    ['table-8', ['4']],
+    ['table-9', ['4', '5']],
+  ] as const)(
+    'fills top seats for %s with complete preview content',
+    (page, positions) => {
+      const { container } = render(<UiSmokePreview page={page} />);
+
+      for (const position of positions) {
+        const seat = container.querySelector<HTMLElement>(
+          `.table-seat[data-seat-position="${position}"]`,
+        );
+        expect(seat).toHaveClass('table-seat--active');
+        expect(seat).toHaveTextContent(/小盲|大盲/);
+        expect(seat).toHaveTextContent('在局');
+        expect(
+          seat?.querySelector('.table-seat__last-action'),
+        ).toHaveTextContent('跟注');
+      }
+    },
+  );
+
+  it('keeps the disabled betting area and restores the board after settlement collapse', () => {
+    const { container } = render(<UiSmokePreview page="settlement" />);
+
+    expect(screen.getByText('第 9 局结算 · 摊牌')).toBeInTheDocument();
+    expect(screen.getByLabelText('行动操作区')).toBeInTheDocument();
+    expect(container.querySelector('.betting-controls')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(screen.queryByLabelText('本局底池')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '收起结算详情' }));
+
+    expect(screen.getByLabelText('本局底池')).toBeInTheDocument();
   });
 
   it('opens the nickname dialog when the discovery preview joins a room', () => {

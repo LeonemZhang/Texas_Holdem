@@ -128,6 +128,15 @@ export function DesktopRoomSetup({
           { cause: reason },
         );
       }
+      if (
+        reason instanceof Error &&
+        reason.message.includes('Host service port is already in use')
+      ) {
+        throw new Error(
+          '本机的游戏端口已被另一个游戏进程或其他程序占用。请关闭重复打开的 Texas Holdem 后重试。',
+          { cause: reason },
+        );
+      }
       throw reason;
     }
   };

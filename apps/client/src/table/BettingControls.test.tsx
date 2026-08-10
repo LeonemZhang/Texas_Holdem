@@ -29,8 +29,9 @@ describe('BettingControls', () => {
       />,
     );
 
-    const toggle = screen.getByRole('button', { name: /调整加注/ });
+    const toggle = screen.getByRole('button', { name: /调整加注到/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('调整加注到 60');
     fireEvent.click(toggle);
     expect(onAction).not.toHaveBeenCalled();
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -38,11 +39,15 @@ describe('BettingControls', () => {
     fireEvent.change(screen.getByLabelText('加注增量'), {
       target: { value: '120' },
     });
+    expect(toggle).toHaveTextContent('调整加注到 180');
     fireEvent.click(screen.getByRole('button', { name: '收起加注设置' }));
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(onAction).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: '确认加注 180' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: '确认加注 180' }));
+    const submit = screen.getAllByRole('button', {
+      name: '确认加注到 180',
+    })[0]!;
+    expect(submit).toBeEnabled();
+    fireEvent.click(submit);
     expect(onAction).toHaveBeenCalledWith({
       type: 'game.raise-to',
       amount: 180,
@@ -53,7 +58,9 @@ describe('BettingControls', () => {
     const onAction = vi.fn();
     render(<BettingControls legalActions={legalActions} onAction={onAction} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '确认加注 60' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: '确认加注到 60' })[0]!,
+    );
     expect(onAction).toHaveBeenCalledWith({
       type: 'game.raise-to',
       amount: 60,
@@ -80,7 +87,9 @@ describe('BettingControls', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '确认加注 140' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: '确认加注到 140' })[0]!,
+    );
     expect(onAction).toHaveBeenCalledWith({
       type: 'game.raise-to',
       amount: 140,
@@ -123,13 +132,37 @@ describe('BettingControls', () => {
     },
   );
 
+  it.each([
+    [999, 'normal'],
+    [1_000, 'wide'],
+    [9_999, 'wide'],
+    [10_000, 'extra-wide'],
+  ] as const)(
+    'marks large call amounts for a wider action button',
+    (callAmount, width) => {
+      const { container } = render(
+        <BettingControls
+          legalActions={{ ...legalActions, callAmount }}
+          onAction={vi.fn()}
+        />,
+      );
+
+      expect(container.querySelector('.betting-controls')).toHaveAttribute(
+        'data-call-width',
+        width,
+      );
+    },
+  );
+
   it('emits raise-to with an explicit amount inside the server range', () => {
     const onAction = vi.fn();
     render(<BettingControls legalActions={legalActions} onAction={onAction} />);
     fireEvent.change(screen.getByLabelText('加注增量'), {
       target: { value: '120' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: '确认加注到 180' })[0]!,
+    );
     expect(onAction).toHaveBeenCalledWith({
       type: 'game.raise-to',
       amount: 180,
@@ -142,7 +175,9 @@ describe('BettingControls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '增加 20 筹码' }));
     fireEvent.click(screen.getByRole('button', { name: '增加 5 筹码' }));
-    fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: '确认加注到 85' })[0]!,
+    );
     expect(onAction).toHaveBeenCalledWith({
       type: 'game.raise-to',
       amount: 85,
@@ -163,19 +198,37 @@ describe('BettingControls', () => {
     }
   });
 
+  it('renders every increase chip with a leading plus sign', () => {
+    render(<BettingControls legalActions={legalActions} onAction={vi.fn()} />);
+
+    for (const value of [1, 2, 5, 10, 20, 50, 100]) {
+      const chip = screen.getByRole('button', {
+        name: `增加 ${value} 筹码`,
+      });
+      expect(chip).toHaveTextContent(`+${value}`);
+      expect(chip.querySelector('.poker-chip__value')).toHaveTextContent(
+        `+${value}`,
+      );
+    }
+  });
+
   it('sets a quick chip as the raise target before adding later chips', () => {
     const onAction = vi.fn();
     render(<BettingControls legalActions={legalActions} onAction={onAction} />);
 
     fireEvent.click(screen.getByRole('button', { name: '增加 100 筹码' }));
-    fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: '确认加注到 100' })[0]!,
+    );
     expect(onAction).toHaveBeenLastCalledWith({
       type: 'game.raise-to',
       amount: 100,
     });
 
     fireEvent.click(screen.getByRole('button', { name: '增加 100 筹码' }));
-    fireEvent.click(screen.getByRole('button', { name: '确认加注' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: '确认加注到 200' })[0]!,
+    );
     expect(onAction).toHaveBeenLastCalledWith({
       type: 'game.raise-to',
       amount: 200,
@@ -197,6 +250,41 @@ describe('BettingControls', () => {
     expect(
       screen.getByText('60', { selector: '.raise-control__value' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('追加 60', { selector: '.raise-control__additional' }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(slider, { target: { value: '120' } });
+    expect(
+      screen.getByText('追加 180', {
+        selector: '.raise-control__additional',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('calculates the added amount from the target and own street commitment', () => {
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        streetCommitted={10}
+        onAction={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText('追加 50', {
+        selector: '.raise-control__additional',
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('加注增量'), {
+      target: { value: '120' },
+    });
+    expect(
+      screen.getByText('追加 170', {
+        selector: '.raise-control__additional',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('keeps the raise bounds and current amount in the slider header', () => {
@@ -209,11 +297,26 @@ describe('BettingControls', () => {
     expect(bar).toHaveTextContent('最小 60');
     expect(bar).toHaveTextContent('60');
     expect(bar).toHaveTextContent('最大 400');
-    expect(bar.textContent?.replace(/\s+/g, '')).toBe('60最小60最大400');
+    expect(bar.textContent?.replace(/\s+/g, '')).toBe('60最小60追加60最大400');
     expect(
       screen.queryByText('加注增量', { selector: 'label' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('本轮已投')).not.toBeInTheDocument();
+  });
+
+  it('uses the call button style and target badge for desktop confirmation', () => {
+    const { container } = render(
+      <BettingControls legalActions={legalActions} onAction={vi.fn()} />,
+    );
+
+    const confirm = container.querySelector<HTMLButtonElement>(
+      '.raise-control__confirm',
+    );
+    expect(confirm).toHaveClass('betting-controls__call');
+    expect(confirm).toHaveTextContent('确认加注到');
+    expect(
+      confirm?.querySelector('.betting-controls__call-amount'),
+    ).toHaveTextContent('60');
   });
 
   it('locks every action while recovering or when it is not this player turn', () => {

@@ -395,6 +395,7 @@ export function GameRoom({
   const own = snapshot.room.players.find(
     ({ playerId }) => playerId === session.playerId,
   );
+  const ownStreetCommitted = own?.streetCommitted ?? 0;
   const names = new Map(
     snapshot.room.players.map(({ playerId, nickname }) => [playerId, nickname]),
   );
@@ -564,6 +565,7 @@ export function GameRoom({
   const settlementView = gameSettlement
     ? {
         handId: game.handId,
+        handNumber: snapshot.room.completedHands + 1,
         reason: gameSettlement.reason,
         communityCards: game.communityCards,
         totalPot: game.totalPot,
@@ -603,6 +605,18 @@ export function GameRoom({
         ({ playerId }) => playerId === game.currentActorId,
       )
     : null;
+  const handLabel =
+    snapshot.room.phase === 'paused'
+      ? '游戏暂停中'
+      : game
+        ? `第 ${snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]} · 盲注：${snapshot.room.smallBlind}/${snapshot.room.bigBlind}`
+        : '等待牌局开始';
+  const mobileHandLabel =
+    snapshot.room.phase === 'paused'
+      ? '游戏暂停中'
+      : game
+        ? `第 ${snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]} · 盲注：${snapshot.room.smallBlind}/${snapshot.room.bigBlind}`
+        : '等待牌局开始';
   return (
     <div className="game-room-shell" aria-busy={sending}>
       {error ? (
@@ -612,13 +626,8 @@ export function GameRoom({
       ) : null}
       <PokerTableLayout
         roomName={snapshot.room.roomName}
-        handLabel={
-          snapshot.room.phase === 'paused'
-            ? '游戏暂停中'
-            : game
-              ? `第 ${snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]} · 盲注：${snapshot.room.smallBlind}/${snapshot.room.bigBlind}${actionActor ? ` · 当前行动：${actionActor.nickname}` : ''}`
-              : '等待牌局开始'
-        }
+        handLabel={handLabel}
+        mobileHandLabel={mobileHandLabel}
         status={
           <TableUtilityToolbar
             activePanel={activeUtilityPanel}
@@ -784,9 +793,17 @@ export function GameRoom({
           ) : null
         }
         controls={
-          snapshot.handReady ? null : (
+          snapshot.handReady && gameSettlement ? (
+            <BettingControls
+              legalActions={null}
+              streetCommitted={ownStreetCommitted}
+              disabled
+              onAction={sendBetting}
+            />
+          ) : snapshot.handReady ? null : (
             <BettingControls
               legalActions={game?.legalActions ?? null}
+              streetCommitted={ownStreetCommitted}
               disabled={sending || snapshot.room.phase !== 'playing'}
               onAction={sendBetting}
             />

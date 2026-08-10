@@ -2,13 +2,86 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { PokerTableLayout } from './PokerTableLayout.js';
+import {
+  calculateDesktopCanvasScale,
+  calculateDesktopCanvasOffsetY,
+  DESKTOP_CANVAS_WIDTH,
+  calculateMobileCanvasScale,
+  MOBILE_CANVAS_BASE_HEIGHT,
+  shouldUseMobileTableLayout,
+} from './DesktopCanvasScale.js';
 
 describe('PokerTableLayout', () => {
+  it.each([
+    [1180, 821, 1180 / DESKTOP_CANVAS_WIDTH, 'compact'],
+    [1460, 821, 1, 'base'],
+    [1920, 1080, 1920 / DESKTOP_CANVAS_WIDTH, '1080p'],
+    [2560, 1440, 1.75, '1440p'],
+    [960, 600, 960 / DESKTOP_CANVAS_WIDTH, 'compact'],
+  ])(
+    'calculates the %s x %s desktop canvas scale and tier',
+    (width, height, expectedScale, expectedTier) => {
+      expect(calculateDesktopCanvasScale(width, height)).toEqual({
+        scale: expect.closeTo(expectedScale, 6),
+        tier: expectedTier,
+      });
+    },
+  );
+
+  it.each([
+    [640, 1],
+    [922, 1],
+    [480, 0.75],
+    [320, 0.5],
+    [0, 1],
+  ])(
+    'scales the mobile canvas from the %s px height baseline',
+    (height, expected) => {
+      expect(calculateMobileCanvasScale(height)).toBeCloseTo(expected, 6);
+    },
+  );
+
+  it('keeps the mobile scale baseline explicit', () => {
+    expect(MOBILE_CANVAS_BASE_HEIGHT).toBe(640);
+  });
+
+  it.each([
+    [1024, 1366, true],
+    [768, 1024, true],
+    [1180, 821, false],
+    [1024, 768, false],
+    [390, 844, true],
+  ])(
+    'switches to the mobile table when the viewport is portrait enough (%s x %s)',
+    (width, height, expected) => {
+      expect(shouldUseMobileTableLayout(width, height)).toBe(expected);
+    },
+  );
+
+  it.each([
+    [601, 877 / DESKTOP_CANVAS_WIDTH, 89.762258],
+    [600, 960 / DESKTOP_CANVAS_WIDTH, 45.75],
+    [1024, 1366 / DESKTOP_CANVAS_WIDTH, 136.732796],
+    [821, 1180 / DESKTOP_CANVAS_WIDTH, 97.40678],
+    [1000, 1600 / DESKTOP_CANVAS_WIDTH, 45.75],
+    [821, 1, 0],
+    [300, 0.4, 0],
+  ])(
+    'centers the rendered desktop canvas while preserving a top fallback',
+    (viewportHeight, scale, expectedOffset) => {
+      expect(calculateDesktopCanvasOffsetY(viewportHeight, scale)).toBeCloseTo(
+        expectedOffset,
+        5,
+      );
+    },
+  );
+
   it('keeps the four gameplay regions explicit and accessible', () => {
     render(
       <PokerTableLayout
         roomName="朋友局"
         handLabel="第 8 局 · 翻牌前 · 盲注：1/2 · 当前行动：Alice"
+        mobileHandLabel="第 8 局 · 翻牌前 · 盲注：1/2"
         seats={<span>Alice 的座位</span>}
         communityCards={<span>翻牌</span>}
         actionTimer={<span>轮到 Alice · 18s</span>}
@@ -27,6 +100,12 @@ describe('PokerTableLayout', () => {
       'title',
       '第 8 局 · 翻牌前 · 盲注：1/2 · 当前行动：Alice',
     );
+    expect(
+      gameStatus.querySelector('.poker-table__game-status--mobile'),
+    ).toHaveTextContent('第 8 局 · 翻牌前 · 盲注：1/2');
+    expect(
+      gameStatus.querySelector('.poker-table__game-status--mobile'),
+    ).not.toHaveTextContent('当前行动');
     expect(gameStatus.closest('.poker-table__felt')).toBeInTheDocument();
     expect(
       within(screen.getByLabelText('玩家座位')).getByText('Alice 的座位'),
@@ -46,6 +125,12 @@ describe('PokerTableLayout', () => {
         name: '过牌',
       }),
     ).toBeInTheDocument();
+    expect(document.querySelector('.poker-table-page')).toHaveStyle(
+      `--desktop-canvas-width: ${DESKTOP_CANVAS_WIDTH}px`,
+    );
+    expect(document.querySelector('.poker-table-page')).toHaveStyle(
+      '--desktop-canvas-height: 821px',
+    );
   });
 
   it('uses containment classes and omits controls when there is no active action', () => {
@@ -63,6 +148,9 @@ describe('PokerTableLayout', () => {
       container.querySelector('.poker-table-page__workspace'),
     ).toBeInTheDocument();
     expect(container.querySelector('.poker-table__felt')).toBeInTheDocument();
+    expect(
+      container.querySelector('.poker-table__action-timer--placeholder'),
+    ).toBeInTheDocument();
     expect(container.querySelector('.poker-table-controls')).toBeNull();
   });
 });

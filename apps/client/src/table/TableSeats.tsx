@@ -1,10 +1,4 @@
-import {
-  Fragment,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  type CSSProperties,
-} from 'react';
+import { useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react';
 
 export type TableSeatStatus =
   | 'waiting'
@@ -65,6 +59,29 @@ const actionLabels = {
 } as const;
 
 const TABLE_SEAT_COUNT = 10;
+const TEN_PLAYER_TOPS = [84, 78, 62, 34, 12, 10, 12, 34, 62, 78] as const;
+const HEADS_UP_POSITIONS = [
+  [50, 87],
+  [50, 10],
+] as const;
+const FOUR_PLAYER_POSITIONS = [
+  [50, 86],
+  [18, 50],
+  [50, 10],
+  [82, 50],
+] as const;
+const SAFE_MULTI_PLAYER_TOPS: Readonly<Record<number, readonly number[]>> = {
+  6: [84, 70, 30, 10, 30, 70],
+  7: [84, 70, 43, 10, 10, 43, 70],
+  8: [84, 78, 50, 24, 10, 24, 50, 78],
+  9: [84, 73, 56, 30, 10, 10, 30, 56, 73],
+};
+const SAFE_MULTI_PLAYER_HORIZONTAL_OVERRIDES: Readonly<
+  Record<number, Readonly<Record<number, number>>>
+> = {
+  7: { 2: 11, 5: 89 },
+  9: { 3: 17, 6: 83 },
+};
 
 function clockwiseDistance(fromSeatIndex: number, toSeatIndex: number): number {
   return (toSeatIndex - fromSeatIndex + TABLE_SEAT_COUNT) % TABLE_SEAT_COUNT;
@@ -81,10 +98,26 @@ function compareClockwiseFrom(
 }
 
 function positionFor(index: number, count: number): CSSProperties {
+  const explicitPositions =
+    count === HEADS_UP_POSITIONS.length
+      ? HEADS_UP_POSITIONS
+      : count === FOUR_PLAYER_POSITIONS.length
+        ? FOUR_PLAYER_POSITIONS
+        : null;
+  const explicitPosition = explicitPositions?.[index];
+  if (explicitPosition) {
+    return {
+      left: `${explicitPosition[0]}%`,
+      top: `${explicitPosition[1]}%`,
+    };
+  }
+
   const angle = (Math.PI / 2 + (index * Math.PI * 2) / count) % (Math.PI * 2);
+  const safeLeft = SAFE_MULTI_PLAYER_HORIZONTAL_OVERRIDES[count]?.[index];
+  const safeTop = SAFE_MULTI_PLAYER_TOPS[count]?.[index];
   return {
-    left: `${50 + Math.cos(angle) * 41}%`,
-    top: `${50 + Math.sin(angle) * 34}%`,
+    left: `${safeLeft ?? 50 + Math.cos(angle) * 41}%`,
+    top: `${count === TEN_PLAYER_TOPS.length ? TEN_PLAYER_TOPS[index]! : (safeTop ?? 50 + Math.sin(angle) * 34)}%`,
   };
 }
 
@@ -103,7 +136,16 @@ function SeatContents({ player }: { readonly player: TableSeatPlayer }) {
         </span>
       ) : null}
       {player.isDealer || player.isSmallBlind || player.isBigBlind ? (
-        <span className="table-seat__position-labels">
+        <span
+          className={[
+            'table-seat__position-labels',
+            player.isDealer && player.isSmallBlind
+              ? 'table-seat__position-labels--dealer-small-blind'
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           {player.isDealer ? <i>庄家</i> : null}
           {player.isSmallBlind ? <i>小盲</i> : null}
           {player.isBigBlind ? <i>大盲</i> : null}
@@ -176,7 +218,7 @@ export function TableSeats({
   ownPlayerId,
   actionRoundKey = null,
 }: TableSeatsProps) {
-  const listRef = useRef<HTMLOListElement>(null);
+  const queueRef = useRef<HTMLDivElement>(null);
   const ownSeatIndex =
     players.find((player) => player.playerId === ownPlayerId)?.seatIndex ?? 0;
   const desktopPlayers = useMemo(
@@ -203,22 +245,22 @@ export function TableSeats({
     desktopPlayers.map((player, index) => [player.playerId, index]),
   );
   useLayoutEffect(() => {
-    const list = listRef.current;
-    if (!list || !currentActor) return;
+    const queue = queueRef.current;
+    if (!queue || !currentActor) return;
     const actorCard = Array.from(
-      list.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
+      queue.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
     ).find(
       (element) =>
         element.dataset.mobileQueuePlayerId === currentActor.playerId,
     );
     if (!actorCard) return;
 
-    const maxScrollLeft = Math.max(0, list.scrollWidth - list.clientWidth);
+    const maxScrollLeft = Math.max(0, queue.scrollWidth - queue.clientWidth);
     const targetScrollLeft = Math.min(actorCard.offsetLeft, maxScrollLeft);
-    if (list.scrollTo) {
-      list.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+    if (queue.scrollTo) {
+      queue.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
     } else {
-      list.scrollLeft = targetScrollLeft;
+      queue.scrollLeft = targetScrollLeft;
     }
   }, [actionRoundKey, currentActor?.playerId]);
   const layout =
@@ -227,62 +269,90 @@ export function TableSeats({
       : desktopPlayers.length === 3
         ? 'three-handed'
         : 'multi-handed';
+  const ownPlayer = orderedPlayers.find(
+    (player) => player.playerId === ownPlayerId,
+  );
 
   return (
-    <ol
+    <div
       className="table-seats"
       data-layout={layout}
       data-player-count={desktopPlayers.length}
-      ref={listRef}
+      role="list"
       aria-label={`${desktopPlayers.length} 人座位布局`}
     >
-      {orderedPlayers.map((player) => {
-        const stateClasses = [
-          'table-seat',
-          `table-seat--${player.status}`,
-          `table-seat--color-${player.seatIndex % 6}`,
-          player.isCurrentActor ? 'table-seat--acting' : '',
-          player.playerId === ownPlayerId ? 'table-seat--own' : '',
-        ]
-          .filter(Boolean)
-          .join(' ');
-        const mobileOwnSummaryClasses = [
-          'table-seat',
-          `table-seat--${player.status}`,
-          `table-seat--color-${player.seatIndex % 6}`,
-          player.isCurrentActor ? 'table-seat--acting' : '',
-          'table-seat--mobile-own-summary',
-        ]
-          .filter(Boolean)
-          .join(' ');
-        return (
-          <Fragment key={player.playerId}>
-            {player.playerId === ownPlayerId ? (
-              <li
-                className={mobileOwnSummaryClasses}
+      <div className="table-seats__queue" ref={queueRef}>
+        {orderedPlayers.map((player) => {
+          const baseClasses = [
+            'table-seat',
+            `table-seat--${player.status}`,
+            `table-seat--color-${player.seatIndex % 6}`,
+            player.isCurrentActor ? 'table-seat--acting' : '',
+          ];
+          if (player.playerId === ownPlayerId) {
+            return (
+              <div
+                className={[...baseClasses, 'table-seat--mobile-own-summary']
+                  .filter(Boolean)
+                  .join(' ')}
+                key={player.playerId}
+                role="listitem"
                 aria-hidden="true"
                 data-mobile-queue-player-id={player.playerId}
               >
-                <SeatContents player={player} />
-              </li>
-            ) : null}
-            <li
-              className={stateClasses}
+                <div className="table-seat__content">
+                  <SeatContents player={player} />
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div
+              className={baseClasses.filter(Boolean).join(' ')}
+              key={player.playerId}
+              role="listitem"
               data-player-id={player.playerId}
-              data-mobile-queue-player-id={
-                player.playerId === ownPlayerId ? undefined : player.playerId
-              }
+              data-seat-position={stablePosition.get(player.playerId) ?? 0}
+              data-mobile-queue-player-id={player.playerId}
               style={positionFor(
                 stablePosition.get(player.playerId) ?? 0,
                 desktopPlayers.length,
               )}
               aria-current={player.isCurrentActor ? 'true' : undefined}
             >
-              <SeatContents player={player} />
-            </li>
-          </Fragment>
-        );
-      })}
-    </ol>
+              <div className="table-seat__content">
+                <SeatContents player={player} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {ownPlayer ? (
+        <div
+          className={[
+            'table-seat',
+            `table-seat--${ownPlayer.status}`,
+            `table-seat--color-${ownPlayer.seatIndex % 6}`,
+            ownPlayer.isCurrentActor ? 'table-seat--acting' : '',
+            'table-seat--own',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          role="listitem"
+          data-player-id={ownPlayer.playerId}
+          data-seat-position={stablePosition.get(ownPlayer.playerId) ?? 0}
+          style={positionFor(
+            stablePosition.get(ownPlayer.playerId) ?? 0,
+            desktopPlayers.length,
+          )}
+          aria-current={ownPlayer.isCurrentActor ? 'true' : undefined}
+        >
+          <div className="table-seat__content">
+            <SeatContents player={ownPlayer} />
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

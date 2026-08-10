@@ -212,6 +212,34 @@ describe('DesktopRoomSetup', () => {
     );
   });
 
+  it('explains that another local game process has occupied the host port', async () => {
+    const adapter = runtime();
+    adapter.startHostService = vi.fn(async () => {
+      throw new Error('Host service port is already in use');
+    });
+
+    render(
+      <DesktopRoomSetup
+        runtime={adapter}
+        onClose={vi.fn()}
+        onHosted={vi.fn(async (service) => service)}
+        onRecovered={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('option', { name: 'Virtual LAN · 10.126.126.1' });
+    fireEvent.change(screen.getByLabelText('联机网卡'), {
+      target: { value: '10.126.126.1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '创建房间' }));
+
+    expect(
+      await screen.findByText(
+        '本机的游戏端口已被另一个游戏进程或其他程序占用。请关闭重复打开的 Texas Holdem 后重试。',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('stops the host and keeps the form for choosing a new network after closing a running room', async () => {
     const adapter = runtime();
     const existingService: HostServiceInfo = {

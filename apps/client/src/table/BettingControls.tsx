@@ -11,12 +11,15 @@ export type BettingActionIntent =
 
 export interface BettingControlsProps {
   readonly legalActions: LegalActions | null;
+  /** 本人本轮已经投入的筹码，由服务端房间快照提供。 */
+  readonly streetCommitted?: number;
   readonly disabled?: boolean;
   readonly onAction: (action: BettingActionIntent) => void;
 }
 
 export function BettingControls({
   legalActions,
+  streetCommitted = 0,
   disabled = false,
   onAction,
 }: BettingControlsProps) {
@@ -26,6 +29,10 @@ export function BettingControls({
   const [raiseIncrement, setRaiseIncrement] = useState(0);
   const [raiseOpen, setRaiseOpen] = useState(false);
   const effectiveRaiseTo = minimum + Math.min(maximumIncrement, raiseIncrement);
+  const effectiveRaiseAdditional = Math.max(
+    legalActions?.callAmount ?? 0,
+    effectiveRaiseTo - Math.max(0, streetCommitted),
+  );
   const locked = disabled || legalActions === null;
   const canRaise = !locked && minimum > 0 && maximum >= minimum;
   const sliderPercent =
@@ -45,8 +52,18 @@ export function BettingControls({
     );
   }, [maximumIncrement]);
 
+  const callAmount = legalActions?.callAmount;
+  const callDigits =
+    callAmount == null ? 0 : String(Math.max(0, callAmount)).length;
+  const callWidth =
+    callDigits >= 5 ? 'extra-wide' : callDigits >= 4 ? 'wide' : 'normal';
+
   return (
-    <div className="betting-controls" aria-busy={disabled}>
+    <div
+      className="betting-controls"
+      aria-busy={disabled}
+      data-call-width={callWidth}
+    >
       <div className="betting-controls__primary">
         <button
           type="button"
@@ -98,7 +115,7 @@ export function BettingControls({
           disabled={!canRaise}
           onClick={() => setRaiseOpen((current) => !current)}
         >
-          {raiseOpen ? '收起加注' : `调整加注 ${effectiveRaiseTo}`}
+          调整加注到 {effectiveRaiseTo}
         </button>
         <button
           className="betting-controls__raise-submit"
@@ -106,7 +123,7 @@ export function BettingControls({
           disabled={!canRaise}
           onClick={submitRaise}
         >
-          确认加注 {effectiveRaiseTo}
+          确认加注到 {effectiveRaiseTo}
         </button>
       </div>
 
@@ -153,6 +170,9 @@ export function BettingControls({
           </div>
           <div className="raise-control__marks" aria-hidden="true">
             <span>最小 {minimum}</span>
+            <span className="raise-control__additional">
+              追加 {effectiveRaiseAdditional}
+            </span>
             <span>最大 {maximum}</span>
           </div>
         </div>
@@ -183,7 +203,7 @@ export function BettingControls({
               }
             >
               <span className="poker-chip__disc" aria-hidden="true">
-                <span className="poker-chip__value">{value}</span>
+                <span className="poker-chip__value">+{value}</span>
               </span>
             </button>
           ))}
@@ -220,12 +240,16 @@ export function BettingControls({
           清零
         </button>
         <button
-          className="raise-control__confirm"
+          className="raise-control__confirm betting-controls__call"
           type="button"
+          aria-label={`确认加注到 ${effectiveRaiseTo}`}
           disabled={!canRaise}
           onClick={submitRaise}
         >
-          确认加注
+          <span>确认加注到</span>
+          <span className="betting-controls__call-amount">
+            {effectiveRaiseTo}
+          </span>
         </button>
       </div>
     </div>

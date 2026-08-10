@@ -35,6 +35,7 @@ import {
 } from '../sound/poker-sound-effects';
 
 const noop = () => undefined;
+const previewHandNumber = 9;
 const previewHostService = {
   port: 32_100,
   advertisedAddress: '10.126.126.1',
@@ -181,6 +182,15 @@ const fullTablePlayers = Array.from({ length: 10 }, (_, index) => ({
   isBigBlind: index === 2,
 }));
 
+const previewTopSeatBlindRoles: Readonly<
+  Record<number, Readonly<Record<number, 'small' | 'big'>>>
+> = {
+  6: { 3: 'big' },
+  7: { 3: 'small', 4: 'big' },
+  8: { 4: 'big' },
+  9: { 4: 'small', 5: 'big' },
+};
+
 const statistics = fullTablePlayers.map((player, index) => ({
   playerId: player.playerId,
   nickname: player.nickname,
@@ -239,6 +249,14 @@ export const uiSmokePreviewPages = [
   'lobby-full',
   'table',
   'table-flights',
+  'table-2',
+  'table-3',
+  'table-4',
+  'table-5',
+  'table-6',
+  'table-7',
+  'table-8',
+  'table-9',
   'table-ten',
   'table-ten-own-action',
   'ready',
@@ -257,6 +275,14 @@ type TablePreviewPage = Extract<
   UiSmokePreviewPage,
   | 'table'
   | 'table-flights'
+  | 'table-2'
+  | 'table-3'
+  | 'table-4'
+  | 'table-5'
+  | 'table-6'
+  | 'table-7'
+  | 'table-8'
+  | 'table-9'
   | 'table-ten'
   | 'table-ten-own-action'
   | 'ready'
@@ -313,6 +339,7 @@ function previewPanel(page: TablePreviewPage): TableUtilityPanel | null {
 function TablePreview({ page }: { readonly page: TablePreviewPage }) {
   const [activeUtilityPanel, setActiveUtilityPanel] =
     useState<TableUtilityPanel | null>(() => previewPanel(page));
+  const [settlementCollapsed, setSettlementCollapsed] = useState(false);
   const waitingReady =
     page === 'ready-waiting' || page === 'settlement-waiting';
   const handReady =
@@ -321,12 +348,36 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
     page === 'settlement' ||
     page === 'settlement-waiting';
   const tenPlayers = page === 'table-ten' || page === 'table-ten-own-action';
-  const tablePlayers = tenPlayers
-    ? fullTablePlayers.map((player, index) => ({
-        ...player,
-        isCurrentActor:
-          page === 'table-ten-own-action' ? index === 0 : index === 3,
-      }))
+  const numberedTableCount = /^table-[2-9]$/.test(page)
+    ? Number(page.slice('table-'.length))
+    : null;
+  const multiPlayerCount = tenPlayers ? 10 : numberedTableCount;
+  const multiPlayerPreview = multiPlayerCount !== null;
+  const currentActorIndex = multiPlayerPreview
+    ? Math.min(3, multiPlayerCount - 1)
+    : -1;
+  const tablePlayers = multiPlayerPreview
+    ? fullTablePlayers.slice(0, multiPlayerCount).map((player, index) => {
+        const blindRole =
+          multiPlayerCount >= 6 && multiPlayerCount <= 9
+            ? previewTopSeatBlindRoles[multiPlayerCount]?.[index]
+            : undefined;
+        return {
+          ...player,
+          ...(blindRole
+            ? {
+                status: 'active' as const,
+                lastAction: 'call' as const,
+                isSmallBlind: blindRole === 'small',
+                isBigBlind: blindRole === 'big',
+              }
+            : {}),
+          isCurrentActor:
+            page === 'table-ten-own-action'
+              ? index === 0
+              : index === currentActorIndex,
+        };
+      })
     : players;
   const showSettlement = page === 'settlement' || page === 'settlement-waiting';
   const renderedTablePlayers = tablePlayers.map((player, index) => ({
@@ -343,8 +394,8 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
   const actorName =
     page === 'table-ten-own-action'
       ? '玩家 1'
-      : tenPlayers
-        ? '玩家 4'
+      : multiPlayerPreview
+        ? `玩家 ${currentActorIndex + 1}`
         : 'Alice';
   const flightAmount = useMemo(() => {
     const amount = Number(
@@ -411,8 +462,13 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
         roomName="朋友局"
         handLabel={
           handReady
-            ? '第 8 局 · 结算与准备'
-            : `第 8 局 · 翻牌 · 盲注：10/20 · 当前行动：${actorName}`
+            ? `第 ${previewHandNumber} 局 · 结算与准备`
+            : `第 ${previewHandNumber} 局 · 翻牌 · 盲注：10/20`
+        }
+        mobileHandLabel={
+          handReady
+            ? `第 ${previewHandNumber} 局 · 结算与准备`
+            : `第 ${previewHandNumber} 局 · 翻牌 · 盲注：10/20`
         }
         status={
           <TableUtilityToolbar
@@ -430,7 +486,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
           />
         }
         communityCards={
-          handReady ? null : (
+          handReady && !settlementCollapsed ? null : (
             <CardsAndPots
               communityCards={['2c', 'Td', 'Jh']}
               totalPot={580}
@@ -475,10 +531,12 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
               ownChips={2_000}
               onChoose={noop}
               onShowHoleCards={noop}
+              onSettlementCollapsedChange={setSettlementCollapsed}
               settlement={
                 page === 'settlement' || page === 'settlement-waiting'
                   ? {
                       handId: 'hand-8',
+                      handNumber: previewHandNumber,
                       reason: 'showdown',
                       communityCards: ['2c', 'Td', 'Jh', 'Qs', 'Ac'],
                       totalPot: 1_380,
@@ -521,14 +579,17 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
           ) : null
         }
         controls={
-          handReady ? null : (
+          showSettlement ? (
+            <BettingControls legalActions={null} disabled onAction={noop} />
+          ) : handReady ? null : (
             <BettingControls
+              streetCommitted={0}
               legalActions={{
                 canFold: true,
                 canCheck: false,
                 callAmount: 2_660,
-                minimumRaiseTo: 120,
-                maximumRaiseTo: 720,
+                minimumRaiseTo: 5_320,
+                maximumRaiseTo: 7_200,
                 canAllIn: true,
               }}
               onAction={noop}
@@ -544,6 +605,14 @@ function isTablePreviewPage(page: string): page is TablePreviewPage {
   return [
     'table',
     'table-flights',
+    'table-2',
+    'table-3',
+    'table-4',
+    'table-5',
+    'table-6',
+    'table-7',
+    'table-8',
+    'table-9',
     'table-ten',
     'table-ten-own-action',
     'ready',

@@ -31,7 +31,7 @@ export function createWindowOptions(
     width: Math.min(restoredWindowTarget.width, workAreaSize.width),
     height: Math.min(restoredWindowTarget.height, workAreaSize.height),
     minWidth: 360,
-    minHeight: 640,
+    minHeight: 700,
     backgroundColor: '#04110e',
     show: false,
     webPreferences: {

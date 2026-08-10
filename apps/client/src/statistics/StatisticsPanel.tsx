@@ -310,11 +310,8 @@ export function StatisticsPanel({
             </p>
           ) : null}
           {handPeaks.global ? (
-            <section
-              className="statistics-hands__global"
-              aria-label="本局最高牌型"
-            >
-              <p>本局最高牌型</p>
+            <section className="statistics-hands__global" aria-label="最高牌型">
+              <p>最高牌型</p>
               <strong>
                 {handTypeNames[handPeaks.global.handType] ??
                   handPeaks.global.handType}
@@ -331,7 +328,7 @@ export function StatisticsPanel({
                   handTypeNames[handPeaks.global.handType] ??
                     handPeaks.global.handType,
                 )}
-                label="本局最高牌型"
+                label="最高牌型"
               />
             </section>
           ) : (
