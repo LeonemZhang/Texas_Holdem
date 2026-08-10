@@ -247,21 +247,28 @@ export function TableSeats({
   useLayoutEffect(() => {
     const queue = queueRef.current;
     if (!queue || !currentActor) return;
-    const actorCard = Array.from(
-      queue.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
-    ).find(
-      (element) =>
-        element.dataset.mobileQueuePlayerId === currentActor.playerId,
-    );
-    if (!actorCard) return;
 
-    const maxScrollLeft = Math.max(0, queue.scrollWidth - queue.clientWidth);
-    const targetScrollLeft = Math.min(actorCard.offsetLeft, maxScrollLeft);
-    if (queue.scrollTo) {
-      queue.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
-    } else {
-      queue.scrollLeft = targetScrollLeft;
-    }
+    const alignCurrentActor = () => {
+      const actorCard = Array.from(
+        queue.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
+      ).find(
+        (element) =>
+          element.dataset.mobileQueuePlayerId === currentActor.playerId,
+      );
+      if (!actorCard) return;
+
+      const maxScrollLeft = Math.max(0, queue.scrollWidth - queue.clientWidth);
+      const targetScrollLeft = Math.min(actorCard.offsetLeft, maxScrollLeft);
+      if (queue.scrollTo) {
+        queue.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+      } else {
+        queue.scrollLeft = targetScrollLeft;
+      }
+    };
+
+    alignCurrentActor();
+    const retryId = window.setTimeout(alignCurrentActor, 0);
+    return () => window.clearTimeout(retryId);
   }, [actionRoundKey, currentActor?.playerId]);
   const layout =
     desktopPlayers.length === 2

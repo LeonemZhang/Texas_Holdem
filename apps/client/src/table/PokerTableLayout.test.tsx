@@ -7,6 +7,7 @@ import {
   calculateDesktopCanvasOffsetY,
   DESKTOP_CANVAS_WIDTH,
   calculateMobileCanvasScale,
+  MOBILE_CANVAS_BASE_WIDTH,
   MOBILE_CANVAS_BASE_HEIGHT,
   shouldUseMobileTableLayout,
 } from './DesktopCanvasScale.js';
@@ -29,20 +30,24 @@ describe('PokerTableLayout', () => {
   );
 
   it.each([
-    [640, 1],
-    [922, 1],
-    [480, 0.75],
-    [320, 0.5],
-    [0, 1],
+    [390, 720, 1],
+    [414, 720, 1],
+    [360, 600, 600 / MOBILE_CANVAS_BASE_HEIGHT],
+    [390, 480, 480 / MOBILE_CANVAS_BASE_HEIGHT],
+    [0, 720, 1],
   ])(
-    'scales the mobile canvas from the %s px height baseline',
-    (height, expected) => {
-      expect(calculateMobileCanvasScale(height)).toBeCloseTo(expected, 6);
+    'scales the mobile canvas from the %s x %s baseline',
+    (width, height, expected) => {
+      expect(calculateMobileCanvasScale(width, height)).toBeCloseTo(
+        expected,
+        6,
+      );
     },
   );
 
   it('keeps the mobile scale baseline explicit', () => {
-    expect(MOBILE_CANVAS_BASE_HEIGHT).toBe(640);
+    expect(MOBILE_CANVAS_BASE_WIDTH).toBe(390);
+    expect(MOBILE_CANVAS_BASE_HEIGHT).toBe(720);
   });
 
   it.each([

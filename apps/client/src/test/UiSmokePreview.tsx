@@ -580,10 +580,16 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
         }
         controls={
           showSettlement ? (
-            <BettingControls legalActions={null} disabled onAction={noop} />
+            <BettingControls
+              legalActions={null}
+              remainingChips={0}
+              disabled
+              onAction={noop}
+            />
           ) : handReady ? null : (
             <BettingControls
               streetCommitted={0}
+              remainingChips={7_200}
               legalActions={{
                 canFold: true,
                 canCheck: false,

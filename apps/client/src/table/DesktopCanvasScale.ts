@@ -2,7 +2,8 @@ export const DESKTOP_CANVAS_WIDTH = 1460;
 export const DESKTOP_CANVAS_HEIGHT = 821;
 export const DESKTOP_CANVAS_MIN_SCALE = 0.4;
 export const DESKTOP_CANVAS_MAX_SCALE = 1.75;
-export const MOBILE_CANVAS_BASE_HEIGHT = 640;
+export const MOBILE_CANVAS_BASE_WIDTH = 390;
+export const MOBILE_CANVAS_BASE_HEIGHT = 720;
 export const MOBILE_CANVAS_MIN_SCALE = 0.5;
 /** Viewports at or above this height-to-width ratio use the mobile table. */
 export const MOBILE_TABLE_MIN_HEIGHT_WIDTH_RATIO = 1.2;
@@ -26,20 +27,28 @@ export function shouldUseMobileTableLayout(
 }
 
 /**
- * Mobile keeps one stable, readable table height and scales the complete page
- * when the viewport is shorter than that baseline. This keeps the hand, board,
- * seats, and action controls in the same coordinate system instead of letting
+ * Mobile uses a fixed 390 x 720 design canvas and scales the complete page to
+ * the largest size that fits both viewport dimensions. This keeps the hand,
+ * board, seats, and action controls in one coordinate system instead of letting
  * one region consume the others' space.
  */
-export function calculateMobileCanvasScale(viewportHeight: number): number {
-  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) {
+export function calculateMobileCanvasScale(
+  viewportWidth: number,
+  viewportHeight: number,
+): number {
+  if (
+    !Number.isFinite(viewportWidth) ||
+    viewportWidth <= 0 ||
+    !Number.isFinite(viewportHeight) ||
+    viewportHeight <= 0
+  ) {
     return 1;
   }
 
-  return Math.min(
-    1,
-    Math.max(
-      MOBILE_CANVAS_MIN_SCALE,
+  return Math.max(
+    MOBILE_CANVAS_MIN_SCALE,
+    Math.min(
+      viewportWidth / MOBILE_CANVAS_BASE_WIDTH,
       viewportHeight / MOBILE_CANVAS_BASE_HEIGHT,
     ),
   );

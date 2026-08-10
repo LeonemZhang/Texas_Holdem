@@ -321,6 +321,7 @@ describe('GameRoom', () => {
         phase: 'playing',
         players: snapshot.room.players.map((player) => ({
           ...player,
+          ...(player.playerId === 'host' ? { chips: 300 } : {}),
           status: 'active' as const,
         })),
       },
@@ -342,7 +343,7 @@ describe('GameRoom', () => {
           canCheck: false,
           callAmount: 98,
           minimumRaiseTo: 100,
-          maximumRaiseTo: 100,
+          maximumRaiseTo: 300,
           canAllIn: true,
         },
       },
@@ -405,6 +406,14 @@ describe('GameRoom', () => {
     );
 
     await screen.findByRole('heading', { name: 'Friends' });
+    const quickThird = screen.getByRole('button', {
+      name: /快速加注到剩余筹码的 1\/3.*目标 100/,
+    });
+    expect(quickThird).toBeInTheDocument();
+    fireEvent.click(quickThird);
+    expect(
+      screen.getByRole('button', { name: /调整加注到/ }),
+    ).toHaveTextContent('调整加注到 100');
     await expect(commandPort!({ type: 'game.call' })).resolves.toBe(true);
     expect(sendCommand).toHaveBeenNthCalledWith(
       1,

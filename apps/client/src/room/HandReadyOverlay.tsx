@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { PlayingCard, type StreetPotView } from '../table/CardsAndPots.js';
 
@@ -168,6 +168,7 @@ export function HandReadyOverlay({
 }: HandReadyOverlayProps) {
   const currentTime = useCurrentTime(nowMs);
   const [settlementCollapsed, setSettlementCollapsed] = useState(false);
+  const actionsHeaderRef = useRef<HTMLElement | null>(null);
   const settlementCommunityCards = settlement?.communityCards ?? [];
   const ownSettlementNetChange =
     settlement?.players.find((player) => player.playerId === ownPlayerId)
@@ -211,6 +212,66 @@ export function HandReadyOverlay({
     onSettlementCollapsedChange?.(false);
   }, [onSettlementCollapsedChange, settlement?.handId]);
 
+  useLayoutEffect(() => {
+    const header = actionsHeaderRef.current;
+    if (!header) return;
+
+    const updateActionScale = () => {
+      const rootFontSize = Number.parseFloat(
+        window.getComputedStyle(document.documentElement).fontSize,
+      );
+      const rem = Number.isFinite(rootFontSize) ? rootFontSize : 16;
+      const actionCount = header.querySelectorAll(
+        '.hand-ready-card__actions .button',
+      ).length;
+      const baseWidth =
+        (4.75 +
+          0.25 +
+          actionCount * 4.9 +
+          Math.max(0, actionCount - 1) * 0.25) *
+        rem;
+      const scale = Math.min(1, header.clientWidth / baseWidth);
+
+      header.style.setProperty('--hand-ready-action-scale', `${scale}`);
+      header.style.setProperty(
+        '--hand-ready-action-gap',
+        `${0.25 * rem * scale}px`,
+      );
+      header.style.setProperty(
+        '--hand-ready-waiting-width',
+        `${4.75 * rem * scale}px`,
+      );
+      header.style.setProperty(
+        '--hand-ready-action-width',
+        `${4.9 * rem * scale}px`,
+      );
+      header.style.setProperty(
+        '--hand-ready-action-height',
+        `${3.25 * rem * scale}px`,
+      );
+      header.style.setProperty(
+        '--hand-ready-action-padding',
+        `${0.4 * rem * scale}px`,
+      );
+      header.style.setProperty(
+        '--hand-ready-action-font-size',
+        `${0.8 * rem * scale}px`,
+      );
+      header.style.setProperty(
+        '--hand-ready-waiting-font-size',
+        `${0.76 * rem * scale}px`,
+      );
+    };
+
+    updateActionScale();
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(updateActionScale);
+    resizeObserver?.observe(header);
+    return () => resizeObserver?.disconnect();
+  });
+
   const collapseSettlement = () => {
     setSettlementCollapsed(true);
     onSettlementCollapsedChange?.(true);
@@ -241,7 +302,7 @@ export function HandReadyOverlay({
   return (
     <section className="hand-ready-overlay" aria-label="发牌前准备">
       <div className="hand-ready-card">
-        <header>
+        <header ref={actionsHeaderRef}>
           <strong
             className={`hand-ready-card__timer${secondsLeft === 0 ? ' hand-ready-card__timer--waiting' : ''}`}
             aria-label={

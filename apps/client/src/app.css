@@ -2097,6 +2097,38 @@ body:has(.poker-table-page) .poker-table-controls {
   gap: 0.15rem;
 }
 
+.raise-control__quick-fractions {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  width: min(calc(100% - 0.55rem), calc(var(--raise-info-width) - 0.55rem));
+  margin-left: 0.55rem;
+  padding: 0.15rem;
+  border: 1px solid rgb(96 165 250 / 35%);
+  border-radius: 0.55rem;
+  background: rgb(15 23 42 / 78%);
+  gap: 0.15rem;
+}
+
+.betting-controls .raise-control__quick-fraction {
+  min-width: 0;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0.15rem 0.2rem !important;
+  border: 1px solid rgb(96 165 250 / 42%) !important;
+  border-radius: 0.45rem !important;
+  color: #dbeafe !important;
+  background: rgb(30 64 175 / 42%) !important;
+  font-size: 0.78rem !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.raise-control__quick-fraction[aria-pressed='true'] {
+  border-color: rgb(253 230 138 / 78%) !important;
+  color: #231506 !important;
+  background: linear-gradient(145deg, #fde68a, #f59e0b) !important;
+}
+
 .raise-control__slider {
   position: relative;
   padding-top: 1.6rem;
@@ -3789,6 +3821,38 @@ body:has(.poker-table-page) .poker-table-controls {
 }
 
 @media (min-width: 600px) and (min-aspect-ratio: 5/6) {
+  /* Keep the 16:9 canvas, but return vertical room from the action shell to
+     the felt so the own seat has a stable gap above the controls. */
+  body:has(.poker-table-page) .poker-table-controls {
+    padding-block: 0.35rem;
+  }
+
+  .table-seat--own {
+    /* The settlement result adds a row; reserve it during play too so the
+       same own-seat anchor produces the same card bounds in both states. */
+    min-height: 7.6rem;
+  }
+
+  .table-seat--own .table-seat__bets {
+    padding-block: 0.08rem;
+  }
+
+  .table-seat--own .table-seat__bets > span + span {
+    margin-top: 0.04rem;
+    padding-top: 0.04rem;
+  }
+
+  .table-seat--own .table-seat__acting-indicator {
+    top: auto;
+    bottom: calc(100% + 2px);
+  }
+
+  body:has(.poker-table-page)
+    .poker-table:has(.table-seat--own .table-seat__acting-indicator)
+    .hole-cards {
+    transform: translateY(-0.75rem);
+  }
+
   .betting-controls {
     width: max-content;
     max-width: 100%;
@@ -3822,18 +3886,57 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   .raise-control {
+    /* Keep the two chip rows centred on the primary action row. */
+    --raise-chip-touch-height: 2.75rem;
+    --raise-chip-row-gap: 0.55rem;
+    --raise-chip-alignment-nudge: 0.05rem;
+    --raise-chip-half-step: calc(
+      (var(--raise-chip-touch-height) + var(--raise-chip-row-gap)) / 2 -
+        var(--raise-chip-alignment-nudge)
+    );
+    /* Compact only the desktop shortcut row. Its removed height is shared by
+       the action buttons and the chip rows, while the slider bottom stays put. */
+    --raise-fraction-height: 1.5rem;
+    --raise-action-reflow: calc((2.25rem - var(--raise-fraction-height)) / 2);
+    --raise-bar-bottom-correction: calc(
+      (2.25rem - var(--raise-fraction-height)) / 4
+    );
+    --raise-bar-lift: 0.4rem;
+
     width: max-content;
     max-width: 100%;
     margin-left: auto;
     /* Keep the clear button and the other columns stable as the target grows. */
     grid-template-columns: minmax(0, var(--raise-info-width)) auto 6.5rem;
-    grid-template-rows: auto auto auto auto;
+    grid-template-rows: repeat(5, auto);
     align-items: start;
   }
 
-  .raise-control__bar {
-    grid-row: 1 / 5;
+  .raise-control__quick-fractions {
     grid-column: 1;
+    grid-row: 1;
+    transform: translateY(
+      calc(
+        var(--raise-chip-half-step) + var(--raise-chip-alignment-nudge) -
+          var(--raise-bar-bottom-correction) - var(--raise-bar-lift)
+      )
+    );
+  }
+
+  .betting-controls .raise-control__quick-fraction {
+    height: var(--raise-fraction-height);
+    min-height: var(--raise-fraction-height);
+  }
+
+  .raise-control__bar {
+    grid-row: 2 / 6;
+    grid-column: 1;
+    transform: translateY(
+      calc(
+        var(--raise-chip-half-step) + var(--raise-chip-alignment-nudge) -
+          var(--raise-bar-bottom-correction) - var(--raise-bar-lift)
+      )
+    );
   }
 
   .raise-control__quick-chips {
@@ -3844,27 +3947,39 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   .raise-control__quick-chips--positive {
-    grid-row: 1 / 3;
+    grid-row: 2 / 4;
+    transform: translateY(
+      calc(var(--raise-action-reflow) - var(--raise-chip-half-step))
+    );
   }
 
   .raise-control__quick-chips--negative {
-    grid-row: 3 / 5;
+    grid-row: 4 / 6;
+    transform: translateY(
+      calc(var(--raise-action-reflow) - var(--raise-chip-half-step))
+    );
   }
 
   .raise-control__confirm {
-    grid-row: 1 / 3;
+    grid-row: 2 / 4;
     grid-column: 3;
     align-self: stretch;
     justify-self: start;
     width: max-content;
     max-width: none;
+    transform: translateY(
+      calc(var(--raise-action-reflow) - var(--raise-chip-half-step))
+    );
   }
 
   .raise-control__clear {
-    grid-row: 3 / 5;
+    grid-row: 4 / 6;
     grid-column: 3;
     align-self: stretch;
     width: 100%;
+    transform: translateY(
+      calc(var(--raise-action-reflow) - var(--raise-chip-half-step))
+    );
   }
 }
 
@@ -4078,8 +4193,20 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   body:has(.poker-table-page) .poker-table-page {
+    /* Keep the transformed canvas's visual width equal to the viewport.
+       Centering a fixed-width pre-transform box shifts its right edge beyond
+       narrow screens, where overflow-x: clip then hides the controls. */
     width: calc(100% / var(--mobile-canvas-scale, 1));
-    height: calc(100dvh / var(--mobile-canvas-scale, 1));
+    height: max(
+      var(--mobile-canvas-height, 720px),
+      calc(100dvh / var(--mobile-canvas-scale, 1))
+    );
+    max-width: none;
+    max-height: none;
+    /* The fixed design width includes its safe-area padding. Otherwise a
+       narrow viewport scales the padding outside the canvas and clips the
+       right edge of the table and action controls. */
+    box-sizing: border-box;
     grid-template-rows: auto minmax(0, 1fr) auto;
     padding: calc(0.35rem + env(safe-area-inset-top)) 0.35rem 0;
     gap: 0.35rem;
@@ -4129,6 +4256,11 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   body:has(.poker-table-page) .poker-table {
+    --mobile-community-cards-width: calc(
+      var(--mobile-canvas-width, 390px) * 0.85
+    );
+    --mobile-table-card-width: calc(var(--mobile-canvas-width, 390px) * 0.162);
+    --mobile-seat-queue-width: 100%;
     width: 100%;
     height: 100%;
     min-height: 18rem;
@@ -4141,10 +4273,12 @@ body:has(.poker-table-page) .poker-table-controls {
     inset: 7.6rem 0.4rem 7.5rem;
     grid-template-rows: auto minmax(0, 1fr);
     gap: 0.35rem;
-    --mobile-progress-center-shift: clamp(
-      -0.45rem,
-      calc(36.2vh + 16.5vw - 298.4px),
-      4.7rem
+    /* The complete progress stack (progress, timer, board, and pot history)
+       is centred from the current actor's street-bet lower edge to the own
+       hole-cards' upper edge. The bet labels remain above this stack. */
+    --mobile-progress-center-shift: var(
+      --mobile-progress-center-shift-override,
+      clamp(1.4rem, calc(4.75rem - 5.71vh), 2.4rem)
     );
   }
 
@@ -4157,7 +4291,11 @@ body:has(.poker-table-page) .poker-table-controls {
 
   .poker-table__game-status {
     margin: 0;
-    font-size: clamp(0.88rem, 3.7vw, 1.08rem);
+    font-size: clamp(
+      0.88rem,
+      calc(var(--mobile-canvas-width, 390px) * 0.037),
+      1.08rem
+    );
     line-height: 1.25;
   }
 
@@ -4165,11 +4303,15 @@ body:has(.poker-table-page) .poker-table-controls {
     flex: 0 0 auto;
     margin-top: 0;
     padding: 0.2rem 0.4rem;
-    font-size: clamp(0.88rem, 3.7vw, 1.08rem);
+    font-size: clamp(
+      0.88rem,
+      calc(var(--mobile-canvas-width, 390px) * 0.037),
+      1.08rem
+    );
   }
 
   .cards-and-pots {
-    --mobile-table-card-width: 16.2vw;
+    --mobile-table-card-width: calc(var(--mobile-canvas-width, 390px) * 0.162);
 
     height: 100%;
     transform: none;
@@ -4191,8 +4333,8 @@ body:has(.poker-table-page) .poker-table-controls {
 
   .cards-and-pots__pot-summary {
     display: grid;
-    width: 85vw;
-    max-width: 85vw;
+    width: var(--mobile-community-cards-width);
+    max-width: var(--mobile-community-cards-width);
     min-width: 0;
     justify-items: center;
     gap: 0.18rem;
@@ -4204,12 +4346,20 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   .street-pot-history > div {
-    font-size: clamp(0.55rem, 2.4vw, 0.7rem);
+    font-size: clamp(
+      0.55rem,
+      calc(var(--mobile-canvas-width, 390px) * 0.024),
+      0.7rem
+    );
   }
 
   .street-pot-history__total {
     padding: 0.2rem 0.58rem;
-    font-size: clamp(0.64rem, 3vw, 0.84rem) !important;
+    font-size: clamp(
+      0.64rem,
+      calc(var(--mobile-canvas-width, 390px) * 0.03),
+      0.84rem
+    ) !important;
   }
 
   .poker-table__game-status--desktop {
@@ -4226,15 +4376,19 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   .community-cards {
-    width: 85vw;
+    width: var(--mobile-community-cards-width);
     max-width: 100%;
-    gap: 1vw;
+    gap: calc(var(--mobile-canvas-width, 390px) * 0.01);
   }
 
   .community-cards .playing-card,
   .hole-cards__cards .playing-card {
     width: var(--mobile-table-card-width);
-    font-size: clamp(1rem, 4.25vw, 1.35rem);
+    font-size: clamp(
+      1rem,
+      calc(var(--mobile-canvas-width, 390px) * 0.0425),
+      1.35rem
+    );
   }
 
   .hole-cards {
@@ -4244,32 +4398,32 @@ body:has(.poker-table-page) .poker-table-controls {
 
   .table-seats {
     --mobile-seat-gap: 0.25rem;
-    --mobile-seat-visible-count: 4;
+    --mobile-seat-card-aspect-ratio: 0.94;
     --mobile-seat-card-width: calc(
-      (
-          100vw - 2.7rem -
-            (var(--mobile-seat-gap) * (var(--mobile-seat-visible-count) - 1))
-        ) /
-        var(--mobile-seat-visible-count)
+      (var(--mobile-seat-queue-width) - (var(--mobile-seat-gap) * 3)) / 4
     );
     overflow: visible;
   }
 
-  .table-seats[data-player-count='2'] {
-    --mobile-seat-visible-count: 2;
-  }
-
-  .table-seats[data-player-count='3'] {
-    --mobile-seat-visible-count: 3;
-  }
-
   .table-seats__queue {
+    --mobile-seat-queue-top-inset: 1.25rem;
+
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
+    width: var(--mobile-seat-queue-width);
+    /* Bets sit outside each seat card. Reserve their two-line height before
+       clipping the queue vertically so the current actor keeps both amounts. */
+    height: calc(
+      var(--mobile-seat-card-width) / var(--mobile-seat-card-aspect-ratio) +
+        3rem + var(--mobile-seat-queue-top-inset)
+    );
+    box-sizing: border-box;
     display: flex;
     align-items: flex-start;
     justify-content: flex-start;
-    padding: 0.75rem 0.25rem 0;
+    padding: var(--mobile-seat-queue-top-inset) 0 0;
+    transform: none;
     overflow-x: auto;
     overflow-y: hidden;
     gap: var(--mobile-seat-gap);
@@ -4283,6 +4437,12 @@ body:has(.poker-table-page) .poker-table-controls {
     display: none;
   }
 
+  .table-seats__queue::after {
+    content: '';
+    flex: 0 0
+      calc(100% - var(--mobile-seat-card-width) + var(--mobile-seat-gap));
+  }
+
   .table-seat {
     position: relative;
     top: auto !important;
@@ -4290,7 +4450,7 @@ body:has(.poker-table-page) .poker-table-controls {
     flex: 0 0 var(--mobile-seat-card-width);
     width: var(--mobile-seat-card-width);
     min-height: 0;
-    aspect-ratio: 0.94;
+    aspect-ratio: var(--mobile-seat-card-aspect-ratio);
     padding: 0.9rem 0.26rem 0.26rem;
     transform: none;
     border-radius: 0.65rem;
@@ -4308,9 +4468,9 @@ body:has(.poker-table-page) .poker-table-controls {
     bottom: 2rem;
     left: 50% !important;
     z-index: 3;
-    width: 6.3rem;
-    min-height: 5.35rem;
-    aspect-ratio: auto;
+    width: var(--mobile-seat-card-width);
+    min-height: 0;
+    aspect-ratio: var(--mobile-seat-card-aspect-ratio);
     transform: translateX(-50%);
     scroll-snap-align: none;
   }
@@ -4425,14 +4585,14 @@ body:has(.poker-table-page) .poker-table-controls {
     display: inline;
   }
 
-  /* Scale queue contents with the responsive card width to avoid overlap. */
-  .table-seat:not(.table-seat--own) {
+  /* Scale every seat card's contents with the shared responsive card width. */
+  .table-seat {
     container-type: inline-size;
     padding: 0;
     border-radius: 0.65rem;
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__content {
+  .table-seat .table-seat__content {
     display: grid;
     width: 100%;
     height: 100%;
@@ -4441,63 +4601,63 @@ body:has(.poker-table-page) .poker-table-controls {
     align-content: start;
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__name,
-  .table-seat:not(.table-seat--own) small,
-  .table-seat:not(.table-seat--own) strong {
+  .table-seat .table-seat__name,
+  .table-seat small,
+  .table-seat strong {
     font-size: max(0.55rem, 16cqw);
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__settlement {
+  .table-seat .table-seat__settlement {
     min-height: 12cqw;
     gap: 3cqw;
     font-size: max(0.45rem, 11cqw);
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__position-labels i {
+  .table-seat .table-seat__position-labels i {
     padding: 1.4cqw 4.2cqw;
     font-size: max(0.45rem, 12cqw);
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__position-labels {
+  .table-seat .table-seat__position-labels {
     gap: 2.4cqw;
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__action-order,
-  .table-seat:not(.table-seat--own) .table-seat__last-action {
+  .table-seat .table-seat__action-order,
+  .table-seat .table-seat__last-action {
     top: 3.2cqw;
     font-size: max(0.45rem, 12cqw);
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__action-order {
+  .table-seat .table-seat__action-order {
     left: 3.2cqw;
     padding: 0.9cqw 3.2cqw;
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__last-action {
+  .table-seat .table-seat__last-action {
     right: 3.2cqw;
     padding: 0.9cqw 3.7cqw;
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__acting-indicator {
+  .table-seat .table-seat__acting-indicator {
     top: -14cqw;
     padding: 1.1cqw 3.5cqw;
     font-size: max(0.45rem, 11cqw);
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__mobile-acting-order {
+  .table-seat .table-seat__mobile-acting-order {
     top: calc(-13cqw - 0.4rem);
     max-width: calc(100% + 8cqw);
     padding: 1.1cqw 3.7cqw;
     font-size: max(0.4rem, 9cqw);
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__bets {
+  .table-seat .table-seat__bets {
     top: calc(100% + 3.4cqw);
     padding: 1.1cqw 3.1cqw;
     font-size: max(0.45rem, 11cqw);
   }
 
-  .table-seat:not(.table-seat--own) .table-seat__bets > span + span {
+  .table-seat .table-seat__bets > span + span {
     margin-top: 1.2cqw;
     padding-top: 1.2cqw;
   }
@@ -4507,6 +4667,7 @@ body:has(.poker-table-page) .poker-table-controls {
     z-index: 70;
     width: 100%;
     margin: 0;
+    transform: translateY(-0.3rem);
     padding: 0.35rem 0.35rem calc(0.35rem + env(safe-area-inset-bottom));
     border-radius: 0.85rem 0.85rem 0 0;
   }
@@ -4606,8 +4767,14 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   .raise-control__bar,
+  .raise-control__quick-fractions,
   .raise-control__quick-chips {
     grid-column: 1 / -1;
+  }
+
+  .raise-control__bar,
+  .raise-control__quick-fractions {
+    grid-row: auto;
   }
 
   .raise-control__quick-chips {
@@ -4631,33 +4798,49 @@ body:has(.poker-table-page) .poker-table-controls {
 
   .poker-table__overlay {
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: auto;
+    left: 0;
     z-index: 50;
     display: block;
     width: 100%;
-    height: 100dvh;
-    padding: calc(0.5rem + env(safe-area-inset-top)) 0.5rem
-      calc(clamp(7rem, 15vh, 9rem) + env(safe-area-inset-bottom));
-    overflow-y: auto;
+    height: var(
+      --mobile-overlay-height,
+      calc(100dvh - clamp(7rem, 15vh, 9rem) - env(safe-area-inset-bottom))
+    );
+    padding: calc(0.5rem + env(safe-area-inset-top)) 0.5rem 0.5rem;
+    overflow: hidden;
     background: rgb(4 17 14 / 96%);
     transform: none;
-    scroll-padding-bottom: calc(
-      clamp(7rem, 15vh, 9rem) + env(safe-area-inset-bottom)
-    );
     overscroll-behavior: contain;
   }
 
   .poker-table__overlay > * {
     width: 100%;
-    max-height: none;
-    overflow: visible;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
   }
 
-  .hand-ready-card {
-    min-height: calc(
-      100dvh - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)
-    );
+  .hand-ready-overlay:has(.hand-ready-card__settlement),
+  .hand-ready-card:has(.hand-ready-card__settlement) {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .hand-ready-card:has(.hand-ready-card__settlement) {
+    display: flex;
+    flex-direction: column;
     border-radius: 0.9rem;
+  }
+
+  .hand-ready-card:has(.hand-ready-card__settlement)
+    .hand-ready-card__settlement {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .poker-table__overlay:has(.hand-ready-overlay--collapsed) {
@@ -5372,35 +5555,39 @@ body:has(.lobby) .lobby-player--drop-target {
 
 @media (max-width: 480px) {
   .hand-ready-card header {
+    display: flex;
     flex-wrap: nowrap;
-    gap: 0.25rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--hand-ready-action-gap, 0.25rem);
   }
 
   .hand-ready-card__timer--waiting {
-    flex: 0 0 4.75rem;
-    width: 4.75rem;
-    height: 3.25rem;
-    min-width: 4.75rem;
-    min-height: 3.25rem;
-    padding-inline: 0.2rem;
-    font-size: 0.76rem;
+    flex: 0 0 var(--hand-ready-waiting-width, 4.75rem);
+    width: var(--hand-ready-waiting-width, 4.75rem);
+    height: var(--hand-ready-action-height, 3.25rem);
+    min-width: var(--hand-ready-waiting-width, 4.75rem);
+    min-height: var(--hand-ready-action-height, 3.25rem);
+    padding-inline: calc(var(--hand-ready-action-padding, 0.4rem) / 2);
+    font-size: var(--hand-ready-waiting-font-size, 0.76rem);
   }
 
   .hand-ready-card__actions {
     display: flex;
     flex: 1 1 0;
     min-width: 0;
+    flex-wrap: nowrap;
     justify-content: flex-end;
-    gap: 0.25rem;
+    gap: var(--hand-ready-action-gap, 0.25rem);
   }
 
   .hand-ready-card__actions .button {
-    flex: 0 0 4.9rem;
-    width: 4.9rem;
-    min-width: 4.9rem;
-    min-height: 3.25rem;
-    padding-inline: 0.4rem;
-    font-size: 0.8rem;
+    flex: 0 0 var(--hand-ready-action-width, 4.9rem);
+    width: var(--hand-ready-action-width, 4.9rem);
+    min-width: var(--hand-ready-action-width, 4.9rem);
+    min-height: var(--hand-ready-action-height, 3.25rem);
+    padding-inline: var(--hand-ready-action-padding, 0.4rem);
+    font-size: var(--hand-ready-action-font-size, 0.8rem);
     white-space: nowrap;
   }
 
@@ -5474,7 +5661,6 @@ body:has(.lobby) .lobby-player--drop-target {
   }
 
   .cards-and-pots {
-    --mobile-table-card-width: 16.2vw;
     align-content: start;
     row-gap: 0.3rem;
   }
@@ -5492,14 +5678,6 @@ body:has(.lobby) .lobby-player--drop-target {
     flex-basis: var(--mobile-seat-card-width);
     width: var(--mobile-seat-card-width);
     min-height: 0;
-  }
-
-  /* Under vertical pressure, keep the four-slot card width baseline while the
-     complete page is scaled. This prevents two or three wide cards from
-     consuming the progress-to-hand interval. */
-  .table-seats[data-player-count='2'],
-  .table-seats[data-player-count='3'] {
-    --mobile-seat-visible-count: 4;
   }
 }
 
@@ -5590,9 +5768,9 @@ body:has(.lobby) .lobby-player--drop-target {
 @media (max-width: 599px), (min-width: 600px) and (max-aspect-ratio: 5/6) {
   /* Mobile hand cards use one fixed lift above the own seat. */
   .table-seat--own {
-    width: 6.3rem;
-    height: auto;
-    min-height: 5.35rem;
+    width: var(--mobile-seat-card-width);
+    min-height: 0;
+    aspect-ratio: var(--mobile-seat-card-aspect-ratio);
     flex: 0 0 auto;
   }
 
@@ -5612,15 +5790,6 @@ body:has(.lobby) .lobby-player--drop-target {
 
   .poker-table__action-timer {
     padding-block: 0;
-  }
-}
-
-@media (max-width: 350px) and (min-height: 880px) {
-  /* The 344x922 pressure viewport leaves a much taller own-card interval;
-     move only the four-block progress group into its center for every table
-     size, while the hand and own seat keep their fixed anchors. */
-  body:has(.poker-table-page) .poker-table__felt {
-    --mobile-progress-center-shift: 7.1rem;
   }
 }
 
@@ -5658,6 +5827,23 @@ body:has(.lobby) .lobby-player--drop-target {
     .poker-table:has(.table-seats[data-player-count='3'])
     .poker-table__cards {
     align-self: auto;
+  }
+}
+
+@media (min-width: 600px) and (min-height: 821px) and (min-aspect-ratio: 5/6) {
+  /* The taller canvas can lower the own seat without crowding the controls. */
+  .table-seat--own {
+    --own-seat-desktop-drop: 0.8rem;
+    transform: translate(-50%, -50%) translateY(var(--own-seat-desktop-drop));
+  }
+}
+
+@media (min-width: 600px) and (max-height: 820px) and (min-aspect-ratio: 5/6) {
+  /* Compact desktop scales the table contents after the shared desktop rule. */
+  body:has(.poker-table-page)
+    .poker-table:has(.table-seat--own .table-seat__acting-indicator)
+    .hole-cards {
+    transform: translateY(-1.3rem);
   }
 }
 

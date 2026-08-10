@@ -11,6 +11,7 @@ const legalActions = {
   maximumRaiseTo: 400,
   canAllIn: true,
 };
+const remainingChips = 400;
 
 describe('BettingControls', () => {
   it('keeps raise adjustment as a draft until the separate submit action', () => {
@@ -25,6 +26,7 @@ describe('BettingControls', () => {
           maximumRaiseTo: 400,
           canAllIn: true,
         }}
+        remainingChips={remainingChips}
         onAction={onAction}
       />,
     );
@@ -56,7 +58,13 @@ describe('BettingControls', () => {
 
   it('submits the minimum legal raise before any draft adjustment', () => {
     const onAction = vi.fn();
-    render(<BettingControls legalActions={legalActions} onAction={onAction} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={onAction}
+      />,
+    );
 
     fireEvent.click(
       screen.getAllByRole('button', { name: '确认加注到 60' })[0]!,
@@ -70,7 +78,11 @@ describe('BettingControls', () => {
   it('clamps a retained draft when the legal raise range narrows', () => {
     const onAction = vi.fn();
     const { rerender } = render(
-      <BettingControls legalActions={legalActions} onAction={onAction} />,
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={onAction}
+      />,
     );
     fireEvent.change(screen.getByLabelText('加注增量'), {
       target: { value: '300' },
@@ -83,6 +95,7 @@ describe('BettingControls', () => {
           minimumRaiseTo: 80,
           maximumRaiseTo: 140,
         }}
+        remainingChips={60}
         onAction={onAction}
       />,
     );
@@ -97,7 +110,13 @@ describe('BettingControls', () => {
   });
 
   it('enables actions only from the server-provided legal action set', () => {
-    render(<BettingControls legalActions={legalActions} onAction={vi.fn()} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={vi.fn()}
+      />,
+    );
     expect(screen.getByRole('button', { name: '弃牌' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '过牌' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '跟注 20' })).toBeEnabled();
@@ -109,6 +128,95 @@ describe('BettingControls', () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    ['1/4', 115],
+    ['1/3', 146],
+    ['1/2', 210],
+    ['2/3', 273],
+    ['3/4', 305],
+    ['全部', 400],
+  ] as const)(
+    'selects %s of the remaining chips as a draft target',
+    (label, expectedTarget) => {
+      const onAction = vi.fn();
+      render(
+        <BettingControls
+          legalActions={legalActions}
+          streetCommitted={19}
+          remainingChips={381}
+          onAction={onAction}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: new RegExp(`快速加注到剩余筹码的 ${label}`),
+        }),
+      );
+
+      expect(onAction).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('button', { name: /调整加注到/ }),
+      ).toHaveTextContent(`调整加注到 ${expectedTarget}`);
+      expect(
+        screen.getAllByRole('button', {
+          name: `确认加注到 ${expectedTarget}`,
+        })[0],
+      ).toBeEnabled();
+    },
+  );
+
+  it('clamps quick targets to the server-provided legal raise range', () => {
+    const onAction = vi.fn();
+    render(
+      <BettingControls
+        legalActions={{
+          ...legalActions,
+          minimumRaiseTo: 80,
+          maximumRaiseTo: 140,
+        }}
+        streetCommitted={10}
+        remainingChips={100}
+        onAction={onAction}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: /快速加注到剩余筹码的 1\/4.*目标 80/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: /快速加注到剩余筹码的 1\/2.*目标 80/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: /快速加注到剩余筹码的 3\/4.*目标 85/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: /快速加注到剩余筹码的 全部.*目标 140/,
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /快速加注到剩余筹码的 3\/4.*目标 85/,
+      }),
+    );
+    expect(onAction).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getAllByRole('button', { name: '确认加注到 85' })[0]!,
+    );
+    expect(onAction).toHaveBeenCalledWith({
+      type: 'game.raise-to',
+      amount: 85,
+    });
+  });
+
   it.each([1, 40, 1000, 10000])(
     'keeps call amount %i in the inline amount badge',
     (callAmount) => {
@@ -116,6 +224,7 @@ describe('BettingControls', () => {
       render(
         <BettingControls
           legalActions={{ ...legalActions, callAmount }}
+          remainingChips={remainingChips}
           onAction={onAction}
         />,
       );
@@ -143,6 +252,7 @@ describe('BettingControls', () => {
       const { container } = render(
         <BettingControls
           legalActions={{ ...legalActions, callAmount }}
+          remainingChips={remainingChips}
           onAction={vi.fn()}
         />,
       );
@@ -156,7 +266,13 @@ describe('BettingControls', () => {
 
   it('emits raise-to with an explicit amount inside the server range', () => {
     const onAction = vi.fn();
-    render(<BettingControls legalActions={legalActions} onAction={onAction} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={onAction}
+      />,
+    );
     fireEvent.change(screen.getByLabelText('加注增量'), {
       target: { value: '120' },
     });
@@ -171,7 +287,13 @@ describe('BettingControls', () => {
 
   it('adds quick chips to the pending raise total', () => {
     const onAction = vi.fn();
-    render(<BettingControls legalActions={legalActions} onAction={onAction} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={onAction}
+      />,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '增加 20 筹码' }));
     fireEvent.click(screen.getByRole('button', { name: '增加 5 筹码' }));
@@ -185,7 +307,13 @@ describe('BettingControls', () => {
   });
 
   it('renders every decrease chip with a leading minus sign', () => {
-    render(<BettingControls legalActions={legalActions} onAction={vi.fn()} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={vi.fn()}
+      />,
+    );
 
     for (const value of [1, 2, 5, 10, 20, 50, 100]) {
       const chip = screen.getByRole('button', {
@@ -199,7 +327,13 @@ describe('BettingControls', () => {
   });
 
   it('renders every increase chip with a leading plus sign', () => {
-    render(<BettingControls legalActions={legalActions} onAction={vi.fn()} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={vi.fn()}
+      />,
+    );
 
     for (const value of [1, 2, 5, 10, 20, 50, 100]) {
       const chip = screen.getByRole('button', {
@@ -214,7 +348,13 @@ describe('BettingControls', () => {
 
   it('sets a quick chip as the raise target before adding later chips', () => {
     const onAction = vi.fn();
-    render(<BettingControls legalActions={legalActions} onAction={onAction} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={onAction}
+      />,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '增加 100 筹码' }));
     fireEvent.click(
@@ -237,7 +377,13 @@ describe('BettingControls', () => {
 
   it('starts the raise slider at zero increment and can clear the selected chips', () => {
     const onAction = vi.fn();
-    render(<BettingControls legalActions={legalActions} onAction={onAction} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={onAction}
+      />,
+    );
     const slider = screen.getByLabelText('加注增量');
     expect(slider).toHaveAttribute('min', '0');
     expect(slider).toHaveValue('0');
@@ -267,6 +413,7 @@ describe('BettingControls', () => {
       <BettingControls
         legalActions={legalActions}
         streetCommitted={10}
+        remainingChips={390}
         onAction={vi.fn()}
       />,
     );
@@ -292,6 +439,7 @@ describe('BettingControls', () => {
       <BettingControls
         legalActions={legalActions}
         streetCommitted={55}
+        remainingChips={345}
         onAction={vi.fn()}
       />,
     );
@@ -304,7 +452,13 @@ describe('BettingControls', () => {
   });
 
   it('keeps the raise bounds and current amount in the slider header', () => {
-    render(<BettingControls legalActions={legalActions} onAction={vi.fn()} />);
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={vi.fn()}
+      />,
+    );
 
     const bar = screen
       .getByLabelText('加注增量')
@@ -315,6 +469,11 @@ describe('BettingControls', () => {
     expect(bar).toHaveTextContent('最大 400');
     expect(bar.textContent?.replace(/\s+/g, '')).toBe('60最小60追加60最大400');
     expect(
+      screen
+        .getByRole('group', { name: '按剩余筹码快速选择加注比例' })
+        .textContent?.replace(/\s+/g, ''),
+    ).toBe('1/41/31/22/33/4全部');
+    expect(
       screen.queryByText('加注增量', { selector: 'label' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('本轮已投')).not.toBeInTheDocument();
@@ -322,7 +481,11 @@ describe('BettingControls', () => {
 
   it('uses the call button style and target badge for desktop confirmation', () => {
     const { container } = render(
-      <BettingControls legalActions={legalActions} onAction={vi.fn()} />,
+      <BettingControls
+        legalActions={legalActions}
+        remainingChips={remainingChips}
+        onAction={vi.fn()}
+      />,
     );
 
     const confirm = container.querySelector<HTMLButtonElement>(
@@ -339,6 +502,7 @@ describe('BettingControls', () => {
     const { rerender } = render(
       <BettingControls
         legalActions={legalActions}
+        remainingChips={remainingChips}
         disabled
         onAction={vi.fn()}
       />,
@@ -348,7 +512,13 @@ describe('BettingControls', () => {
         .getAllByRole('button')
         .every((button) => (button as HTMLButtonElement).disabled),
     ).toBe(true);
-    rerender(<BettingControls legalActions={null} onAction={vi.fn()} />);
+    rerender(
+      <BettingControls
+        legalActions={null}
+        remainingChips={0}
+        onAction={vi.fn()}
+      />,
+    );
     expect(
       screen
         .getAllByRole('button')

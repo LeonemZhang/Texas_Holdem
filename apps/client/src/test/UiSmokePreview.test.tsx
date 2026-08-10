@@ -15,6 +15,16 @@ describe('UiSmokePreview', () => {
   it('exercises the current action-order and hand-peak presentation', () => {
     render(<UiSmokePreview page="table" />);
     expect(screen.getAllByText('行动顺位 1').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole('button', {
+        name: /快速加注到剩余筹码的/,
+      }),
+    ).toHaveLength(6);
+    expect(
+      screen.getByRole('button', {
+        name: /快速加注到剩余筹码的 1\/3/,
+      }),
+    ).toBeInTheDocument();
 
     cleanup();
     render(<UiSmokePreview page="statistics" />);

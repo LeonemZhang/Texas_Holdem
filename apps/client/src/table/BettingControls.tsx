@@ -13,13 +13,45 @@ export interface BettingControlsProps {
   readonly legalActions: LegalActions | null;
   /** 本人本轮已经投入的筹码，由服务端房间快照提供。 */
   readonly streetCommitted?: number;
+  /** 本人当前尚未投入本局的筹码，由服务端房间快照提供。 */
+  readonly remainingChips: number;
   readonly disabled?: boolean;
   readonly onAction: (action: BettingActionIntent) => void;
+}
+
+const quickRaiseOptions = [
+  { label: '1/4', ratio: 0.25 },
+  { label: '1/3', ratio: 1 / 3 },
+  { label: '1/2', ratio: 0.5 },
+  { label: '2/3', ratio: 2 / 3 },
+  { label: '3/4', ratio: 0.75 },
+  { label: '全部', ratio: 1 },
+] as const;
+
+function quickRaiseTarget({
+  ratio,
+  remainingChips,
+  streetCommitted,
+  minimum,
+  maximum,
+}: {
+  readonly ratio: number;
+  readonly remainingChips: number;
+  readonly streetCommitted: number;
+  readonly minimum: number;
+  readonly maximum: number;
+}): number {
+  if (ratio === 1) return maximum;
+  const requested =
+    Math.max(0, streetCommitted) +
+    Math.ceil(Math.max(0, remainingChips) * ratio);
+  return Math.min(maximum, Math.max(minimum, requested));
 }
 
 export function BettingControls({
   legalActions,
   streetCommitted = 0,
+  remainingChips,
   disabled = false,
   onAction,
 }: BettingControlsProps) {
@@ -39,11 +71,26 @@ export function BettingControls({
     maximumIncrement > 0
       ? (Math.min(maximumIncrement, raiseIncrement) / maximumIncrement) * 100
       : 0;
+  const quickRaiseTargets = quickRaiseOptions.map((option) => ({
+    ...option,
+    target: quickRaiseTarget({
+      ratio: option.ratio,
+      remainingChips,
+      streetCommitted,
+      minimum,
+      maximum,
+    }),
+  }));
   const quickChipValues = [1, 2, 5, 10, 20, 50, 100] as const;
   const submitRaise = () => {
     if (!canRaise) return;
     onAction({ type: 'game.raise-to', amount: effectiveRaiseTo });
     setRaiseOpen(false);
+  };
+  const selectQuickRaise = (target: number) => {
+    setRaiseIncrement(
+      Math.min(maximumIncrement, Math.max(0, target - minimum)),
+    );
   };
 
   useEffect(() => {
@@ -142,6 +189,25 @@ export function BettingControls({
             收起
           </button>
         </header>
+        <div
+          className="raise-control__quick-fractions"
+          role="group"
+          aria-label="按剩余筹码快速选择加注比例"
+        >
+          {quickRaiseTargets.map(({ label, target }) => (
+            <button
+              className="raise-control__quick-fraction"
+              key={label}
+              type="button"
+              aria-label={`快速加注到剩余筹码的 ${label}（目标 ${target}）`}
+              aria-pressed={effectiveRaiseTo === target}
+              disabled={!canRaise}
+              onClick={() => selectQuickRaise(target)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="raise-control__bar">
           <div className="raise-control__slider">
             <output

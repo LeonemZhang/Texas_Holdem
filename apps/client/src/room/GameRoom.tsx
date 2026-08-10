@@ -396,6 +396,7 @@ export function GameRoom({
     ({ playerId }) => playerId === session.playerId,
   );
   const ownStreetCommitted = own?.streetCommitted ?? 0;
+  const ownRemainingChips = own?.chips ?? 0;
   const names = new Map(
     snapshot.room.players.map(({ playerId, nickname }) => [playerId, nickname]),
   );
@@ -797,6 +798,7 @@ export function GameRoom({
             <BettingControls
               legalActions={null}
               streetCommitted={ownStreetCommitted}
+              remainingChips={ownRemainingChips}
               disabled
               onAction={sendBetting}
             />
@@ -804,6 +806,7 @@ export function GameRoom({
             <BettingControls
               legalActions={game?.legalActions ?? null}
               streetCommitted={ownStreetCommitted}
+              remainingChips={ownRemainingChips}
               disabled={sending || snapshot.room.phase !== 'playing'}
               onAction={sendBetting}
             />
