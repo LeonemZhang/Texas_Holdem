@@ -269,29 +269,23 @@ export function TableSeats({
         (element) =>
           element.dataset.mobileQueuePlayerId === currentActor.playerId,
       );
-      const lastCard = queueCards.at(-1);
-      if (!actorCard || !lastCard || queue.clientWidth <= 0) return;
+      const secondCard = queueCards[1];
+      if (!actorCard || !secondCard || queue.clientWidth <= 0) {
+        return;
+      }
 
       const maxScrollLeft = Math.max(0, queue.scrollWidth - queue.clientWidth);
-      if (maxScrollLeft <= 0) return;
-
-      const actorLeft = actorCard.offsetLeft;
-      const actorRight = actorLeft + actorCard.offsetWidth;
-      const viewportLeft = queue.scrollLeft;
-      const viewportRight = viewportLeft + queue.clientWidth;
-      const actorIsVisible =
-        actorLeft >= viewportLeft && actorRight <= viewportRight;
-      if (actorIsVisible) return;
-
-      const remainingRight = lastCard.offsetLeft + lastCard.offsetWidth;
-      const remainingWidth = remainingRight - actorLeft;
-      const targetScrollLeft = Math.min(
-        remainingWidth <= queue.clientWidth
-          ? Math.max(0, remainingRight - queue.clientWidth)
-          : actorLeft,
-        maxScrollLeft,
-      );
+      const actorIndex = queueCards.indexOf(actorCard);
+      const targetScrollLeft =
+        actorIndex < 2
+          ? 0
+          : Math.min(
+              actorCard.offsetLeft - secondCard.offsetLeft,
+              maxScrollLeft,
+            );
       if (Math.abs(targetScrollLeft - queue.scrollLeft) < 1) return;
+
+      if (maxScrollLeft <= 0) return;
 
       if (queue.scrollTo) {
         queue.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });

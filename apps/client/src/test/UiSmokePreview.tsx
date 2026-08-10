@@ -255,6 +255,7 @@ export const uiSmokePreviewPages = [
   'table-6',
   'table-7',
   'table-8',
+  'table-8-scroll',
   'table-9',
   'table-ten',
   'table-ten-own-action',
@@ -281,6 +282,7 @@ type TablePreviewPage = Extract<
   | 'table-6'
   | 'table-7'
   | 'table-8'
+  | 'table-8-scroll'
   | 'table-9'
   | 'table-ten'
   | 'table-ten-own-action'
@@ -339,6 +341,8 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
   const [activeUtilityPanel, setActiveUtilityPanel] =
     useState<TableUtilityPanel | null>(() => previewPanel(page));
   const [settlementCollapsed, setSettlementCollapsed] = useState(false);
+  const scrollPreview = page === 'table-8-scroll';
+  const [scrollPreviewActorIndex, setScrollPreviewActorIndex] = useState(3);
   const waitingReady =
     page === 'ready-waiting' || page === 'settlement-waiting';
   const handReady =
@@ -350,11 +354,17 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
   const numberedTableCount = /^table-[2-9]$/.test(page)
     ? Number(page.slice('table-'.length))
     : null;
-  const multiPlayerCount = tenPlayers ? 10 : numberedTableCount;
+  const multiPlayerCount = scrollPreview
+    ? 8
+    : tenPlayers
+      ? 10
+      : numberedTableCount;
   const multiPlayerPreview = multiPlayerCount !== null;
-  const currentActorIndex = multiPlayerPreview
-    ? Math.min(3, multiPlayerCount - 1)
-    : -1;
+  const currentActorIndex = scrollPreview
+    ? scrollPreviewActorIndex
+    : multiPlayerPreview
+      ? Math.min(3, multiPlayerCount - 1)
+      : -1;
   const tablePlayers = multiPlayerPreview
     ? fullTablePlayers.slice(0, multiPlayerCount).map((player, index) => {
         const blindRole =
@@ -470,12 +480,42 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
             : `第 ${previewHandNumber} 局 · 翻牌 · 盲注：10/20`
         }
         status={
-          <TableUtilityToolbar
-            activePanel={activeUtilityPanel}
-            isHost={isHost}
-            onOpenPanel={(panel) => setActiveUtilityPanel(panel)}
-            onExitRoom={isHost ? undefined : noop}
-          />
+          <div className="table-preview-status">
+            <TableUtilityToolbar
+              activePanel={activeUtilityPanel}
+              isHost={isHost}
+              onOpenPanel={(panel) => setActiveUtilityPanel(panel)}
+              onExitRoom={isHost ? undefined : noop}
+            />
+            {scrollPreview ? (
+              <div
+                className="table-preview-scroll-controls"
+                aria-label="8人座位队列预览控制"
+              >
+                <span aria-live="polite">
+                  当前行动：玩家 {currentActorIndex + 1}
+                </span>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={() =>
+                    setScrollPreviewActorIndex((currentActorIndex + 7) % 8)
+                  }
+                >
+                  上一位
+                </button>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={() =>
+                    setScrollPreviewActorIndex((currentActorIndex + 1) % 8)
+                  }
+                >
+                  下一位
+                </button>
+              </div>
+            ) : null}
+          </div>
         }
         seats={
           <TableSeats
@@ -617,6 +657,7 @@ function isTablePreviewPage(page: string): page is TablePreviewPage {
     'table-6',
     'table-7',
     'table-8',
+    'table-8-scroll',
     'table-9',
     'table-ten',
     'table-ten-own-action',

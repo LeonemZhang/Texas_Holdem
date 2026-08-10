@@ -1253,6 +1253,30 @@ body:has(.poker-table-page) .poker-table-page {
   text-align: right;
 }
 
+.table-preview-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.table-preview-scroll-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: 0.35rem;
+  color: #fef3c7;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.table-preview-scroll-controls .button {
+  min-height: 44px;
+  padding-inline: 0.7rem;
+}
+
 .poker-table-page__header-actions {
   display: flex;
   align-items: center;
@@ -4233,6 +4257,17 @@ body:has(.poker-table-page) .poker-table-controls {
   .poker-table-page__status,
   .poker-table-page__utility-actions {
     min-width: 0;
+  }
+
+  .table-preview-status {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .table-preview-scroll-controls {
+    justify-content: flex-end;
+    overflow-x: auto;
   }
 
   .poker-table-page__utility-actions {

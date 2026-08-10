@@ -479,105 +479,8 @@ describe('TableSeats', () => {
     expect(ownSeat?.closest('.table-seats__queue')).toBeNull();
   });
 
-  it.each([
-    {
-      name: 'left aligns while remaining cards overflow',
-      clientWidth: 120,
-      scrollWidth: 360,
-      actorOffset: 160,
-      actorWidth: 60,
-      lastOffset: 300,
-      lastWidth: 60,
-      expectedLeft: 160,
-    },
-    {
-      name: 'uses the minimum scroll when remaining cards fit',
-      clientWidth: 200,
-      scrollWidth: 300,
-      actorOffset: 180,
-      actorWidth: 60,
-      lastOffset: 240,
-      lastWidth: 60,
-      expectedLeft: 100,
-    },
-    {
-      name: 'does not scroll when the full queue fits',
-      clientWidth: 320,
-      scrollWidth: 300,
-      actorOffset: 180,
-      actorWidth: 60,
-      lastOffset: 240,
-      lastWidth: 60,
-      expectedLeft: 0,
-    },
-  ])(
-    '$name',
-    ({
-      clientWidth,
-      scrollWidth,
-      actorOffset,
-      actorWidth,
-      lastOffset,
-      lastWidth,
-      expectedLeft,
-    }) => {
-      const players = makePlayers(4).map((player, index) => ({
-        ...player,
-        actionOrder: index + 1,
-        isCurrentActor: player.playerId === 'p0',
-      }));
-      const { container, rerender } = render(
-        <TableSeats
-          actionRoundKey="hand-1:flop"
-          players={players}
-          ownPlayerId="p0"
-        />,
-      );
-      const seats = container.querySelector<HTMLElement>(
-        '.table-seats__queue',
-      )!;
-      const actorCard = container.querySelector(
-        '[data-mobile-queue-player-id="p2"]',
-      )!;
-      const lastCard = container.querySelector(
-        '[data-mobile-queue-player-id="p3"]',
-      )!;
-      const scrollTo = vi.fn();
-      setElementMetric(seats, 'clientWidth', clientWidth);
-      setElementMetric(seats, 'scrollWidth', scrollWidth);
-      setElementMetric(actorCard, 'offsetLeft', actorOffset);
-      setElementMetric(actorCard, 'offsetWidth', actorWidth);
-      setElementMetric(lastCard, 'offsetLeft', lastOffset);
-      setElementMetric(lastCard, 'offsetWidth', lastWidth);
-      Object.defineProperty(seats, 'scrollTo', {
-        configurable: true,
-        value: scrollTo,
-      });
-
-      rerender(
-        <TableSeats
-          actionRoundKey="hand-1:flop"
-          players={players.map((player) => ({
-            ...player,
-            isCurrentActor: player.playerId === 'p2',
-          }))}
-          ownPlayerId="p0"
-        />,
-      );
-
-      if (scrollWidth <= clientWidth) {
-        expect(scrollTo).not.toHaveBeenCalled();
-      } else {
-        expect(scrollTo).toHaveBeenLastCalledWith({
-          left: expectedLeft,
-          behavior: 'smooth',
-        });
-      }
-    },
-  );
-
-  it('does not scroll when the current actor is already visible', () => {
-    const players = makePlayers(5).map((player, index) => ({
+  it('keeps the first two actors at the queue start and anchors later actors at position two', () => {
+    const players = makePlayers(8).map((player, index) => ({
       ...player,
       actionOrder: index + 1,
       isCurrentActor: player.playerId === 'p0',
@@ -590,20 +493,86 @@ describe('TableSeats', () => {
       />,
     );
     const seats = container.querySelector<HTMLElement>('.table-seats__queue')!;
-    const actorCard = container.querySelector(
-      '[data-mobile-queue-player-id="p2"]',
-    )!;
-    const lastCard = container.querySelector(
-      '[data-mobile-queue-player-id="p4"]',
-    )!;
+    const queueCards = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
+    );
+    const scrollTo = vi.fn(({ left }: { readonly left: number }) => {
+      setElementMetric(seats, 'scrollLeft', left);
+    });
+    setElementMetric(seats, 'clientWidth', 240);
+    setElementMetric(seats, 'scrollWidth', 480);
+    queueCards.forEach((card, index) => {
+      setElementMetric(card, 'offsetLeft', index * 60);
+      setElementMetric(card, 'offsetWidth', 60);
+    });
+    Object.defineProperty(seats, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    const setActor = (index: number) =>
+      rerender(
+        <TableSeats
+          actionRoundKey="hand-1:flop"
+          players={players.map((player) => ({
+            ...player,
+            isCurrentActor: player.playerId === `p${index}`,
+          }))}
+          ownPlayerId="p0"
+        />,
+      );
+
+    setActor(1);
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    setActor(2);
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 60, behavior: 'smooth' });
+    setActor(3);
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      left: 120,
+      behavior: 'smooth',
+    });
+    setActor(4);
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      left: 180,
+      behavior: 'smooth',
+    });
+    setActor(5);
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      left: 240,
+      behavior: 'smooth',
+    });
+
+    const callCountAtNaturalMaximum = scrollTo.mock.calls.length;
+    setActor(6);
+    setActor(7);
+    expect(scrollTo).toHaveBeenCalledTimes(callCountAtNaturalMaximum);
+  });
+
+  it('does not scroll when the full queue fits', () => {
+    const players = makePlayers(4).map((player, index) => ({
+      ...player,
+      actionOrder: index + 1,
+      isCurrentActor: player.playerId === 'p0',
+    }));
+    const { container, rerender } = render(
+      <TableSeats
+        actionRoundKey="hand-1:flop"
+        players={players}
+        ownPlayerId="p0"
+      />,
+    );
+    const seats = container.querySelector<HTMLElement>('.table-seats__queue')!;
+    const queueCards = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-mobile-queue-player-id]'),
+    );
     const scrollTo = vi.fn();
-    setElementMetric(seats, 'clientWidth', 200);
-    setElementMetric(seats, 'scrollWidth', 360);
-    setElementMetric(seats, 'scrollLeft', 100);
-    setElementMetric(actorCard, 'offsetLeft', 180);
-    setElementMetric(actorCard, 'offsetWidth', 60);
-    setElementMetric(lastCard, 'offsetLeft', 300);
-    setElementMetric(lastCard, 'offsetWidth', 60);
+    setElementMetric(seats, 'clientWidth', 320);
+    setElementMetric(seats, 'scrollWidth', 300);
+    queueCards.forEach((card, index) => {
+      setElementMetric(card, 'offsetLeft', index * 60);
+      setElementMetric(card, 'offsetWidth', 60);
+    });
     Object.defineProperty(seats, 'scrollTo', {
       configurable: true,
       value: scrollTo,

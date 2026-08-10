@@ -32,6 +32,19 @@ describe('UiSmokePreview', () => {
     expect(screen.getByText('最高牌型')).toBeInTheDocument();
   });
 
+  it('provides an interactive eight-player queue scroll preview', () => {
+    const { container } = render(<UiSmokePreview page="table-8-scroll" />);
+
+    expect(
+      container.querySelectorAll('[data-mobile-queue-player-id]'),
+    ).toHaveLength(8);
+    expect(screen.getByText('当前行动：玩家 4')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '下一位' }));
+
+    expect(screen.getByText('当前行动：玩家 5')).toBeInTheDocument();
+  });
+
   it('renders the settlement sound preview', () => {
     render(<UiSmokePreview page="sound" />);
 
