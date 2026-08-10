@@ -287,6 +287,22 @@ describe('BettingControls', () => {
     ).toBeInTheDocument();
   });
 
+  it('never renders an added amount below the call amount', () => {
+    render(
+      <BettingControls
+        legalActions={legalActions}
+        streetCommitted={55}
+        onAction={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText('追加 20', {
+        selector: '.raise-control__additional',
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('keeps the raise bounds and current amount in the slider header', () => {
     render(<BettingControls legalActions={legalActions} onAction={vi.fn()} />);
 
