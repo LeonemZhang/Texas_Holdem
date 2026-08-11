@@ -498,6 +498,46 @@ describe('BettingControls', () => {
     ).toHaveTextContent('60');
   });
 
+  it('keeps the call presentation while the call action is disabled', () => {
+    const onAction = vi.fn();
+    render(
+      <BettingControls
+        legalActions={{ ...legalActions, callAmount: 0 }}
+        remainingChips={remainingChips}
+        disabled
+        onAction={onAction}
+      />,
+    );
+
+    const call = screen.getByRole('button', { name: '跟注 0' });
+    expect(call).toBeDisabled();
+    expect(call).toHaveClass('betting-controls__call');
+    expect(
+      call.querySelector('.betting-controls__call-amount'),
+    ).toHaveTextContent('0');
+    fireEvent.click(call);
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it('shows a disabled zero call when no call is owed', () => {
+    const onAction = vi.fn();
+    render(
+      <BettingControls
+        legalActions={{ ...legalActions, callAmount: null }}
+        remainingChips={remainingChips}
+        onAction={onAction}
+      />,
+    );
+
+    const call = screen.getByRole('button', { name: '跟注 0' });
+    expect(call).toBeDisabled();
+    expect(
+      call.querySelector('.betting-controls__call-amount'),
+    ).toHaveTextContent('0');
+    fireEvent.click(call);
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
   it('locks every action while recovering or when it is not this player turn', () => {
     const { rerender } = render(
       <BettingControls

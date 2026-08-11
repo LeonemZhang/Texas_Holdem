@@ -129,20 +129,14 @@ export function BettingControls({
         <button
           className="betting-controls__call"
           type="button"
-          aria-label={
-            legalActions?.callAmount !== null
-              ? `跟注 ${legalActions?.callAmount ?? 0}`
-              : '跟注'
-          }
+          aria-label={`跟注 ${legalActions?.callAmount ?? 0}`}
           disabled={locked || legalActions?.callAmount === null}
           onClick={() => onAction({ type: 'game.call' })}
         >
           <span>跟注</span>
-          {legalActions?.callAmount !== null ? (
-            <span className="betting-controls__call-amount">
-              {legalActions?.callAmount ?? 0}
-            </span>
-          ) : null}
+          <span className="betting-controls__call-amount">
+            {legalActions?.callAmount ?? 0}
+          </span>
         </button>
         <button
           type="button"
