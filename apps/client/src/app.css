@@ -366,9 +366,16 @@ body:has(.lobby) .lobby-player > strong {
 
 .statistics-hand-cards {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
   margin-top: 0.45rem;
   gap: 0.3rem;
+}
+
+.statistics-hand-cards > .playing-card {
+  width: min(4rem, calc((100% - 1.2rem) / 5));
+  min-width: 0;
+  flex: 0 1 min(4rem, calc((100% - 1.2rem) / 5));
 }
 
 .statistics-hands {
@@ -422,10 +429,6 @@ body:has(.lobby) .lobby-player > strong {
 .statistics-hands__player > span,
 .statistics-hands__player > small {
   white-space: nowrap;
-}
-
-.statistics-hands__player .statistics-hand-cards {
-  flex-wrap: nowrap;
 }
 
 .fun-titles__title {
