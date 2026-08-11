@@ -3873,12 +3873,6 @@ body:has(.poker-table-page) .poker-table-controls {
     bottom: calc(100% + 2px);
   }
 
-  body:has(.poker-table-page)
-    .poker-table:has(.table-seat--own .table-seat__acting-indicator)
-    .hole-cards {
-    transform: translateY(-0.75rem);
-  }
-
   .betting-controls {
     width: max-content;
     max-width: 100%;
@@ -5880,15 +5874,6 @@ body:has(.lobby) .lobby-player--drop-target {
   .table-seat--own {
     --own-seat-desktop-drop: -0.3rem;
     transform: translate(-50%, -50%) translateY(var(--own-seat-desktop-drop));
-  }
-}
-
-@media (min-width: 600px) and (max-height: 820px) and (min-aspect-ratio: 5/6) {
-  /* Compact desktop scales the table contents after the shared desktop rule. */
-  body:has(.poker-table-page)
-    .poker-table:has(.table-seat--own .table-seat__acting-indicator)
-    .hole-cards {
-    transform: translateY(-1.3rem);
   }
 }
 
