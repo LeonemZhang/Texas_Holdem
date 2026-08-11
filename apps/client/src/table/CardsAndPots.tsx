@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from 'react';
+
 export interface StreetPotView {
   readonly street: 'preflop' | 'flop' | 'turn' | 'river';
   readonly amount: number;
@@ -70,6 +72,77 @@ export function CardsAndPots({
   ownHandType = null,
   showdownHands = [],
 }: CardsAndPotsProps) {
+  const potHistoryRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const history = potHistoryRef.current;
+    const content = history?.querySelector<HTMLElement>(
+      '.street-pot-history__content',
+    );
+    const mobileQuery = window.matchMedia?.(
+      '(max-width: 599px), (min-width: 600px) and (max-aspect-ratio: 5/6)',
+    );
+    if (!history || !content || !mobileQuery) return;
+
+    const measure = () => {
+      history.style.setProperty('--street-pot-history-scale', '1');
+      history.style.setProperty('--street-pot-history-offset-x', '0px');
+      const historyRect = history.getBoundingClientRect();
+      if (!mobileQuery.matches || historyRect.width <= 0) return;
+
+      const firstItem = content.firstElementChild;
+      const lastItem = content.lastElementChild;
+      if (
+        !(firstItem instanceof HTMLElement) ||
+        !(lastItem instanceof HTMLElement)
+      ) {
+        return;
+      }
+
+      const firstItemRect = firstItem.getBoundingClientRect();
+      const lastItemRect = lastItem.getBoundingClientRect();
+      const contentWidth = lastItemRect.right - firstItemRect.left;
+      if (contentWidth <= historyRect.width + 1) return;
+
+      const availableWidth = historyRect.width;
+      const scale = Math.max(
+        0.76,
+        Math.min(0.9, availableWidth / contentWidth),
+      );
+      history.style.setProperty('--street-pot-history-scale', `${scale}`);
+
+      const scaledContentWidth = contentWidth * scale;
+      if (scaledContentWidth <= availableWidth + 1) {
+        const firstItemOffset = firstItemRect.left - historyRect.left;
+        const renderScale =
+          history.clientWidth > 0 ? historyRect.width / history.clientWidth : 1;
+        const offsetX =
+          ((availableWidth - scaledContentWidth) / 2 -
+            firstItemOffset * scale) /
+          renderScale;
+        history.style.setProperty(
+          '--street-pot-history-offset-x',
+          `${Math.max(0, offsetX)}px`,
+        );
+      }
+    };
+
+    measure();
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(measure);
+    resizeObserver?.observe(history);
+    window.addEventListener('resize', measure);
+    mobileQuery.addEventListener?.('change', measure);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', measure);
+      mobileQuery.removeEventListener?.('change', measure);
+    };
+  }, [streetPots, totalPot]);
+
   const hasCurrentStreetPot = streetPots.some(
     (pot) => pot.street === currentStreet,
   );
@@ -87,31 +160,38 @@ export function CardsAndPots({
         </div>
 
         <div className="cards-and-pots__pot-summary">
-          <dl className="street-pot-history" aria-label="本局底池">
-            <div
-              className="street-pot-history__total"
-              data-pot-target={hasCurrentStreetPot ? undefined : true}
-            >
-              <dt>总池</dt>
-              <dd>{totalPot.toLocaleString('zh-CN')}</dd>
-            </div>
-            {streetPots.map((pot) => (
+          <div
+            className="street-pot-history"
+            role="group"
+            aria-label="本局底池"
+            ref={potHistoryRef}
+          >
+            <dl className="street-pot-history__content">
               <div
-                className={
-                  pot.street === currentStreet
-                    ? 'street-pot-history__street street-pot-history__street--current'
-                    : 'street-pot-history__street'
-                }
-                data-pot-target={
-                  pot.street === currentStreet ? true : undefined
-                }
-                key={pot.street}
+                className="street-pot-history__total"
+                data-pot-target={hasCurrentStreetPot ? undefined : true}
               >
-                <dt>{streetLabels[pot.street]}</dt>
-                <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
+                <dt>总池</dt>
+                <dd>{totalPot.toLocaleString('zh-CN')}</dd>
               </div>
-            ))}
-          </dl>
+              {streetPots.map((pot) => (
+                <div
+                  className={
+                    pot.street === currentStreet
+                      ? 'street-pot-history__street street-pot-history__street--current'
+                      : 'street-pot-history__street'
+                  }
+                  data-pot-target={
+                    pot.street === currentStreet ? true : undefined
+                  }
+                  key={pot.street}
+                >
+                  <dt>{streetLabels[pot.street]}</dt>
+                  <dd>{pot.amount.toLocaleString('zh-CN')}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
       </div>
 
