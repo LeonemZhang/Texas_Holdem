@@ -236,16 +236,18 @@ pnpm package:win
 | `packages/ui`            | 可复用的响应式 React 组件。                                       |
 | `packages/test-support`  | 测试构建器与确定性夹具。                                          |
 
-房主 Windows 客户端启动独立房主服务进程；Windows 客户端、电脑浏览器和手机浏览器都通过 HTTP 与 Socket.IO 连接同一个权威服务。更完整的边界和数据流见[架构文档](./docs/architecture.md)。
+房主 Windows 客户端启动独立房主服务进程；Windows 客户端、电脑浏览器和手机浏览器都通过 HTTP 与 Socket.IO 连接同一个权威服务。更完整的边界和数据流见[架构入口](./ARCHITECTURE.md)。
 
 ## 项目文档
 
 - [v1.0.2 发布说明](./docs/releases/v1.0.2.md)
 - [v1.0.1 发布说明](./docs/releases/v1.0.1.md)
-- [产品规则与明确边界](./docs/product-spec.md)
-- [系统架构与模块职责](./docs/architecture.md)
+- [产品规格地图](./docs/product-specs/index.md)
+- [系统架构入口](./ARCHITECTURE.md)
+- [详细设计地图](./docs/design-docs/index.md)
+- [产品决策索引](./docs/decisions/index.md)
 - [Windows 打包与版本管理](./docs/release.md)
-- [Luna 增量开发计划](./docs/plans/luna-incremental-plan.md)
+- [执行计划地图](./docs/exec-plans/index.md)
 - [v1.0.2 最终 Windows 与联机验收记录](./docs/verification/e2e10-v1.0.2-final-smoke.md)
 - [v1.0.1 最终 Windows 与联机验收记录](./docs/verification/e2e10-v1.0.1-final-smoke.md)
 

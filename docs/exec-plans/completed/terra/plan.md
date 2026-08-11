@@ -1,9 +1,12 @@
 # GPT-5.6 Terra 基础框架开发计划
 
+> 生命周期：legacy
+> 归档说明：本计划完成于结构化任务证据契约建立之前；任务完成状态保留，验收采用同目录聚合说明和仓库现有代码、测试及 `docs/verification/` 记录，不补造逐任务历史证据。
+
 > 目标模型：GPT-5.6 Terra  
 > 建议推理强度：High  
 > 计划类型：一次性工程骨架建设  
-> 前置事实：`docs/product-spec.md` 与 `docs/architecture.md` 已评审通过
+> 前置事实：`docs/product-specs/` 与 `ARCHITECTURE.md` 已评审通过
 
 ## 1. 计划定位
 
@@ -15,14 +18,14 @@
 
 执行前必须完整阅读：
 
-1. `docs/product-spec.md`：产品行为和永久非目标。
-2. `docs/architecture.md`：技术栈、运行时边界和模块职责。
+1. `docs/product-specs/`：产品行为和永久非目标。
+2. `ARCHITECTURE.md`：技术栈、运行时边界和模块职责。
 3. 本计划：框架阶段的允许范围和验收标准。
 
 如三者发生冲突：
 
-- 产品行为以 `product-spec.md` 为准。
-- 技术边界以 `architecture.md` 为准。
+- 产品行为以 `docs/product-specs/` 为准。
+- 技术边界以 `ARCHITECTURE.md` 和 `docs/design-docs/` 为准。
 - 本计划只能细化执行顺序，不能改变前两份文档。
 
 ## 3. 最终交付结果
@@ -61,6 +64,8 @@ Terra 在本计划中不得实现：
 - 依赖必须固定明确版本并生成锁文件，不能保留浮动的 `latest`。
 - 优先使用纯 TypeScript 和跨平台 npm scripts，确保 Windows PowerShell 可执行。
 - 每完成一个阶段立即运行该阶段验证，不把所有错误留到最后处理。
+- 如果需求与现有产品决策、ADR 或不变量不一致，先确认是修改既有决策还是修改需求；不能静默选择一方。
+- 每完成一个阶段后，检查产品规格、设计文档、不变量、决策和验证证据是否需要同步更新；系统事实变化时必须更新对应文档。
 - 不在 Electron renderer 中启用 Node.js integration。
 - 不允许共享包反向导入 `apps/*`。
 - 不为了让检查通过而关闭严格规则、跳过测试或加入宽泛 `any`。
@@ -96,9 +101,9 @@ Texas_Holdem/
 │  ├─ ui/
 │  └─ test-support/
 ├─ docs/
-│  ├─ product-spec.md
-│  ├─ architecture.md
-│  └─ plans/
+│  ├─ product-specs/
+│  ├─ design-docs/
+│  └─ exec-plans/
 ├─ AGENTS.md
 ├─ package.json
 ├─ pnpm-lock.yaml
@@ -390,6 +395,23 @@ CI 要求：
 - 搜索 `TODO`、`FIXME`、宽泛 `any` 和跳过测试，逐项说明或清除。
 - 检查 Git diff，确认没有实现本计划禁止的业务功能。
 
+## 任务状态登记表
+
+本表是本计划唯一的任务状态来源。Terra 已归档，所有阶段均以 `done` 表示；详细阶段说明保留在下方。
+
+| ID       | Status | Depends               | Affected | Acceptance     | Detail |
+| -------- | ------ | --------------------- | -------- | -------------- | ------ |
+| TERRA-00 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-01 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-02 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-03 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-04 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-05 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-06 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-07 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-08 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+| TERRA-09 | done   | external:precondition | 工程骨架 | 见下方阶段说明 | -      |
+
 ## 8. 根命令契约
 
 Terra 可以调整底层工具，但必须交付以下稳定用户接口：
@@ -424,9 +446,9 @@ Terra 可以调整底层工具，但必须交付以下稳定用户接口：
 ## 10. 交给 Terra 的建议执行提示
 
 ```text
-请执行 docs/plans/terra-foundation-plan.md。
+请执行 docs/exec-plans/completed/terra/plan.md。
 
-完整阅读 docs/product-spec.md、docs/architecture.md 和该计划后再修改代码。
+完整阅读 docs/product-specs/、ARCHITECTURE.md、相关 docs/design-docs/ 和该计划后再修改代码。
 按 TERRA-00 至 TERRA-09 顺序执行，每完成一个阶段立即运行阶段验证。
 只建立基础框架，不实现任何扑克、房间、筹码、持久化或局域网发现业务。
 保留所有无关工作区改动。遇到产品或架构歧义时停止并报告，不要静默决定。

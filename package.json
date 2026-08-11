@@ -19,6 +19,10 @@
     "dev": "concurrently --kill-others-on-fail --names client,desktop --prefix-colors cyan,magenta \"pnpm --filter @texas-holdem/client dev\" \"pnpm --filter @texas-holdem/desktop dev\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "harness:check": "node scripts/check-repository-harness.mjs",
+    "harness:test": "vitest run tests/harness/repository-harness.test.ts --environment node",
+    "check": "pnpm harness:check && pnpm harness:test && pnpm format:check && pnpm lint && pnpm typecheck",
+    "check:full": "pnpm check && pnpm test && pnpm build",
     "lint": "eslint .",
     "typecheck": "pnpm --filter \"./packages/*\" build && pnpm -r --if-present typecheck",
     "version:check": "node scripts/version.mjs --check",
@@ -35,13 +39,18 @@
     "@types/node": "26.1.2",
     "concurrently": "10.0.4",
     "eslint": "10.8.0",
+    "github-slugger": "2.0.0",
     "globals": "17.8.0",
+    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-gfm-table": "2.0.0",
+    "micromark-extension-gfm-table": "2.1.1",
     "png-to-ico": "3.0.2",
     "prettier": "3.9.6",
     "sharp": "0.35.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.65.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "yaml": "2.9.0"
   },
   "optionalDependencies": {
     "@rolldown/binding-win32-x64-msvc": "1.2.1"

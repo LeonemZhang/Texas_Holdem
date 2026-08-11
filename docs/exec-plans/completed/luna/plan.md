@@ -1,28 +1,31 @@
-# GPT-5.6 Luna 增量小模块开发计划
+# GPT-5.6 Luna 历史增量计划（已取代）
 
+> 生命周期：superseded
+> 归档说明：本计划是在功能已落地后迁移的历史任务清单，未逐项回填验收证据；表中的 `pending` 不代表当前实现缺失，不得作为重复实现或判断依赖缺失的依据。
 > 目标模型：GPT-5.6 Luna  
 > 默认推理强度：Medium  
 > 复杂规则任务：High  
 > 执行单位：一次调用只执行一个任务 ID  
-> 前置条件：`docs/plans/terra-foundation-plan.md` 已完成且全套质量门禁通过
+> 前置条件：`docs/exec-plans/completed/terra/plan.md` 已完成且全套质量门禁通过
 
 ## 1. 计划目的
 
-本计划把已评审的产品和架构基线拆成可以由 Luna 逐个完成、逐个测试、逐个验收的小模块。
+本计划记录最初用于建设产品的 Luna 小模块分解，当前仅供追溯历史任务边界。
 
-本计划不是待办事项大纲。每个任务 ID 都是独立执行边界，不能把同一阶段的多行任务合并为一次“大功能实现”。
+本计划已被当前代码、产品规格和按变更创建的新执行计划取代。Agent 不得从本计划选择 `pending` 任务继续开发；需要修改现有行为时，以用户请求、当前产品规格和与本次变更对应的进行中计划为准。
 
 ## 2. 必读事实来源
 
-每次执行任意 Luna 任务前必须阅读：
+查阅历史 Luna 任务时按需阅读：
 
 1. 根 `AGENTS.md`。
-2. `docs/product-spec.md`。
-3. `docs/architecture.md`。
-4. 本文的执行契约、当前任务行和直接依赖任务行。
-5. 当前任务涉及的现有源码与测试。
+2. `INVARIANTS.md`。
+3. `docs/product-specs/` 中与任务相关的产品规格。
+4. `ARCHITECTURE.md` 和 `docs/design-docs/` 中与任务相关的设计。
+5. 本文中对应的历史任务行和直接依赖任务行。
+6. 当前任务涉及的现有源码与测试。
 
-产品规则以 `product-spec.md` 为准，技术边界以 `architecture.md` 为准。本文只决定实现顺序和任务边界。
+产品规则以 `docs/product-specs/` 为准，技术边界以 `ARCHITECTURE.md` 和 `docs/design-docs/` 为准；本文只决定实现顺序和任务边界。
 
 ## 3. Luna 单任务执行契约
 
@@ -33,6 +36,7 @@
 - 确认当前任务的所有依赖 ID 已在代码中完成，而不是仅在文档中勾选。
 - 只打开当前任务、直接依赖模块和必要测试构造器。
 - 不重新选择架构、依赖管理器或应用边界。
+- 如果需求与现有产品决策、ADR 或不变量不一致，先确认是修改既有决策还是修改需求；确认前不得编码。
 
 ### 3.2 修改范围
 
@@ -51,6 +55,7 @@
 - 对关键不变量和错误分支的测试。
 - 当前 workspace 的测试、类型检查和根 lint 结果。
 - 实际改动与计划偏差说明。
+- 完成前检查产品规格、设计文档、不变量、决策、计划和验收证据是否需要同步更新；系统事实变化时必须更新对应文档。
 
 ### 3.4 任务完成定义
 
@@ -75,17 +80,154 @@
 
 ## 4. 单任务提示模板
 
-以后执行某个任务时，使用以下提示；一次只替换一个任务 ID：
+以下提示仅保留为历史记录，不得用于启动新的实现任务：
 
 ```text
-执行 docs/plans/luna-incremental-plan.md 中的任务 <TASK_ID>，不要执行其他任务。
+查阅 docs/exec-plans/completed/luna/plan.md 中的历史任务 <TASK_ID>，不要据此重复实现。
 
-先完整阅读根 AGENTS.md、docs/product-spec.md、docs/architecture.md、计划执行契约、<TASK_ID> 任务行及其直接依赖任务。检查当前 Git 状态并保留无关改动。
+先完整阅读根 AGENTS.md、INVARIANTS.md、相关 product-spec、ARCHITECTURE.md、相关 design-doc、计划执行契约、<TASK_ID> 任务行及其直接依赖任务。检查当前 Git 状态并保留无关改动。
 
 严格遵守该任务的目录范围、依赖、不变量和完成条件。为本任务新增或更新测试，运行当前 workspace 测试、根 typecheck 和根 lint。不要提交或推送，除非本次请求另有明确授权。
 
 完成时报告：改动文件、实现行为、测试命令与结果、未完成项、Git 状态。若前置任务缺失或文档存在会改变业务结果的歧义，停止并报告，不要自行扩展范围。
 ```
+
+## 任务状态登记表
+
+本表保留迁移时的历史状态。由于迁移没有逐项补录证据，未取得证据的任务保持 `pending`；该状态只表示历史计划未回填，不表示当前代码缺少对应能力。
+
+| ID          | Status  | Depends                             | Affected | Acceptance     | Detail |
+| ----------- | ------- | ----------------------------------- | -------- | -------------- | ------ |
+| LUNA-C01    | pending | external:Terra                      | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C02    | pending | LUNA-C01                            | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C03    | pending | LUNA-C02                            | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C04    | pending | LUNA-C01                            | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C05    | pending | LUNA-C01                            | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C06    | pending | LUNA-C05                            | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C07    | pending | LUNA-C06                            | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C08    | pending | LUNA-C04, LUNA-C07                  | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C09    | pending | LUNA-C08                            | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-C10    | pending | LUNA-C06                            | 阶段 A   | 见下方任务目录 | -      |
+| LUNA-S01    | pending | LUNA-C01                            | 阶段 B   | 见下方任务目录 | -      |
+| LUNA-S02    | pending | LUNA-S01                            | 阶段 B   | 见下方任务目录 | -      |
+| LUNA-S03    | pending | LUNA-S01, LUNA-S02                  | 阶段 B   | 见下方任务目录 | -      |
+| LUNA-S04    | pending | LUNA-S03                            | 阶段 B   | 见下方任务目录 | -      |
+| LUNA-B01    | pending | LUNA-S04                            | 阶段 C   | 见下方任务目录 | -      |
+| LUNA-B02    | pending | LUNA-B01                            | 阶段 C   | 见下方任务目录 | -      |
+| LUNA-B03    | pending | LUNA-B01                            | 阶段 C   | 见下方任务目录 | -      |
+| LUNA-B04    | pending | LUNA-B02, LUNA-B03                  | 阶段 C   | 见下方任务目录 | -      |
+| LUNA-B05    | pending | LUNA-B04                            | 阶段 C   | 见下方任务目录 | -      |
+| LUNA-B06    | pending | LUNA-B02, LUNA-B05, LUNA-S04        | 阶段 C   | 见下方任务目录 | -      |
+| LUNA-P01    | pending | LUNA-B01                            | 阶段 D   | 见下方任务目录 | -      |
+| LUNA-P02    | pending | LUNA-P01                            | 阶段 D   | 见下方任务目录 | -      |
+| LUNA-P03    | pending | LUNA-P02, LUNA-C07                  | 阶段 D   | 见下方任务目录 | -      |
+| LUNA-P04    | pending | LUNA-P03, LUNA-S01                  | 阶段 D   | 见下方任务目录 | -      |
+| LUNA-H01    | pending | LUNA-C03, LUNA-S04, LUNA-B01        | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-H02    | pending | LUNA-H01, LUNA-B06                  | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-H03    | pending | LUNA-H02                            | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-H04    | pending | LUNA-H03                            | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-H05    | pending | LUNA-H02                            | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-H06    | pending | LUNA-H04, LUNA-C08, LUNA-P04        | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-H07    | pending | LUNA-H05, LUNA-H06                  | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-H08    | pending | LUNA-H07, LUNA-S03                  | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-H09    | pending | LUNA-H08                            | 阶段 E   | 见下方任务目录 | -      |
+| LUNA-R01    | pending | external:Terra                      | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R02    | pending | LUNA-R01                            | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R03    | pending | LUNA-R02, LUNA-S01                  | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R04    | pending | LUNA-R03                            | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R05    | pending | LUNA-R04, LUNA-H01                  | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R06    | pending | LUNA-H07                            | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R07    | pending | LUNA-R06                            | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R08    | pending | LUNA-R06                            | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R09    | pending | LUNA-R08                            | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R10    | pending | LUNA-R07, LUNA-R09, LUNA-H08        | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R11    | pending | LUNA-R03                            | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R12    | pending | LUNA-R11                            | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R13    | pending | LUNA-R05, LUNA-R10, LUNA-R12        | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-R14    | pending | LUNA-R01, LUNA-R04                  | 阶段 F   | 见下方任务目录 | -      |
+| LUNA-ST01   | pending | LUNA-H07                            | 阶段 G   | 见下方任务目录 | -      |
+| LUNA-ST02   | pending | LUNA-ST01                           | 阶段 G   | 见下方任务目录 | -      |
+| LUNA-ST03   | pending | LUNA-ST02                           | 阶段 G   | 见下方任务目录 | -      |
+| LUNA-ST04   | pending | LUNA-ST03                           | 阶段 G   | 见下方任务目录 | -      |
+| LUNA-PR01   | pending | external:Terra                      | 阶段 H   | 见下方任务目录 | -      |
+| LUNA-PR02   | pending | LUNA-R04, LUNA-R13, LUNA-PR01       | 阶段 H   | 见下方任务目录 | -      |
+| LUNA-PR03   | pending | LUNA-B06, LUNA-PR01                 | 阶段 H   | 见下方任务目录 | -      |
+| LUNA-PR04   | pending | LUNA-R07, LUNA-R09, LUNA-PR01       | 阶段 H   | 见下方任务目录 | -      |
+| LUNA-PR05   | pending | LUNA-H07, LUNA-ST04, LUNA-PR01      | 阶段 H   | 见下方任务目录 | -      |
+| LUNA-PR06   | pending | LUNA-R13, LUNA-ST04, LUNA-PR05      | 阶段 H   | 见下方任务目录 | -      |
+| LUNA-PR07   | pending | LUNA-PR06                           | 阶段 H   | 见下方任务目录 | -      |
+| LUNA-PR08   | pending | LUNA-PR06, LUNA-H07                 | 阶段 H   | 见下方任务目录 | -      |
+| LUNA-HS01   | pending | LUNA-R13, LUNA-PR07                 | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS02   | pending | LUNA-HS01                           | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS03   | pending | LUNA-HS02                           | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS04   | pending | LUNA-HS03, LUNA-PR02, LUNA-PR04     | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS05   | pending | LUNA-HS03, LUNA-PR03                | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS06   | pending | LUNA-PR05, LUNA-HS04, LUNA-HS05     | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS07   | pending | LUNA-PR06, LUNA-HS06                | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS08   | pending | LUNA-R06, LUNA-B06, LUNA-HS04       | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS09   | pending | external:Terra, LUNA-PR01           | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS10   | pending | LUNA-HS03, LUNA-HS07                | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS11   | pending | LUNA-HS06, LUNA-HS10                | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-HS12   | pending | LUNA-HS06, LUNA-HS07, LUNA-HS10     | 阶段 I   | 见下方任务目录 | -      |
+| LUNA-DB01   | pending | LUNA-HS06                           | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-DB02   | pending | LUNA-DB01                           | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-DB03   | pending | LUNA-DB02                           | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-DB04   | pending | LUNA-DB03, LUNA-HS06                | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-DB05   | pending | LUNA-DB03, LUNA-HS07                | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-DB06   | pending | LUNA-DB03, LUNA-R09                 | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-DB07   | pending | LUNA-DB04, LUNA-DB05                | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-DB08   | pending | LUNA-DB07, LUNA-R12                 | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-DB09   | pending | LUNA-DB04, LUNA-ST04                | 阶段 J   | 见下方任务目录 | -      |
+| LUNA-RC01   | pending | LUNA-DB03, LUNA-PR01                | 阶段 J2  | 见下方任务目录 | -      |
+| LUNA-RC02   | pending | LUNA-DB05, LUNA-DB09, LUNA-RC01     | 阶段 J2  | 见下方任务目录 | -      |
+| LUNA-RC03   | pending | LUNA-DB07, LUNA-RC02                | 阶段 J2  | 见下方任务目录 | -      |
+| LUNA-RC04   | pending | LUNA-HS01, LUNA-RC01, LUNA-RC03     | 阶段 J2  | 见下方任务目录 | -      |
+| LUNA-RC05   | pending | LUNA-PR07, LUNA-RC04                | 阶段 J2  | 见下方任务目录 | -      |
+| LUNA-RC06   | pending | LUNA-RC05, LUNA-UI18                | 阶段 J2  | 见下方任务目录 | -      |
+| LUNA-NET01  | pending | LUNA-PR01, LUNA-R01                 | 阶段 K   | 见下方任务目录 | -      |
+| LUNA-NET02  | pending | LUNA-NET01, LUNA-HS09               | 阶段 K   | 见下方任务目录 | -      |
+| LUNA-NET03  | pending | LUNA-NET01                          | 阶段 K   | 见下方任务目录 | -      |
+| LUNA-NET04  | pending | LUNA-NET03, LUNA-HS09               | 阶段 K   | 见下方任务目录 | -      |
+| LUNA-UI01   | pending | LUNA-PR07, external:Terra           | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI02   | pending | LUNA-UI01, LUNA-HS10                | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI03   | pending | LUNA-UI02, LUNA-HS12                | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI04   | pending | LUNA-UI03, LUNA-R12                 | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI05   | pending | LUNA-NET04                          | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI06   | pending | LUNA-NET03, LUNA-UI05               | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI07   | pending | LUNA-R01, LUNA-UI03                 | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI08   | pending | LUNA-R04, LUNA-UI03                 | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI09   | pending | LUNA-PR06, LUNA-UI03                | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI10   | pending | LUNA-UI09                           | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI11   | pending | LUNA-UI09                           | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI12   | pending | LUNA-B06, LUNA-UI03                 | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI13   | pending | LUNA-R07, LUNA-UI03                 | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI14   | pending | LUNA-R09, LUNA-UI13                 | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI15   | pending | LUNA-ST04, LUNA-UI03                | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI16   | pending | LUNA-R13, LUNA-UI03                 | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI17   | pending | LUNA-UI01, LUNA-UI04                | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI18   | pending | LUNA-RC05, LUNA-UI05                | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI19   | pending | LUNA-UI09, LUNA-PR06                | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-UI20   | pending | LUNA-UI15, LUNA-UI18, LUNA-DESK07   | 阶段 L   | 见下方任务目录 | -      |
+| LUNA-DESK01 | pending | LUNA-NET03, external:Terra          | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-DESK02 | pending | LUNA-HS09, LUNA-DB07                | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-DESK03 | pending | LUNA-DESK01, LUNA-DESK02, LUNA-UI05 | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-DESK04 | pending | LUNA-R11, LUNA-UI17                 | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-DESK05 | pending | LUNA-R13, LUNA-DB07                 | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-DESK06 | pending | LUNA-DESK03, LUNA-DESK05            | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-DESK07 | pending | LUNA-RC04, LUNA-UI18, LUNA-DESK02   | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-DESK08 | pending | external:Terra, LUNA-DESK06         | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-DESK09 | pending | LUNA-DESK06, LUNA-DESK08, LUNA-UI05 | 阶段 M   | 见下方任务目录 | -      |
+| LUNA-E2E01  | pending | LUNA-UI12, LUNA-HS11                | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E02  | pending | LUNA-E2E01, LUNA-S04                | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E03  | pending | LUNA-H06, LUNA-UI12                 | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E04  | pending | LUNA-UI14, LUNA-R10                 | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E05  | pending | LUNA-UI17, LUNA-HS12                | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E06  | pending | LUNA-DB07, LUNA-DESK05              | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E07  | pending | LUNA-UI09, LUNA-UI14, LUNA-UI15     | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E08  | pending | LUNA-NET04, LUNA-DESK03             | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E09  | pending | LUNA-ST04, LUNA-DB09                | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E10  | pending | LUNA-DESK06                         | Luna     | 见下方任务目录 | -      |
+| LUNA-E2E11  | pending | LUNA-RC03, LUNA-UI18, LUNA-DESK07   | Luna     | 见下方任务目录 | -      |
 
 ## 5. 阶段 A：牌、牌组与牌型比较
 
