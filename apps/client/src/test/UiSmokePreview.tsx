@@ -480,7 +480,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
             : `第 ${previewHandNumber} 局 · 翻牌 · 盲注：10/20`
         }
         status={
-          <div className="table-preview-status">
+          <div className="poker-table-page__header-actions">
             <TableUtilityToolbar
               activePanel={activeUtilityPanel}
               isHost={isHost}
@@ -489,7 +489,7 @@ function TablePreview({ page }: { readonly page: TablePreviewPage }) {
             />
             {scrollPreview ? (
               <div
-                className="table-preview-scroll-controls"
+                className="poker-table-page__utility-actions"
                 aria-label="8人座位队列预览控制"
               >
                 <span aria-live="polite">

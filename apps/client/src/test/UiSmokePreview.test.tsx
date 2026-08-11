@@ -45,6 +45,18 @@ describe('UiSmokePreview', () => {
     expect(screen.getByText('当前行动：玩家 5')).toBeInTheDocument();
   });
 
+  it('uses the formal table toolbar styles for preview controls', () => {
+    const { container } = render(<UiSmokePreview page="table-8-scroll" />);
+
+    expect(
+      container.querySelector('.poker-table-page__header-actions'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('.poker-table-page__utility-actions'),
+    ).toBeInTheDocument();
+    expect(container.querySelector('[class*="table-preview"]')).toBeNull();
+  });
+
   it('renders the settlement sound preview', () => {
     render(<UiSmokePreview page="sound" />);
 
