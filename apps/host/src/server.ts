@@ -109,8 +109,7 @@ export async function createHostServer(
     const port = actualPort ?? 32_100;
     const advertisedHost = options.advertisedHost?.trim();
     const host =
-      hostFromHeader(request?.headers.host) ??
-      (advertisedHost || '127.0.0.1');
+      hostFromHeader(request?.headers.host) ?? (advertisedHost || '127.0.0.1');
     const urlHost = host.includes(':') ? `[${host}]` : host;
     return {
       host,
