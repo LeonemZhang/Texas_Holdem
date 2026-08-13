@@ -18,6 +18,7 @@ export function ConnectionGuard({
 }: ConnectionGuardProps) {
   const recovering =
     state.status === 'recovering' || state.status === 'connecting';
+  const locked = recovering || state.status === 'failed';
   const error = networkErrorMessage(
     state.status === 'failed' ? state.error : synchronizationError,
   );
@@ -47,7 +48,7 @@ export function ConnectionGuard({
         </div>
       ) : null}
 
-      <fieldset className="connection-guard__content" disabled={recovering}>
+      <fieldset className="connection-guard__content" disabled={locked}>
         {children}
       </fieldset>
     </div>

@@ -60,6 +60,7 @@ const defaultSocketFactory: ClientSocketFactory = (
     autoConnect: false,
     auth: credentials,
     path: socketPath,
+    reconnection: false,
   }) as Socket as unknown as ClientSocketPort;
 
 export class SocketIoConnectionAdapter implements ConnectionAdapter {
@@ -67,6 +68,12 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
   readonly #eventListeners = new Set<(event: DomainEvent) => void>();
   readonly #snapshotListeners = new Set<(snapshot: PlayerSnapshot) => void>();
   #socket: ClientSocketPort | null = null;
+  #generation = 0;
+  #pendingConnection: {
+    readonly generation: number;
+    readonly reject: (reason: unknown) => void;
+  } | null = null;
+  #socketCleanup: (() => void) | null = null;
 
   constructor(
     private readonly url: string,
@@ -77,47 +84,117 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
 
   async connect(credentials: SocketAuthentication): Promise<void> {
     this.disconnect();
+    const generation = ++this.#generation;
     const socket = this.socketFactory(this.url, credentials, this.socketPath);
     this.#socket = socket;
     await new Promise<void>((resolve, reject) => {
-      const connected = () => {
+      let settled = false;
+      const isCurrent = () =>
+        generation === this.#generation && this.#socket === socket;
+      const removeHandshakeListeners = () => {
+        socket.off('connect', connected as (...arguments_: never[]) => void);
         socket.off('connect_error', failed as (...arguments_: never[]) => void);
+      };
+      const cleanup = () => {
+        removeHandshakeListeners();
+        socket.off(
+          'disconnect',
+          disconnected as (...arguments_: never[]) => void,
+        );
+        socket.off(
+          'event:domain',
+          domainEvent as (...arguments_: never[]) => void,
+        );
+        socket.off(
+          'state:snapshot',
+          snapshot as (...arguments_: never[]) => void,
+        );
+        if (this.#socketCleanup === cleanup) this.#socketCleanup = null;
+        if (
+          this.#pendingConnection?.generation === generation &&
+          this.#pendingConnection.reject === reject
+        ) {
+          this.#pendingConnection = null;
+        }
+      };
+      const fail = (action: () => void) => {
+        if (settled || !isCurrent()) return;
+        settled = true;
+        cleanup();
+        action();
+      };
+      const connected = () => {
+        if (settled || !isCurrent()) return;
+        settled = true;
+        removeHandshakeListeners();
+        if (
+          this.#pendingConnection?.generation === generation &&
+          this.#pendingConnection.reject === reject
+        ) {
+          this.#pendingConnection = null;
+        }
         resolve();
       };
       const failed = (error: Error) => {
-        socket.off('connect', connected);
-        reject(
-          new CommandTransportError('CONNECTION_FAILED', error.message, {
-            cause: error,
-          }),
+        fail(() =>
+          reject(
+            new CommandTransportError('CONNECTION_FAILED', error.message, {
+              cause: error,
+            }),
+          ),
         );
       };
-      socket.on('connect', connected);
-      socket.on('connect_error', failed);
-      socket.on('disconnect', (reason) => {
+      const disconnected = (reason: string) => {
+        if (!isCurrent()) return;
+        if (!settled) {
+          fail(() =>
+            reject(
+              new CommandTransportError(
+                'CONNECTION_FAILED',
+                `Socket disconnected before connecting: ${reason}`,
+              ),
+            ),
+          );
+          return;
+        }
         this.#lostListeners.forEach((listener) => listener(reason));
-      });
-      socket.on('event:domain', (payload) => {
+      };
+      const domainEvent = (payload: unknown) => {
+        if (!isCurrent()) return;
         const event = DomainEventSchema.safeParse(payload);
         if (event.success) {
           this.#eventListeners.forEach((listener) => listener(event.data));
         }
-      });
-      socket.on('state:snapshot', (payload) => {
-        const snapshot = PlayerSnapshotSchema.safeParse(payload);
-        if (snapshot.success) {
-          this.#snapshotListeners.forEach((listener) =>
-            listener(snapshot.data),
-          );
+      };
+      const snapshot = (payload: unknown) => {
+        if (!isCurrent()) return;
+        const parsed = PlayerSnapshotSchema.safeParse(payload);
+        if (parsed.success) {
+          this.#snapshotListeners.forEach((listener) => listener(parsed.data));
         }
-      });
+      };
+      socket.on('connect', connected);
+      socket.on('connect_error', failed);
+      socket.on('disconnect', disconnected);
+      socket.on('event:domain', domainEvent);
+      socket.on('state:snapshot', snapshot);
+      this.#socketCleanup = cleanup;
+      this.#pendingConnection = { generation, reject };
       socket.connect();
     });
   }
 
   disconnect(): void {
+    this.#generation += 1;
+    const pending = this.#pendingConnection;
+    this.#pendingConnection = null;
+    this.#socketCleanup?.();
+    this.#socketCleanup = null;
     this.#socket?.disconnect();
     this.#socket = null;
+    pending?.reject(
+      new CommandTransportError('DISCONNECTED', 'Socket connection cancelled'),
+    );
   }
 
   createCommandId(): string {

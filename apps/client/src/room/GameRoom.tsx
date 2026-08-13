@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   PROTOCOL_VERSION,
   type PlayerSnapshot,
@@ -9,6 +16,8 @@ import {
 import type { ConnectionAdapter } from '../connection/connection.js';
 import { SocketIoConnectionAdapter } from '../connection/socket-io-adapter.js';
 import { networkErrorMessage } from '../connection/error-message.js';
+import { ConnectionGuard } from '../connection/ConnectionGuard.js';
+import { ReconnectController } from '../connection/reconnect-controller.js';
 import { StatisticsPanel } from '../statistics/StatisticsPanel.js';
 import {
   BettingControls,
@@ -129,7 +138,24 @@ export function GameRoom({
     () => connectionFactory(session),
     [connectionFactory, session],
   );
+  const credentials = useMemo(
+    () => ({
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: session.roomId,
+      playerId: session.playerId,
+      token: session.token,
+    }),
+    [session.playerId, session.roomId, session.token],
+  );
+  const reconnectController = useMemo(
+    () => new ReconnectController(connection, credentials),
+    [connection, credentials],
+  );
   const [snapshot, setSnapshot] = useState<PlayerSnapshot | null>(null);
+  const [connectionState, setConnectionState] = useState(
+    reconnectController.state,
+  );
+  const [snapshotReady, setSnapshotReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
   const [statisticsCollapsed, setStatisticsCollapsed] = useState(false);
@@ -141,6 +167,7 @@ export function GameRoom({
     readonly PotChipFlight[]
   >([]);
   const latestSnapshot = useRef<PlayerSnapshot | null>(null);
+  const snapshotReadyRef = useRef(false);
   const stoppedHostRoomId = useRef<string | null>(null);
   const removedExitNotified = useRef(false);
   const onExitedRef = useRef(onExited);
@@ -198,26 +225,46 @@ export function GameRoom({
   }, [activeUtilityPanel, closeUtilityPanel]);
 
   useEffect(() => {
+    const stopState = reconnectController.subscribe((state) => {
+      setConnectionState(state);
+      if (state.status === 'recovering' || state.status === 'connecting') {
+        snapshotReadyRef.current = false;
+        setSnapshotReady(false);
+      }
+    });
     const stopSnapshot = connection.onSnapshot((next) => {
       if (
-        latestSnapshot.current &&
-        next.sequence < latestSnapshot.current.sequence
+        next.roomId !== session.roomId ||
+        next.playerId !== session.playerId ||
+        !next.room.players.some(
+          ({ playerId }) => playerId === session.playerId,
+        ) ||
+        (latestSnapshot.current &&
+          next.sequence < latestSnapshot.current.sequence)
       ) {
         return;
       }
-      const flights = potContributionFlights(latestSnapshot.current, next);
-      if (flights.length > 0) {
+      const recovering = !snapshotReadyRef.current;
+      const flights = recovering
+        ? []
+        : potContributionFlights(latestSnapshot.current, next);
+      if (!recovering && flights.length > 0) {
         setPotChipFlights((current) => [...current, ...flights]);
       }
-      soundEffects.play(pokerSoundCues(latestSnapshot.current, next));
-      soundEffects.setTurnClock(
-        next.game?.currentActorId === next.playerId
-          ? (next.game.actionDeadlineMs ?? null)
-          : null,
-      );
+      if (!recovering) {
+        soundEffects.play(pokerSoundCues(latestSnapshot.current, next));
+        soundEffects.setTurnClock(
+          next.game?.currentActorId === next.playerId
+            ? (next.game.actionDeadlineMs ?? null)
+            : null,
+        );
+      }
       latestSnapshot.current = next;
       setSnapshot(next);
       setError(null);
+      snapshotReadyRef.current = true;
+      setSnapshotReady(true);
+      reconnectController.acceptSnapshot();
       if (
         !removedExitNotified.current &&
         next.room.players.some(
@@ -226,43 +273,28 @@ export function GameRoom({
         )
       ) {
         removedExitNotified.current = true;
+        reconnectController.stop();
         onExitedRef.current?.('removed');
       }
-    });
-    const stopLost = connection.onConnectionLost(() => {
-      // A host closes its local service only after the final closed snapshot
-      // has been delivered. That expected disconnect must not mask the normal
-      // room-closed state as a network failure.
-      if (latestSnapshot.current?.room.phase !== 'closed') {
-        setError('网络异常，请重试');
-      }
+      if (next.room.phase === 'closed') reconnectController.stop();
     });
     const stopEvent = connection.onDomainEvent(() => undefined);
-    void connection
-      .connect({
-        protocolVersion: PROTOCOL_VERSION,
-        roomId: session.roomId,
-        playerId: session.playerId,
-        token: session.token,
-      })
-      .catch((reason: unknown) =>
-        setError(
-          networkErrorMessage(reason instanceof Error ? reason.message : null),
-        ),
-      );
+    reconnectController.start();
     return () => {
+      stopState();
       stopSnapshot();
-      stopLost();
       stopEvent();
-      connection.disconnect();
+      reconnectController.stop();
     };
-  }, [connection, session, soundEffects]);
+  }, [connection, reconnectController, session, soundEffects]);
 
   const send = useCallback(
     async (command: Record<string, unknown>): Promise<boolean> => {
       const submittedSnapshot = latestSnapshot.current;
       if (
         !submittedSnapshot ||
+        !snapshotReadyRef.current ||
+        reconnectController.state.status !== 'connected' ||
         sending ||
         submittedSnapshot.room.players.some(
           ({ playerId, status }) =>
@@ -309,7 +341,7 @@ export function GameRoom({
         setSending(false);
       }
     },
-    [connection, sending, session],
+    [connection, reconnectController, sending, session],
   );
 
   const dismissPotChipFlight = useCallback((id: string) => {
@@ -325,9 +357,9 @@ export function GameRoom({
   }, [connection]);
 
   useEffect(() => {
-    onCommandPortChange?.(send);
+    onCommandPortChange?.(snapshotReady ? send : null);
     return () => onCommandPortChange?.(null);
-  }, [onCommandPortChange, send]);
+  }, [onCommandPortChange, send, snapshotReady]);
 
   useEffect(() => {
     if (
@@ -383,12 +415,27 @@ export function GameRoom({
     }
   };
 
+  const guardState =
+    connectionState.status === 'connected' && !snapshotReady
+      ? { status: 'recovering' as const, reason: '正在等待权威房间快照' }
+      : connectionState;
+  const guarded = (content: ReactNode) => (
+    <ConnectionGuard state={guardState} onRetry={reconnectController.retry}>
+      {content}
+    </ConnectionGuard>
+  );
+
   if (!snapshot) {
-    return (
+    return guarded(
       <section className="game-room-loading" aria-live="polite">
         <h2>正在连接牌桌</h2>
-        <p>{error ?? '正在获取服务端状态…'}</p>
-      </section>
+        <p>
+          {error ??
+            (connectionState.status === 'failed'
+              ? connectionState.error
+              : '正在获取服务端状态…')}
+        </p>
+      </section>,
     );
   }
 
@@ -426,7 +473,7 @@ export function GameRoom({
   }));
 
   if (snapshot.room.phase === 'lobby') {
-    return (
+    return guarded(
       <div className="game-room-shell" aria-busy={sending}>
         {error ? (
           <p className="form-error" role="alert">
@@ -493,12 +540,12 @@ export function GameRoom({
             退出房间
           </button>
         ) : null}
-      </div>
+      </div>,
     );
   }
 
   if (snapshot.room.phase === 'closed') {
-    return (
+    return guarded(
       <div className="game-room-shell">
         {error ? (
           <p className="form-error" role="alert">
@@ -538,7 +585,7 @@ export function GameRoom({
           onCollapse={() => setStatisticsCollapsed(true)}
           onExpand={() => setStatisticsCollapsed(false)}
         />
-      </div>
+      </div>,
     );
   }
 
@@ -618,7 +665,7 @@ export function GameRoom({
       : game
         ? `第 ${game.handNumber ?? snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]} · 盲注：${snapshot.room.smallBlind}/${snapshot.room.bigBlind}`
         : '等待牌局开始';
-  return (
+  return guarded(
     <div className="game-room-shell" aria-busy={sending}>
       {error ? (
         <p className="form-error" role="alert">
@@ -813,6 +860,6 @@ export function GameRoom({
           )
         }
       />
-    </div>
+    </div>,
   );
 }

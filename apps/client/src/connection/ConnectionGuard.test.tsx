@@ -25,10 +25,11 @@ describe('ConnectionGuard', () => {
         state={{ status: 'failed', error: '版本不兼容' }}
         onRetry={onRetry}
       >
-        <span>牌桌</span>
+        <button type="button">下注</button>
       </ConnectionGuard>,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('版本不兼容');
+    expect(screen.getByRole('button', { name: '下注' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
