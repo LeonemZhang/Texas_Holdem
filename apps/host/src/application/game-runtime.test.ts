@@ -836,7 +836,7 @@ describe('GameRuntime', () => {
     runtime.dispose();
   });
 
-  it('publishes and persists automatic runout streets at 2s/2s/2s/1s', async () => {
+  it('publishes and persists automatic runout streets at 2s/2s/2s/2s', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
     const runtime = new GameRuntime();
@@ -910,7 +910,7 @@ describe('GameRuntime', () => {
     expect(
       runtime.snapshot(context.host.roomId, context.host.playerId)!.game,
     ).toMatchObject({ street: 'river' });
-    await vi.advanceTimersByTimeAsync(999);
+    await vi.advanceTimersByTimeAsync(1_999);
     expect(
       runtime.snapshot(context.host.roomId, context.host.playerId)!.room.phase,
     ).toBe('playing');

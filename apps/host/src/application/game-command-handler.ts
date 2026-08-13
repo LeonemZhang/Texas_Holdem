@@ -123,7 +123,7 @@ export class GameCommandHandler {
     ) {
       return null;
     }
-    return hand.street === 'river' ? 1_000 : 2_000;
+    return 2_000;
   }
 
   handle(

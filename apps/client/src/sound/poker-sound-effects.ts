@@ -13,6 +13,8 @@ type PlayerActionSound = 'fold' | 'check' | 'call' | 'raise' | 'all-in';
 
 export type PokerSoundCue =
   | 'deal'
+  | 'runout-wait'
+  | 'runout-reveal'
   | 'ready'
   | 'turn-self'
   | 'turn-other'
@@ -59,6 +61,11 @@ function turnCue(snapshot: PlayerSnapshot): PokerSoundCue | null {
   return actorId === snapshot.playerId ? 'turn-self' : 'turn-other';
 }
 
+function isAutomaticRunoutWaiting(snapshot: PlayerSnapshot): boolean {
+  const game = snapshot.game;
+  return game !== null && game.currentActorId === null && !game.settlement;
+}
+
 function settlementCue(
   previous: PlayerSnapshot,
   next: PlayerSnapshot,
@@ -95,6 +102,11 @@ export function pokerSoundCues(
   }
 
   const cues: PokerSoundCue[] = [];
+  const automaticRunoutReveal =
+    previous.game?.handId === next.game?.handId &&
+    previous.game?.street !== next.game?.street &&
+    isAutomaticRunoutWaiting(previous);
+  if (automaticRunoutReveal) cues.push('runout-reveal');
   const newSettlement = Boolean(
     next.game?.settlement && !previous.game?.settlement,
   );
@@ -114,6 +126,7 @@ export function pokerSoundCues(
     const cue = turnCue(next);
     if (cue) cues.push(cue);
   }
+  if (isAutomaticRunoutWaiting(next)) cues.push('runout-wait');
   return cues;
 }
 
@@ -215,6 +228,33 @@ export class PokerSoundEffects {
         [0, 0.06, 0.12, 0.18].forEach((offset, index) =>
           this.tone(context, 1_100 - index * 80, start + offset, 0.035, 0.035),
         );
+        return;
+      case 'runout-wait':
+        [0, 0.42, 0.84, 1.26, 1.62].forEach((offset, index) =>
+          this.tone(
+            context,
+            680 + index * 42,
+            start + offset,
+            0.075,
+            index === 4 ? 0.052 : 0.042,
+            'square',
+          ),
+        );
+        this.tone(context, 360, start + 1.78, 0.18, 0.045, 'triangle', 620);
+        return;
+      case 'runout-reveal':
+        [920, 1_040, 1_160].forEach((frequency, index) =>
+          this.tone(
+            context,
+            frequency,
+            start + index * 0.08,
+            0.1,
+            0.052,
+            'square',
+            frequency + 60,
+          ),
+        );
+        this.tone(context, 740, start + 0.18, 0.5, 0.045, 'triangle', 1_180);
         return;
       case 'ready':
         this.tone(context, 440, start, 0.08, 0.055);

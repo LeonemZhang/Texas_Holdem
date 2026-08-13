@@ -110,6 +110,40 @@ describe('poker sound effects', () => {
     ).toEqual(['ready']);
   });
 
+  it('plays cold runout waiting and reveal cues only on automatic-runout edges', () => {
+    const previous = snapshot();
+    const waiting = snapshot({
+      sequence: 2,
+      game: { ...previous.game!, currentActorId: null },
+      statistics: {
+        ...previous.statistics,
+        players: previous.statistics.players.map((player) => ({
+          ...player,
+          actions: { ...player.actions, allIn: 1 },
+        })),
+      },
+    });
+    expect(pokerSoundCues(previous, waiting)).toEqual([
+      'all-in',
+      'runout-wait',
+    ]);
+
+    const flop = snapshot({
+      sequence: 3,
+      game: { ...waiting.game!, street: 'flop', currentActorId: null },
+    });
+    expect(pokerSoundCues(waiting, flop)).toEqual([
+      'runout-reveal',
+      'runout-wait',
+    ]);
+
+    const normalStreetChange = snapshot({
+      sequence: 4,
+      game: { ...previous.game!, street: 'flop', currentActorId: 'alice' },
+    });
+    expect(pokerSoundCues(previous, normalStreetChange)).toEqual([]);
+  });
+
   it.each([
     [20, 'settlement-win'],
     [-20, 'settlement-loss'],
