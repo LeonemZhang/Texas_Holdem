@@ -294,7 +294,6 @@ export function GameRoom({
       if (
         !submittedSnapshot ||
         !snapshotReadyRef.current ||
-        reconnectController.state.status !== 'connected' ||
         sending ||
         submittedSnapshot.room.players.some(
           ({ playerId, status }) =>
@@ -341,7 +340,7 @@ export function GameRoom({
         setSending(false);
       }
     },
-    [connection, reconnectController, sending, session],
+    [connection, sending, session],
   );
 
   const dismissPotChipFlight = useCallback((id: string) => {

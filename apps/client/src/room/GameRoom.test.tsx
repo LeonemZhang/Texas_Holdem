@@ -310,6 +310,67 @@ describe('GameRoom', () => {
     );
   });
 
+  it('sends the start-first-hand command from an enabled host lobby button', async () => {
+    let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
+    const sendCommand = vi.fn().mockResolvedValue({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: 'command-start',
+      status: 'accepted',
+      stateVersion: 3,
+      sequence: 3,
+    });
+    const connection: ConnectionAdapter = {
+      connect: vi.fn(async () =>
+        consumeSnapshot({
+          ...snapshot,
+          playerId: 'host',
+          room: {
+            ...snapshot.room,
+            players: snapshot.room.players.map((player) => ({
+              ...player,
+              lobbyReady: true,
+            })),
+          },
+        }),
+      ),
+      disconnect: vi.fn(),
+      sendCommand,
+      requestResync: vi.fn(),
+      onConnectionLost: vi.fn(() => () => undefined),
+      onDomainEvent: vi.fn(() => () => undefined),
+      onSnapshot: vi.fn((listener) => {
+        consumeSnapshot = listener;
+        return () => undefined;
+      }),
+    };
+
+    render(
+      <GameRoom
+        session={{
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: 'room-1',
+          playerId: 'host',
+          token: 'host-reconnect-token-123456',
+          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+          socketPath: '/socket.io',
+        }}
+        connectionFactory={() => connection}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '开始游戏' }));
+    await waitFor(() =>
+      expect(sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'room.start-first-hand',
+          roomId: 'room-1',
+          playerId: 'host',
+          expectedVersion: 2,
+        }),
+      ),
+    );
+  });
+
   it('retries a betting action once when a conflict arrives with a newer snapshot', async () => {
     const staleSnapshot: PlayerSnapshot = {
       ...snapshot,
