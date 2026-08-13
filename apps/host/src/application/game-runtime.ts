@@ -112,6 +112,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
   readonly #results = new Map<string, CommandResponse>();
   readonly #handReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #actionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #runoutTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #actionDeadlines = new Map<
     string,
     {
@@ -208,10 +209,9 @@ export class GameRuntime implements RoomSessionBootstrapService {
       sequence,
     );
     this.startNextHandIfReady(command.roomId, false);
-    const playingRoom = this.rooms.get(command.roomId);
-    if (playingRoom) this.#gameHandler.resolveAutomatic(playingRoom);
     this.scheduleHandReadyTimeout(command.roomId);
     this.scheduleActionTimeout(command.roomId);
+    this.scheduleAutomaticRunout(command.roomId);
     this.#sequences.set(command.roomId, sequence);
     const sequenced = Object.freeze({
       ...response,
@@ -248,8 +248,11 @@ export class GameRuntime implements RoomSessionBootstrapService {
     if (handTimer) clearTimeout(handTimer);
     const actionTimer = this.#actionTimers.get(roomId);
     if (actionTimer) clearTimeout(actionTimer);
+    const runoutTimer = this.#runoutTimers.get(roomId);
+    if (runoutTimer) clearTimeout(runoutTimer);
     this.#handReadyTimers.delete(roomId);
     this.#actionTimers.delete(roomId);
+    this.#runoutTimers.delete(roomId);
     this.#actionDeadlines.delete(roomId);
     this.#summaries.delete(roomId);
     this.#facts.delete(roomId);
@@ -290,6 +293,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     }
     this.scheduleHandReadyTimeout(state.room.roomId);
     this.scheduleActionTimeout(state.room.roomId);
+    this.scheduleAutomaticRunout(state.room.roomId);
   }
 
   createRecoveredHostSession(baseJoinUrl: string): RoomSessionResponse {
@@ -344,8 +348,10 @@ export class GameRuntime implements RoomSessionBootstrapService {
   dispose(): void {
     for (const timer of this.#handReadyTimers.values()) clearTimeout(timer);
     for (const timer of this.#actionTimers.values()) clearTimeout(timer);
+    for (const timer of this.#runoutTimers.values()) clearTimeout(timer);
     this.#handReadyTimers.clear();
     this.#actionTimers.clear();
+    this.#runoutTimers.clear();
     this.#actionDeadlines.clear();
     this.#automaticListeners.clear();
     this.#committedListeners.clear();
@@ -876,6 +882,43 @@ export class GameRuntime implements RoomSessionBootstrapService {
     );
     timer.unref?.();
     this.#actionTimers.set(roomId, timer);
+  }
+
+  private scheduleAutomaticRunout(roomId: string): void {
+    const existing = this.#runoutTimers.get(roomId);
+    if (existing) clearTimeout(existing);
+    this.#runoutTimers.delete(roomId);
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    const delayMs = this.#gameHandler.automaticRunoutDelayMs(room);
+    if (delayMs === null) return;
+    const timer = setTimeout(() => {
+      this.#runoutTimers.delete(roomId);
+      const currentRoom = this.rooms.get(roomId);
+      if (!currentRoom) return;
+      const previousPhase = currentRoom.phase;
+      const result = this.#gameHandler.resolveAutomatic(currentRoom);
+      if (!result) {
+        this.scheduleAutomaticRunout(roomId);
+        return;
+      }
+      const nextRoom = this.rooms.get(roomId);
+      if (previousPhase === 'playing' && nextRoom?.phase === 'hand-ready') {
+        this.#completedHands.set(
+          roomId,
+          (this.#completedHands.get(roomId) ?? 0) + 1,
+        );
+      }
+      const sequence = (this.#sequences.get(roomId) ?? 0) + 1;
+      this.#sequences.set(roomId, sequence);
+      this.#committedListeners.forEach((listener) => listener(roomId));
+      this.#automaticListeners.forEach((listener) => listener(roomId));
+      this.scheduleHandReadyTimeout(roomId);
+      this.scheduleActionTimeout(roomId);
+      this.scheduleAutomaticRunout(roomId);
+    }, delayMs);
+    timer.unref?.();
+    this.#runoutTimers.set(roomId, timer);
   }
 
   private rememberReconnectToken(

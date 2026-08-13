@@ -61,12 +61,12 @@
 完整行为规范：[玩法规格：行动与下注轮](docs/product-specs/gameplay.md#行动与下注轮)
 
 执行方式：test + architecture
-覆盖状态：partial
-证据：[牌局生命周期设计](docs/design-docs/hand-lifecycle.md)、[Runout 关闭条件测试](packages/poker-core/src/hand/turn-river.test.ts)
+覆盖状态：complete
+证据：[牌局生命周期设计](docs/design-docs/hand-lifecycle.md)、[Runout 关闭条件测试](packages/poker-core/src/hand/turn-river.test.ts)、[Host 逐街计时测试](apps/host/src/application/game-runtime.test.ts)
 
-缺口：核心状态机已拒绝未关闭下注轮，但尚无房主计时或命令编排路径证明待 Call/Fold 玩家始终先获得响应机会。
-责任边界：`packages/poker-core` 负责下注轮关闭判定，`apps/host` 负责命令、计时和阶段编排。
-跟进：下一次修改自动 Runout 或行动超时时，补房主编排集成测试并覆盖仍有待响应玩家的场景。
+缺口：无。核心状态机拒绝未关闭下注轮，Host 只有在当前行动者为空且下注轮已关闭时才建立 Runout 计时链；仍有合法 Call/Fold 响应时不会提前公开街道。
+责任边界：`packages/poker-core` 负责下注轮关闭和单街推进，`apps/host` 负责命令、计时和阶段编排。
+跟进：若后续修改自动 Runout 或行动超时，必须保留并扩展核心与 Host 的关闭条件测试。
 
 ## INV-POT — 底池与筹码
 

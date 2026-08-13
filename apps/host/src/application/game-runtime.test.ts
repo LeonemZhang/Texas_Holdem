@@ -827,7 +827,280 @@ describe('GameRuntime', () => {
     runtime.dispose();
   });
 
-  it('counts a heads-up loss after other players fold before showdown', () => {
+  it('publishes and persists automatic runout streets at 2s/2s/2s/1s', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime);
+    context.send(context.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    context.send(context.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+
+    const firstActor = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!.game!.currentActorId!;
+    context.send(firstActor, { type: 'game.all-in' });
+    const secondActor = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!.game!.currentActorId!;
+    context.send(secondActor, { type: 'game.all-in' });
+
+    const published: Array<{
+      readonly street: string | undefined;
+      readonly sequence: number;
+      readonly stateVersion: number;
+    }> = [];
+    const committed: Array<{
+      readonly street: string | undefined;
+      readonly sequence: number;
+      readonly stateVersion: number;
+    }> = [];
+    runtime.onAutomaticStateChange((roomId) => {
+      const snapshots = runtime.snapshotsForRoom(roomId);
+      expect(snapshots).toHaveLength(2);
+      const snapshot = runtime.snapshot(roomId, context.host.playerId)!;
+      published.push({
+        street: snapshot.game?.street,
+        sequence: snapshot.sequence,
+        stateVersion: snapshot.stateVersion,
+      });
+    });
+    runtime.onStateCommitted((roomId) => {
+      const state = runtime.exportState(roomId)!;
+      committed.push({
+        street: state.hand?.street,
+        sequence: state.sequence,
+        stateVersion: state.room.version,
+      });
+    });
+
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'preflop' });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'flop' });
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'flop' });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'turn' });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'river' });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)!.room.phase,
+    ).toBe('playing');
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(published.map(({ street }) => street)).toEqual([
+      'flop',
+      'turn',
+      'river',
+      'river',
+    ]);
+    expect(committed.map(({ street }) => street)).toEqual([
+      'flop',
+      'turn',
+      'river',
+      'river',
+    ]);
+    expect(published.map(({ sequence }) => sequence)).toEqual(
+      [...published.map(({ sequence }) => sequence)].sort((a, b) => a - b),
+    );
+    expect(committed.map(({ stateVersion }) => stateVersion)).toEqual(
+      [...committed.map(({ stateVersion }) => stateVersion)].sort(
+        (a, b) => a - b,
+      ),
+    );
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId),
+    ).toMatchObject({
+      room: { phase: 'hand-ready' },
+      game: { street: 'river' },
+    });
+    runtime.dispose();
+  });
+
+  it('does not start runout while another player still has a legal response', async () => {
+    vi.useFakeTimers();
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime);
+    context.send(context.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    context.send(context.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    const firstActor = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!.game!.currentActorId!;
+    context.send(firstActor, { type: 'game.all-in' });
+    const waitingSnapshot = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!;
+    expect(waitingSnapshot.game?.currentActorId).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'preflop' });
+
+    context.send(waitingSnapshot.game!.currentActorId!, {
+      type: 'game.all-in',
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(
+      runtime.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'flop' });
+    runtime.dispose();
+  });
+
+  it('resumes automatic runout from the persisted current street without replay', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const runtime = new GameRuntime();
+    const context = reachHandReady(runtime);
+    context.send(context.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    context.send(context.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    const firstActor = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!.game!.currentActorId!;
+    context.send(firstActor, { type: 'game.all-in' });
+    const secondActor = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    )!.game!.currentActorId!;
+    context.send(secondActor, { type: 'game.all-in' });
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    const persisted = runtime.exportState(context.host.roomId)!;
+    expect(persisted.hand?.street).toBe('flop');
+    const sequence = persisted.sequence;
+    runtime.dispose();
+
+    const recovered = new GameRuntime();
+    recovered.restore(persisted, sequence);
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(
+      recovered.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'flop' });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(
+      recovered.snapshot(context.host.roomId, context.host.playerId)!.game,
+    ).toMatchObject({ street: 'turn' });
+    recovered.dispose();
+  });
+
+  it('clears automatic runout timers across pause, close, and dispose', async () => {
+    vi.useFakeTimers();
+    const pausedRuntime = new GameRuntime();
+    const paused = reachHandReady(pausedRuntime);
+    paused.send(paused.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    paused.send(paused.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    let actorId = pausedRuntime.snapshot(
+      paused.host.roomId,
+      paused.host.playerId,
+    )!.game!.currentActorId!;
+    paused.send(actorId, { type: 'game.all-in' });
+    actorId = pausedRuntime.snapshot(paused.host.roomId, paused.host.playerId)!
+      .game!.currentActorId!;
+    paused.send(actorId, { type: 'game.all-in' });
+    paused.send(paused.host.playerId, { type: 'room.pause' });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(
+      pausedRuntime.snapshot(paused.host.roomId, paused.host.playerId),
+    ).toMatchObject({ room: { phase: 'paused' }, game: { street: 'preflop' } });
+    paused.send(paused.host.playerId, { type: 'room.resume' });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(
+      pausedRuntime.snapshot(paused.host.roomId, paused.host.playerId)!.game,
+    ).toMatchObject({ street: 'flop' });
+    pausedRuntime.dispose();
+
+    const closedRuntime = new GameRuntime();
+    const closed = reachHandReady(closedRuntime);
+    closed.send(closed.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    closed.send(closed.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    actorId = closedRuntime.snapshot(closed.host.roomId, closed.host.playerId)!
+      .game!.currentActorId!;
+    closed.send(actorId, { type: 'game.all-in' });
+    actorId = closedRuntime.snapshot(closed.host.roomId, closed.host.playerId)!
+      .game!.currentActorId!;
+    closed.send(actorId, { type: 'game.all-in' });
+    closed.send(closed.host.playerId, { type: 'room.close' });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(
+      closedRuntime.snapshot(closed.host.roomId, closed.host.playerId)!.room,
+    ).toMatchObject({ phase: 'closed' });
+    closedRuntime.dispose();
+
+    const disposedRuntime = new GameRuntime();
+    const disposed = reachHandReady(disposedRuntime);
+    disposed.send(disposed.host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    disposed.send(disposed.guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    actorId = disposedRuntime.snapshot(
+      disposed.host.roomId,
+      disposed.host.playerId,
+    )!.game!.currentActorId!;
+    disposed.send(actorId, { type: 'game.all-in' });
+    actorId = disposedRuntime.snapshot(
+      disposed.host.roomId,
+      disposed.host.playerId,
+    )!.game!.currentActorId!;
+    disposed.send(actorId, { type: 'game.all-in' });
+    disposedRuntime.dispose();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(
+      disposedRuntime.snapshot(disposed.host.roomId, disposed.host.playerId)!
+        .game,
+    ).toMatchObject({ street: 'preflop' });
+  });
+
+  it('counts a heads-up loss after other players fold before showdown', async () => {
+    vi.useFakeTimers();
     const runtime = new GameRuntime();
     const host = runtime.create(
       { hostNickname: 'Alice', settings },
@@ -871,6 +1144,8 @@ describe('GameRuntime', () => {
         type: actor === folded.playerId ? 'game.fold' : 'game.all-in',
       });
     }
+
+    await vi.advanceTimersByTimeAsync(7_000);
 
     const title = runtime
       .snapshot(host.roomId, host.playerId)!

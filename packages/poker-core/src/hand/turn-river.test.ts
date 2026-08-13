@@ -10,6 +10,7 @@ import {
 } from './start-hand.js';
 import {
   advanceAfterCompletedBetting,
+  advanceRunoutStreet,
   advanceToFlop,
   hasFurtherBettingCompetition,
 } from './streets.js';
@@ -159,6 +160,41 @@ describe('turn and river progression', () => {
     expect(hand.street).toBe('river');
     expect(hand.communityCards).toHaveLength(5);
     expect(hand.betting.currentActorId).toBeNull();
+  });
+
+  it('advances automatic runout one street at a time', () => {
+    let hand = headsUp(2);
+    hand = applyPreflopAction(hand, 'a', { type: 'call' });
+
+    hand = advanceRunoutStreet(hand);
+    expect(hand.street).toBe('flop');
+    expect(hand.communityCards).toHaveLength(3);
+    expect(hand.betting.currentActorId).toBeNull();
+
+    hand = advanceRunoutStreet(hand);
+    expect(hand.street).toBe('turn');
+    expect(hand.communityCards).toHaveLength(4);
+
+    hand = advanceRunoutStreet(hand);
+    expect(hand.street).toBe('river');
+    expect(hand.communityCards).toHaveLength(5);
+    expect(new Set(hand.communityCards).size).toBe(5);
+  });
+
+  it('rejects a non-automatic or already-complete runout step', () => {
+    const hand = headsUp();
+    expect(() => advanceRunoutStreet(hand)).toThrow(
+      'Betting round is not complete',
+    );
+
+    let allInHand = headsUp(2);
+    allInHand = applyPreflopAction(allInHand, 'a', { type: 'call' });
+    allInHand = advanceRunoutStreet(allInHand);
+    allInHand = advanceRunoutStreet(allInHand);
+    allInHand = advanceRunoutStreet(allInHand);
+    expect(() => advanceRunoutStreet(allInHand)).toThrow(
+      'Automatic runout is already at the river',
+    );
   });
 
   it('runs out when only one contender can still bet', () => {

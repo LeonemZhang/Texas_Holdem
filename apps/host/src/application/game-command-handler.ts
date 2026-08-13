@@ -1,7 +1,9 @@
 import {
+  advanceRunoutStreet,
   advanceAfterCompletedBetting,
   applyHandAction,
   createHandSummary,
+  hasFurtherBettingCompetition,
   isContender,
   isBettingRoundComplete,
   settleShowdown,
@@ -42,6 +44,10 @@ type CompletedBettingTransition =
   | {
       readonly type: 'continue';
       readonly hand: StartedHandState;
+    }
+  | {
+      readonly type: 'runout';
+      readonly hand: StartedHandState;
     };
 
 function transitionAfterCompletedBetting(
@@ -60,11 +66,11 @@ function transitionAfterCompletedBetting(
   if (hand.street === 'river') {
     return { type: 'settle-showdown', hand };
   }
+  if (!hasFurtherBettingCompetition(hand.players)) {
+    return { type: 'runout', hand };
+  }
   const progressed = advanceAfterCompletedBetting(hand);
-  return progressed.street === 'river' &&
-    isBettingRoundComplete(progressed.betting)
-    ? { type: 'settle-showdown', hand: progressed }
-    : { type: 'continue', hand: progressed };
+  return { type: 'continue', hand: progressed };
 }
 
 function toBettingAction(command: BettingCommand): BettingAction {
@@ -105,6 +111,21 @@ export class GameCommandHandler {
     private readonly hooks: GameCommandHandlerHooks = {},
   ) {}
 
+  automaticRunoutDelayMs(room: RoomState): number | null {
+    if (room.phase !== 'playing') return null;
+    const hand = this.runtime.getCurrentHand(room.roomId);
+    if (
+      !hand ||
+      hand.betting.currentActorId !== null ||
+      !isBettingRoundComplete(hand.betting) ||
+      hand.players.filter(isContender).length < 2 ||
+      hasFurtherBettingCompetition(hand.players)
+    ) {
+      return null;
+    }
+    return hand.street === 'river' ? 1_000 : 2_000;
+  }
+
   handle(
     command: BettingCommand,
     room: RoomState | null,
@@ -144,6 +165,9 @@ export class GameCommandHandler {
           settleShowdown(transition.hand),
         );
       }
+      if (transition.type === 'runout') {
+        return this.savePlayingHand(room, transition.hand);
+      }
       nextHand = transition.hand;
     }
     return this.savePlayingHand(room, nextHand);
@@ -174,7 +198,10 @@ export class GameCommandHandler {
         settleShowdown(transition.hand),
       );
     }
-    return this.savePlayingHand(room, transition.hand);
+    if (transition.type === 'runout') {
+      return this.savePlayingHand(room, advanceRunoutStreet(transition.hand));
+    }
+    return null;
   }
 
   private savePlayingHand(

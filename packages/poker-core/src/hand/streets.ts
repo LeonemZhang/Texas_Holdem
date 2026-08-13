@@ -108,6 +108,37 @@ function runoutToRiver(state: StartedHandState): StartedHandState {
   return next;
 }
 
+/**
+ * Advances an automatic runout by exactly one community-card street.
+ *
+ * The caller must have observed a closed betting round with at least two
+ * contenders and no two funded contenders left to make a future decision.
+ * Automatic runout never creates another betting decision, so the next round
+ * is closed at the point the street is dealt.
+ */
+export function advanceRunoutStreet(state: StartedHandState): StartedHandState {
+  if (!isBettingRoundComplete(state.betting)) {
+    throw new RangeError('Betting round is not complete');
+  }
+  const contenders = state.players.filter(isContender);
+  if (contenders.length < 2) {
+    throw new RangeError('An uncontested hand must settle without runout');
+  }
+  if (hasFurtherBettingCompetition(state.players)) {
+    throw new RangeError('Automatic runout requires no further betting');
+  }
+  if (state.street === 'river') {
+    throw new RangeError('Automatic runout is already at the river');
+  }
+  const nextStreet =
+    state.street === 'preflop'
+      ? 'flop'
+      : state.street === 'flop'
+        ? 'turn'
+        : 'river';
+  return dealStreet(state, nextStreet, true);
+}
+
 export function advanceToFlop(state: StartedHandState): StartedHandState {
   if (state.street !== 'preflop') {
     throw new RangeError(

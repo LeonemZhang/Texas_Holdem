@@ -79,7 +79,7 @@ function playingRoom(extraPlayerIds: readonly string[] = []) {
 }
 
 describe('GameCommandHandler', () => {
-  it('runs an all-in hand directly to the river when nobody can act', () => {
+  it('advances an all-in hand one street per automatic resolution', () => {
     const { rooms, runtime } = playingRoom();
     const handler = new GameCommandHandler(rooms, runtime, () => 5_000);
     runtime.replaceCurrentHand(
@@ -96,6 +96,12 @@ describe('GameCommandHandler', () => {
       }),
     );
 
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    expect(runtime.getCurrentHand('room-1')?.street).toBe('flop');
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    expect(runtime.getCurrentHand('room-1')?.street).toBe('turn');
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    expect(runtime.getCurrentHand('room-1')?.street).toBe('river');
     handler.resolveAutomatic(rooms.get('room-1')!);
 
     expect(runtime.getCurrentHand('room-1')?.street).toBe('river');
@@ -144,12 +150,19 @@ describe('GameCommandHandler', () => {
       rooms.get('room-1'),
     );
 
+    expect(runtime.getCurrentHand('room-1')?.street).toBe('preflop');
+    expect(runtime.getCurrentHand('room-1')?.communityCards).toHaveLength(0);
+    expect(rooms.get('room-1')?.phase).toBe('playing');
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    handler.resolveAutomatic(rooms.get('room-1')!);
     expect(runtime.getCurrentHand('room-1')?.street).toBe('river');
     expect(runtime.getCurrentHand('room-1')?.communityCards).toHaveLength(5);
     expect(rooms.get('room-1')?.phase).toBe('hand-ready');
   });
 
-  it('settles after the final all-in command without waiting for a timer', () => {
+  it('waits for automatic resolutions after the final all-in command', () => {
     const { rooms, runtime } = playingRoom();
     const handler = new GameCommandHandler(rooms, runtime, () => 5_000);
     runtime.replaceCurrentHand(
@@ -180,6 +193,13 @@ describe('GameCommandHandler', () => {
       rooms.get('room-1'),
     );
 
+    const beforeAutomatic = runtime.getCurrentHand('room-1');
+    expect(beforeAutomatic?.street).toBe('preflop');
+    expect('settlement' in (beforeAutomatic ?? {})).toBe(false);
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    handler.resolveAutomatic(rooms.get('room-1')!);
+    handler.resolveAutomatic(rooms.get('room-1')!);
     const settled = runtime.getCurrentHand('room-1');
     expect(settled?.street).toBe('river');
     expect(settled?.communityCards).toHaveLength(5);
