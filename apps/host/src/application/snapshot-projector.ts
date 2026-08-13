@@ -289,6 +289,16 @@ export function projectPlayerSnapshot(
   const hand = input.hand ?? null;
   const ready = input.handReady ?? null;
   const requests = input.chipRequests ?? null;
+  const completedHands = input.completedHands ?? 0;
+  // Legacy recovery can retain a settled hand without restoring its completed
+  // hand count. Omit the field there so old-client compatibility remains the
+  // only fallback instead of publishing an invented settled-hand number.
+  const handNumber =
+    hand && (!isSettledHand(hand) || completedHands > 0)
+      ? isSettledHand(hand)
+        ? completedHands
+        : completedHands + 1
+      : undefined;
   const currentViewer = handPlayer(hand, input.viewerPlayerId);
   const actionOrder = actionOrderByPlayerId(hand);
   const blindLevel =
@@ -337,7 +347,7 @@ export function projectPlayerSnapshot(
         blindGrowth: input.room.settings.blindGrowth,
         zeroChipPolicy: input.room.settings.zeroChipPolicy,
       },
-      completedHands: input.completedHands ?? 0,
+      completedHands,
       players: input.room.players.map((player) => ({
         playerId: player.playerId,
         nickname: player.nickname,
@@ -356,6 +366,7 @@ export function projectPlayerSnapshot(
     game: hand
       ? {
           handId: hand.handId,
+          ...(handNumber === undefined ? {} : { handNumber }),
           street: hand.street,
           buttonPlayerId: hand.positions.button.playerId,
           smallBlindPlayerId: hand.positions.smallBlind.playerId,

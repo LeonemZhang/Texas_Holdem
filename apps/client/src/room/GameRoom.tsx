@@ -566,7 +566,7 @@ export function GameRoom({
   const settlementView = gameSettlement
     ? {
         handId: game.handId,
-        handNumber: snapshot.room.completedHands + 1,
+        handNumber: game.handNumber ?? snapshot.room.completedHands + 1,
         reason: gameSettlement.reason,
         communityCards: game.communityCards,
         totalPot: game.totalPot,
@@ -610,13 +610,13 @@ export function GameRoom({
     snapshot.room.phase === 'paused'
       ? '游戏暂停中'
       : game
-        ? `第 ${snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]} · 盲注：${snapshot.room.smallBlind}/${snapshot.room.bigBlind}`
+        ? `第 ${game.handNumber ?? snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]} · 盲注：${snapshot.room.smallBlind}/${snapshot.room.bigBlind}`
         : '等待牌局开始';
   const mobileHandLabel =
     snapshot.room.phase === 'paused'
       ? '游戏暂停中'
       : game
-        ? `第 ${snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]} · 盲注：${snapshot.room.smallBlind}/${snapshot.room.bigBlind}`
+        ? `第 ${game.handNumber ?? snapshot.room.completedHands + 1} 局 · ${streetLabels[game.street]} · 盲注：${snapshot.room.smallBlind}/${snapshot.room.bigBlind}`
         : '等待牌局开始';
   return (
     <div className="game-room-shell" aria-busy={sending}>

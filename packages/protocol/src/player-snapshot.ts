@@ -108,6 +108,8 @@ export const PlayerSnapshotSchema = z.object({
   game: z
     .object({
       handId: IdSchema,
+      // Optional so clients can render snapshots from pre-HANDNUM-001 hosts.
+      handNumber: z.number().int().positive().safe().optional(),
       street: z.enum(['preflop', 'flop', 'turn', 'river', 'settled']),
       buttonPlayerId: IdSchema,
       smallBlindPlayerId: IdSchema,

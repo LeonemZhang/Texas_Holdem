@@ -43,6 +43,7 @@ const snapshot = {
   },
   game: {
     handId: 'h1',
+    handNumber: 1,
     street: 'preflop',
     buttonPlayerId: 'p1',
     smallBlindPlayerId: 'p1',
@@ -180,6 +181,30 @@ describe('PlayerSnapshotSchema', () => {
           ...snapshot.game,
           legalActions: { ...snapshot.game.legalActions, minimumRaiseTo: -1 },
         },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an older snapshot without the optional current hand number', () => {
+    const legacyGame = { ...snapshot.game };
+    delete (legacyGame as { handNumber?: number }).handNumber;
+
+    expect(
+      PlayerSnapshotSchema.parse({ ...snapshot, game: legacyGame }).game,
+    ).not.toHaveProperty('handNumber');
+  });
+
+  it('rejects a non-positive or unsafe current hand number', () => {
+    expect(
+      PlayerSnapshotSchema.safeParse({
+        ...snapshot,
+        game: { ...snapshot.game, handNumber: 0 },
+      }).success,
+    ).toBe(false);
+    expect(
+      PlayerSnapshotSchema.safeParse({
+        ...snapshot,
+        game: { ...snapshot.game, handNumber: Number.MAX_SAFE_INTEGER + 1 },
       }).success,
     ).toBe(false);
   });

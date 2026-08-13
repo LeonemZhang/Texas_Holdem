@@ -53,6 +53,7 @@ describe('projectPlayerSnapshot', () => {
 
     expect(snapshot.room.smallBlind).toBe(20);
     expect(snapshot.room.bigBlind).toBe(40);
+    expect(snapshot.game?.handNumber).toBe(1);
     expect(snapshot.room.settings?.smallBlind).toBe(1);
   });
 
@@ -69,6 +70,47 @@ describe('projectPlayerSnapshot', () => {
 
     expect(snapshot.room.smallBlind).toBe(2);
     expect(snapshot.room.bigBlind).toBe(4);
+  });
+
+  it('keeps the settled hand number until the next hand is projected', () => {
+    const started = startedRoom();
+    const settled = {
+      ...started.hand,
+      settlement: {
+        reason: 'uncontested' as const,
+        winnerIds: ['host'],
+        payouts: { host: 100 },
+        revealedHoleCards: {},
+      },
+    } as unknown as UncontestedSettledHand;
+    const handReadyRoom = { ...started.room, phase: 'hand-ready' as const };
+
+    const settledSnapshot = projectPlayerSnapshot({
+      room: handReadyRoom,
+      viewerPlayerId: 'host',
+      sequence: 2,
+      completedHands: 1,
+      hand: settled,
+    });
+    const nextHandSnapshot = projectPlayerSnapshot({
+      room: { ...started.room, phase: 'playing' as const },
+      viewerPlayerId: 'host',
+      sequence: 3,
+      completedHands: 1,
+      hand: { ...started.hand, handId: 'hand-2' },
+    });
+
+    expect(settledSnapshot.game?.handNumber).toBe(1);
+    expect(nextHandSnapshot.game?.handNumber).toBe(2);
+    expect(
+      projectPlayerSnapshot({
+        room: handReadyRoom,
+        viewerPlayerId: 'host',
+        sequence: 4,
+        completedHands: 2,
+        hand: settled,
+      }).game?.handNumber,
+    ).toBe(2);
   });
 
   it('projects only the viewing player hole cards for host and guest alike', () => {
@@ -240,12 +282,14 @@ describe('projectPlayerSnapshot', () => {
       room: started.room,
       viewerPlayerId: 'host',
       sequence: 2,
+      completedHands: 1,
       hand: settled,
     });
     const bobSnapshot = projectPlayerSnapshot({
       room: started.room,
       viewerPlayerId: 'bob',
       sequence: 2,
+      completedHands: 1,
       hand: settled,
     });
     const expected = Object.fromEntries(
@@ -308,6 +352,7 @@ describe('projectPlayerSnapshot', () => {
       room: started.room,
       viewerPlayerId: 'host',
       sequence: 2,
+      completedHands: 1,
       hand: settled,
     });
 
@@ -369,6 +414,7 @@ describe('projectPlayerSnapshot', () => {
       room,
       viewerPlayerId: 'bob',
       sequence: 2,
+      completedHands: 1,
       hand,
     });
 

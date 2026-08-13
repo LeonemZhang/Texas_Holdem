@@ -750,6 +750,15 @@ describe('GameRuntime', () => {
   it('starts the next hand immediately when every player becomes ready', () => {
     const runtime = new GameRuntime();
     const context = reachHandReady(runtime);
+    const settledSnapshot = runtime.snapshot(
+      context.host.roomId,
+      context.host.playerId,
+    );
+    expect(settledSnapshot).toMatchObject({
+      room: { phase: 'hand-ready', completedHands: 1 },
+      game: { handNumber: 1 },
+    });
+    const settledHandId = settledSnapshot?.game?.handId;
     context.send(context.host.playerId, {
       type: 'hand-ready.set-choice',
       choice: 'ready',
@@ -765,7 +774,7 @@ describe('GameRuntime', () => {
     );
     expect(snapshot).toMatchObject({
       room: { phase: 'playing', completedHands: 1 },
-      game: { street: 'preflop' },
+      game: { street: 'preflop', handNumber: 2 },
       handReady: null,
       statistics: {
         players: expect.arrayContaining([
@@ -777,7 +786,7 @@ describe('GameRuntime', () => {
         ]),
       },
     });
-    expect(snapshot?.game?.handId).not.toBe('hand-1');
+    expect(snapshot?.game?.handId).not.toBe(settledHandId);
     runtime.dispose();
   });
 
@@ -1409,6 +1418,8 @@ describe('GameRuntime', () => {
       playerId: recoveredHost.playerId,
     });
     expect(after?.room.completedHands).toBe(1);
+    expect(before.game?.handNumber).toBe(1);
+    expect(after?.game?.handNumber).toBe(1);
     expect(after?.statistics).toEqual(before.statistics);
     recovered.dispose();
   });

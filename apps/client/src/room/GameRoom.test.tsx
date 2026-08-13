@@ -800,6 +800,7 @@ describe('GameRoom', () => {
       room: {
         ...snapshot.room,
         phase: 'hand-ready',
+        completedHands: 7,
         players: snapshot.room.players.map((player) => ({
           ...player,
           status: 'active' as const,
@@ -812,6 +813,7 @@ describe('GameRoom', () => {
       },
       game: {
         handId: 'hand-1',
+        handNumber: 7,
         street: 'settled',
         buttonPlayerId: 'host',
         smallBlindPlayerId: 'host',
@@ -909,7 +911,7 @@ describe('GameRoom', () => {
     );
 
     const settlementPlayers = await screen.findByLabelText('本局结算玩家牌型');
-    expect(screen.getByText('第 1 局结算 · 摊牌')).toBeInTheDocument();
+    expect(screen.getByText('第 7 局结算 · 摊牌')).toBeInTheDocument();
     const settlementRows = within(settlementPlayers).getAllByRole('listitem');
     expect(settlementRows[0]).toHaveTextContent('我');
     expect(screen.queryByLabelText('公共牌牌面')).toBeNull();
@@ -1103,6 +1105,7 @@ describe('GameRoom', () => {
       },
       game: {
         handId: 'hand-1',
+        handNumber: 9,
         street: 'preflop',
         buttonPlayerId: 'host',
         smallBlindPlayerId: 'host',
@@ -1157,9 +1160,36 @@ describe('GameRoom', () => {
       await screen.findByLabelText(/Alice 行动剩余 \d+ 秒/),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('牌局进度')).toHaveTextContent(
-      '第 1 局 · 翻牌前 · 盲注：1/2',
+      '第 9 局 · 翻牌前 · 盲注：1/2',
     );
     expect(screen.getByText('行动中')).toBeInTheDocument();
+    act(() =>
+      consumeSnapshot({
+        ...playingSnapshot,
+        sequence: 4,
+        stateVersion: 4,
+        room: { ...playingSnapshot.room, completedHands: 9 },
+        game: { ...playingSnapshot.game!, handId: 'hand-2', handNumber: 10 },
+      }),
+    );
+    expect(screen.getByLabelText('牌局进度')).toHaveTextContent(
+      '第 10 局 · 翻牌前 · 盲注：1/2',
+    );
+    act(() =>
+      consumeSnapshot({
+        ...playingSnapshot,
+        sequence: 5,
+        stateVersion: 5,
+        room: {
+          ...playingSnapshot.room,
+          phase: 'paused',
+          completedHands: 9,
+        },
+        game: { ...playingSnapshot.game!, handId: 'hand-2', handNumber: 10 },
+      }),
+    );
+    expect(screen.getByLabelText('牌局进度')).toHaveTextContent('游戏暂停中');
+    expect(screen.getByLabelText('牌局进度')).not.toHaveTextContent('第 11 局');
     fireEvent.click(screen.getByRole('button', { name: '退出房间' }));
     fireEvent.click(screen.getByRole('button', { name: '退出房间' }));
     fireEvent.click(screen.getByRole('button', { name: '确认退出' }));

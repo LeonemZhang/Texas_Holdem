@@ -16,7 +16,7 @@
 
 执行方式：test + architecture
 覆盖状态：complete
-证据：[客户端设计](docs/design-docs/client.md)、[协议与同步设计](docs/design-docs/protocol-and-sync.md)
+证据：[客户端设计](docs/design-docs/client.md)、[协议与同步设计](docs/design-docs/protocol-and-sync.md)、[Host 快照投影测试](apps/host/src/application/snapshot-projector.test.ts)、[Host 生命周期测试](apps/host/src/application/game-runtime.test.ts)
 
 ### INV-AUTH-002 — 私有信息按玩家投影
 
@@ -100,7 +100,7 @@
 
 执行方式：test + architecture
 覆盖状态：partial
-证据：[牌局生命周期设计](docs/design-docs/hand-lifecycle.md)、[完整牌局结算集成测试](packages/poker-core/src/hand/complete-hand.integration.test.ts)、[下一局创建测试](apps/host/src/domain/start-next-hand.test.ts)
+证据：[牌局生命周期设计](docs/design-docs/hand-lifecycle.md)、[完整牌局结算集成测试](packages/poker-core/src/hand/complete-hand.integration.test.ts)、[下一局创建测试](apps/host/src/domain/start-next-hand.test.ts)、[Host 快照投影测试](apps/host/src/application/snapshot-projector.test.ts)、[Host 生命周期测试](apps/host/src/application/game-runtime.test.ts)
 
 缺口：核心结算和下一局创建已有测试，但尚无单一房主运行时用例贯通下注轮关闭、跨街、结算持久化、准备阶段和下一局启动。
 责任边界：`packages/poker-core` 负责单局状态机，`apps/host` 负责连续牌局编排、持久化和快照发布。
