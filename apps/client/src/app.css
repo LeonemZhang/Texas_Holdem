@@ -3049,6 +3049,7 @@ body:has(.poker-table-page) .poker-table-controls {
 }
 
 .host-controls__player-removal .button {
+  width: auto;
   min-height: 2.15rem;
   padding: 0.3rem 0.55rem;
   font-size: 0.78rem;
