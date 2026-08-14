@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
+import { PROTOCOL_VERSION, type DomainEvent } from '@texas-holdem/protocol';
 
 import { APP_VERSION } from './app-version.js';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -6,9 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { io as createSocketClient } from 'socket.io-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { persistCommandOutcome } from './application/persist-command-outcome.js';
 import { InMemorySessionAuthenticator } from './application/session-authenticator.js';
 import { GameRuntime } from './application/game-runtime.js';
 import { CommandDispatcher } from './application/command-dispatcher.js';
+import type { PersistenceUnitOfWork } from './application/persistence-ports.js';
 import { InMemoryRoomRegistry } from './application/room-registry.js';
 import { projectPlayerSnapshot } from './application/snapshot-projector.js';
 import { InMemoryEventBuffer } from './application/event-buffer.js';
@@ -17,6 +19,12 @@ import { createRoom, freezeRoom } from './domain/room.js';
 import { joinRoom } from './domain/join-room.js';
 import { setLobbyReady } from './domain/lobby-ready.js';
 import { startFirstHand } from './domain/start-first-hand.js';
+import { HOST_MIGRATIONS } from './persistence/migrations.js';
+import {
+  openSqliteDatabase,
+  runSqliteMigrations,
+} from './persistence/sqlite-database.js';
+import { SqliteTransactionStore } from './persistence/sqlite-event-command-store.js';
 import { createHostServer, type HostServer } from './server.js';
 
 let activeHost: HostServer | undefined;
@@ -27,6 +35,175 @@ afterEach(async () => {
     activeHost = undefined;
   }
 });
+
+type PersistenceFailure = 'none' | 'before-commit' | 'commit';
+
+function createPersistenceProbe(
+  database: ReturnType<typeof openSqliteDatabase>,
+  failure: PersistenceFailure,
+  order: string[],
+) {
+  database.exec(`
+    CREATE TABLE acknowledgement_probe (
+      kind TEXT NOT NULL,
+      value TEXT NOT NULL
+    ) STRICT
+  `);
+  const stores: PersistenceUnitOfWork = {
+    events: {
+      append(events) {
+        for (const event of events) {
+          order.push('event-write');
+          database
+            .prepare(
+              'INSERT INTO acknowledgement_probe (kind, value) VALUES (?, ?)',
+            )
+            .run('event', event.eventId);
+        }
+      },
+      readAfter: () => [],
+      latestSequence: () => 0,
+    },
+    snapshots: {
+      save: () => undefined,
+      latest: () => null,
+    },
+    commands: {
+      find: () => null,
+      save(result) {
+        order.push('command-write');
+        database
+          .prepare(
+            'INSERT INTO acknowledgement_probe (kind, value) VALUES (?, ?)',
+          )
+          .run('command', result.commandId);
+        if (failure === 'before-commit') {
+          throw new Error('simulated persistence failure before commit');
+        }
+      },
+    },
+  };
+  const realExec = database.exec.bind(database);
+  const execSpy = vi.spyOn(database, 'exec').mockImplementation((sql) => {
+    if (sql === 'BEGIN IMMEDIATE') order.push('begin');
+    if (sql === 'COMMIT') {
+      order.push('commit');
+      if (failure === 'commit') {
+        throw new Error('simulated commit failure');
+      }
+    }
+    if (sql === 'ROLLBACK') order.push('rollback');
+    return realExec(sql);
+  });
+  const transactions = new SqliteTransactionStore(database, stores);
+  return {
+    execSpy,
+    persist: (input: Parameters<typeof persistCommandOutcome>[1]) =>
+      persistCommandOutcome(transactions, input),
+    markerCount: () => {
+      const row = database
+        .prepare('SELECT COUNT(*) AS count FROM acknowledgement_probe')
+        .get() as unknown as { readonly count: number };
+      return row.count;
+    },
+  };
+}
+
+async function exercisePersistenceAcknowledgement(failure: PersistenceFailure) {
+  const runtime = new GameRuntime();
+  const session = runtime.create(
+    {
+      hostNickname: 'Alice',
+      settings: {
+        roomName: 'Persistence order',
+        maxPlayers: 2,
+        initialChips: 100,
+        smallBlind: 1,
+        actionTimeoutSeconds: 30,
+        handReadyTimeoutSeconds: 30,
+        blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
+        zeroChipPolicy: 'request-chips',
+      },
+    },
+    'http://127.0.0.1:32100',
+  );
+  const database = openSqliteDatabase(':memory:');
+  runSqliteMigrations(database, HOST_MIGRATIONS);
+  const order: string[] = [];
+  const probe = createPersistenceProbe(database, failure, order);
+  const commandId = `persistence-${failure}`;
+  const stopPersistence = runtime.onStateCommitted((roomId) => {
+    const state = runtime.exportState(roomId);
+    if (!state) throw new Error('Missing committed runtime state');
+    const event: DomainEvent = {
+      protocolVersion: PROTOCOL_VERSION,
+      eventId: `${commandId}-event`,
+      roomId,
+      sequence: state.sequence,
+      stateVersion: state.room.version,
+      type: 'room.control-changed',
+      phase: 'closed',
+      normalClose: true,
+    };
+    probe.persist({
+      roomId,
+      playerId: session.playerId,
+      commandId,
+      response: {
+        protocolVersion: PROTOCOL_VERSION,
+        commandId,
+        status: 'accepted',
+        stateVersion: state.room.version,
+        sequence: state.sequence,
+      },
+      events: [event],
+    });
+    order.push('persistence-return');
+  });
+  activeHost = await createHostServer({
+    commandDispatcher: runtime,
+    sessionAuthenticator: runtime,
+  });
+  const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+  const client = createSocketClient(address, {
+    autoConnect: false,
+    transports: ['websocket'],
+    auth: {
+      ...session,
+    },
+  });
+  try {
+    const response = await new Promise<unknown>((resolve, reject) => {
+      client.on('connect_error', reject);
+      client.emit(
+        'command:submit',
+        {
+          protocolVersion: PROTOCOL_VERSION,
+          commandId,
+          roomId: session.roomId,
+          playerId: session.playerId,
+          expectedVersion: 0,
+          type: 'room.close',
+        },
+        (acknowledgement: unknown) => {
+          order.push('ack');
+          resolve(acknowledgement);
+        },
+      );
+      client.connect();
+    });
+    return {
+      response,
+      order,
+      markerCount: probe.markerCount(),
+    };
+  } finally {
+    client.disconnect();
+    stopPersistence();
+    probe.execSpy.mockRestore();
+    database.close();
+  }
+}
 
 describe('host framework server', () => {
   it('creates and joins a room through HTTP then sends the authenticated snapshot', async () => {
@@ -104,6 +281,82 @@ describe('host framework server', () => {
         playerId: guestSession.playerId,
         room: { players: [{ nickname: 'Alice' }, { nickname: 'Bob' }] },
       });
+    } finally {
+      client.disconnect();
+    }
+  });
+
+  it('sends a service-only Host session through its private Host snapshot channel', async () => {
+    const runtime = new GameRuntime();
+    activeHost = await createHostServer({
+      roomSessionService: runtime,
+      commandDispatcher: runtime,
+      sessionAuthenticator: runtime,
+      reconnectSynchronizer: runtime.reconnect,
+      hostSnapshotProvider: (roomId, hostId) =>
+        runtime.hostSnapshot(roomId, hostId),
+      hostSnapshotsProvider: (roomId) => runtime.hostSnapshotsForRoom(roomId),
+    });
+    const created = await activeHost.app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      payload: {
+        hostNickname: 'Service Host',
+        hostParticipation: 'service-only',
+        settings: {
+          roomName: 'Service table',
+          maxPlayers: 4,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    const hostSession = created.json<{
+      roomId: string;
+      playerId: string;
+      hostId: string;
+      sessionType: 'host';
+      token: string;
+    }>();
+    await activeHost.app.inject({
+      method: 'POST',
+      url: `/api/rooms/${hostSession.roomId}/join`,
+      payload: { nickname: 'Alice' },
+    });
+    const address = await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
+    const client = createSocketClient(address, {
+      autoConnect: false,
+      transports: ['websocket'],
+      auth: {
+        protocolVersion: PROTOCOL_VERSION,
+        ...hostSession,
+      },
+    });
+    try {
+      const received = new Promise<unknown>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.on('state:host-snapshot', resolve);
+      });
+      client.connect();
+      await expect(received).resolves.toMatchObject({
+        roomId: hostSession.roomId,
+        hostId: hostSession.hostId,
+        hostParticipation: 'service-only',
+        room: { players: [{ nickname: 'Alice' }] },
+      });
+      client.disconnect();
+      expect(runtime.rooms.get(hostSession.roomId)).toMatchObject({
+        phase: 'lobby',
+        hostParticipation: 'service-only',
+      });
+      expect(
+        runtime.hostSnapshot(hostSession.roomId, hostSession.hostId),
+      ).not.toBeNull();
     } finally {
       client.disconnect();
     }
@@ -291,6 +544,54 @@ describe('host framework server', () => {
     });
   });
 
+  it('returns a recommended nickname during detection without changing join semantics', async () => {
+    const runtime = new GameRuntime();
+    activeHost = await createHostServer({ roomSessionService: runtime });
+    const created = await activeHost.app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      payload: {
+        hostNickname: 'Alice',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 10,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      },
+    });
+    const roomId = created.json<{ roomId: string }>().roomId;
+
+    const probe = await activeHost.app.inject({
+      method: 'GET',
+      url: '/api/rooms/current?nickname=Alice',
+    });
+    expect(probe.statusCode).toBe(200);
+    expect(probe.json()).toMatchObject({
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      nickname: 'Bob',
+    });
+
+    const duplicateJoin = await activeHost.app.inject({
+      method: 'POST',
+      url: `/api/rooms/${roomId}/join`,
+      payload: { nickname: 'Alice' },
+    });
+    expect(duplicateJoin.statusCode).toBe(409);
+    expect(duplicateJoin.json()).toMatchObject({
+      error: { message: 'Nickname already exists: Alice' },
+    });
+    expect(
+      runtime.snapshot(roomId, created.json<{ playerId: string }>().playerId)
+        ?.room.players,
+    ).toHaveLength(1);
+  });
+
   it('reports the actual listen port and advertised LAN join address', async () => {
     activeHost = await createHostServer({ advertisedHost: '10.126.126.1' });
     await activeHost.app.listen({ host: '127.0.0.1', port: 0 });
@@ -455,6 +756,61 @@ describe('host framework server', () => {
     } finally {
       client.disconnect();
     }
+  });
+
+  it('acknowledges a command only after the persistence transaction commits', async () => {
+    const result = await exercisePersistenceAcknowledgement('none');
+
+    expect(result.response).toMatchObject({
+      status: 'accepted',
+      commandId: 'persistence-none',
+    });
+    expect(result.order).toEqual([
+      'begin',
+      'event-write',
+      'command-write',
+      'commit',
+      'persistence-return',
+      'ack',
+    ]);
+    expect(result.markerCount).toBe(2);
+  });
+
+  it('does not acknowledge success when persistence fails before commit', async () => {
+    const result = await exercisePersistenceAcknowledgement('before-commit');
+
+    expect(result.response).toMatchObject({
+      status: 'rejected',
+      commandId: 'persistence-before-commit',
+    });
+    expect(result.response).not.toMatchObject({ status: 'accepted' });
+    expect(result.order).toEqual([
+      'begin',
+      'event-write',
+      'command-write',
+      'rollback',
+      'ack',
+    ]);
+    expect(result.markerCount).toBe(0);
+  });
+
+  it('does not acknowledge success when the SQLite commit fails', async () => {
+    const result = await exercisePersistenceAcknowledgement('commit');
+
+    expect(result.response).toMatchObject({
+      status: 'rejected',
+      commandId: 'persistence-commit',
+    });
+    expect(result.response).not.toMatchObject({ status: 'accepted' });
+    expect(result.order).toEqual([
+      'begin',
+      'event-write',
+      'command-write',
+      'commit',
+      'rollback',
+      'ack',
+    ]);
+    expect(result.markerCount).toBe(0);
   });
 
   it('pushes the caller a fresh snapshot before acknowledging a version conflict', async () => {

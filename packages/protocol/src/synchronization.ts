@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { DomainEventSchema } from './domain-events.js';
+import { HostManagementSnapshotSchema } from './host-snapshot.js';
 import { PlayerSnapshotSchema } from './player-snapshot.js';
 import {
   ErrorEnvelopeSchema,
@@ -14,6 +15,8 @@ export const ResyncRequestSchema = z.object({
   roomId: IdSchema,
   playerId: IdSchema,
   offset: SequenceSchema,
+  sessionType: z.enum(['player', 'host']).optional(),
+  hostId: IdSchema.optional(),
 });
 
 const responseBase = {
@@ -33,6 +36,12 @@ export const ResyncSnapshotResponseSchema = z.object({
   snapshot: PlayerSnapshotSchema,
 });
 
+export const ResyncHostSnapshotResponseSchema = z.object({
+  ...responseBase,
+  status: z.literal('snapshot'),
+  snapshot: HostManagementSnapshotSchema,
+});
+
 export const ResyncFailedResponseSchema = z.object({
   ...responseBase,
   status: z.literal('failed'),
@@ -45,5 +54,14 @@ export const ResyncResponseSchema = z.discriminatedUnion('status', [
   ResyncFailedResponseSchema,
 ]);
 
+/** Host control sessions use a separate response type so old Player clients
+ * continue to receive the original PlayerSnapshot-only contract. */
+export const ResyncHostResponseSchema = z.discriminatedUnion('status', [
+  ResyncEventsResponseSchema,
+  ResyncHostSnapshotResponseSchema,
+  ResyncFailedResponseSchema,
+]);
+
 export type ResyncRequest = z.infer<typeof ResyncRequestSchema>;
 export type ResyncResponse = z.infer<typeof ResyncResponseSchema>;
+export type ResyncHostResponse = z.infer<typeof ResyncHostResponseSchema>;

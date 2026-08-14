@@ -10,6 +10,7 @@ import {
   SystemHelloRequestSchema,
   SystemHelloResponseSchema,
   type HealthResponse,
+  type HostManagementSnapshot,
   type JoinBootstrapResponse,
   type PlayerSnapshot,
   type RoomSessionResponse,
@@ -35,6 +36,7 @@ import {
   privatePlayerChannel,
   publicRoomChannel,
   SocketPublisher,
+  hostControlChannel,
 } from './application/socket-publisher.js';
 import { APP_VERSION } from './app-version.js';
 
@@ -53,6 +55,11 @@ export interface CreateHostServerOptions {
     playerId: string,
   ) => PlayerSnapshot | null;
   roomSnapshotsProvider?: (roomId: string) => readonly PlayerSnapshot[];
+  hostSnapshotProvider?: (
+    roomId: string,
+    hostId: string,
+  ) => HostManagementSnapshot | null;
+  hostSnapshotsProvider?: (roomId: string) => readonly HostManagementSnapshot[];
   onClosedRoomPublished?: (roomId: string) => void;
 }
 
@@ -77,6 +84,9 @@ export async function createHostServer(
   const publishRoomSnapshots = (roomId: string) => {
     for (const snapshot of options.roomSnapshotsProvider?.(roomId) ?? []) {
       publisher.publishSnapshot(snapshot);
+    }
+    for (const snapshot of options.hostSnapshotsProvider?.(roomId) ?? []) {
+      publisher.publishHostSnapshot(snapshot);
     }
   };
 
@@ -141,13 +151,43 @@ export async function createHostServer(
   }));
 
   if (options.roomSessionService) {
-    app.get('/api/rooms/current', async (_request, reply) => {
+    app.get('/api/rooms/current', async (request, reply) => {
       const roomId = options.roomSessionService!.currentRoomId();
-      return roomId
-        ? { protocolVersion: PROTOCOL_VERSION, roomId }
-        : reply.code(404).send({
-            error: { code: 'NOT_FOUND', message: '房主尚未创建房间' },
+      if (!roomId) {
+        return reply.code(404).send({
+          error: { code: 'NOT_FOUND', message: '房主尚未创建房间' },
+        });
+      }
+      const query = request.query as { readonly nickname?: unknown };
+      if (query.nickname !== undefined) {
+        if (
+          typeof query.nickname !== 'string' ||
+          !query.nickname.trim() ||
+          query.nickname.trim().length > 40
+        ) {
+          return reply.code(400).send({
+            error: { code: 'INVALID_MESSAGE', message: '昵称无效' },
           });
+        }
+        try {
+          return {
+            protocolVersion: PROTOCOL_VERSION,
+            roomId,
+            nickname: options.roomSessionService!.suggestNickname(
+              roomId,
+              query.nickname,
+            ),
+          };
+        } catch (error) {
+          return reply.code(409).send({
+            error: {
+              code: 'CONFLICT',
+              message: error instanceof Error ? error.message : '昵称检测失败',
+            },
+          });
+        }
+      }
+      return { protocolVersion: PROTOCOL_VERSION, roomId };
     });
     app.post(
       '/api/rooms',
@@ -279,13 +319,28 @@ export async function createHostServer(
     if (identity) {
       void socket.join([
         publicRoomChannel(identity.roomId),
-        privatePlayerChannel(identity.roomId, identity.playerId),
+        ...(identity.sessionType === 'host'
+          ? [
+              hostControlChannel(
+                identity.roomId,
+                identity.hostId ?? identity.playerId,
+              ),
+            ]
+          : [privatePlayerChannel(identity.roomId, identity.playerId)]),
       ]);
-      const snapshot = options.snapshotProvider?.(
-        identity.roomId,
-        identity.playerId,
-      );
-      if (snapshot) socket.emit('state:snapshot', snapshot);
+      if (identity.sessionType === 'host') {
+        const snapshot = options.hostSnapshotProvider?.(
+          identity.roomId,
+          identity.hostId ?? identity.playerId,
+        );
+        if (snapshot) socket.emit('state:host-snapshot', snapshot);
+      } else {
+        const snapshot = options.snapshotProvider?.(
+          identity.roomId,
+          identity.playerId,
+        );
+        if (snapshot) socket.emit('state:snapshot', snapshot);
+      }
     }
 
     socket.on('system:hello', (rawRequest: unknown, acknowledge: unknown) => {
@@ -329,7 +384,9 @@ export async function createHostServer(
         !('roomId' in rawCommand) ||
         !('playerId' in rawCommand) ||
         rawCommand.roomId !== identity.roomId ||
-        rawCommand.playerId !== identity.playerId
+        rawCommand.playerId !== identity.playerId ||
+        (identity.sessionType === 'host' &&
+          (!('actorType' in rawCommand) || rawCommand.actorType !== 'host'))
       ) {
         acknowledge(unauthorized());
         return;
@@ -337,11 +394,19 @@ export async function createHostServer(
       try {
         const response = options.commandDispatcher.dispatch(rawCommand);
         if (response.status === 'conflict') {
-          const snapshot = options.snapshotProvider?.(
-            identity.roomId,
-            identity.playerId,
-          );
-          if (snapshot) socket.emit('state:snapshot', snapshot);
+          if (identity.sessionType === 'host') {
+            const snapshot = options.hostSnapshotProvider?.(
+              identity.roomId,
+              identity.hostId ?? identity.playerId,
+            );
+            if (snapshot) socket.emit('state:host-snapshot', snapshot);
+          } else {
+            const snapshot = options.snapshotProvider?.(
+              identity.roomId,
+              identity.playerId,
+            );
+            if (snapshot) socket.emit('state:snapshot', snapshot);
+          }
         }
         acknowledge(response);
         if (response.status === 'accepted') {

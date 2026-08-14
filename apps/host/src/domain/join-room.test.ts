@@ -1,12 +1,31 @@
 import { describe, expect, it } from 'vitest';
 
-import { joinRoom } from './join-room.js';
+import { joinRoom, suggestAvailableNickname } from './join-room.js';
 import { createRoom } from './room.js';
 
 function room(maxPlayers = 3) {
   return createRoom({
     roomId: 'room',
     hostPlayerId: 'host',
+    hostNickname: 'Alice',
+    settings: {
+      roomName: 'Friends',
+      maxPlayers,
+      initialChips: 2_000,
+      blind: { kind: 'preset', smallBlind: 1 },
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    },
+  });
+}
+
+function serviceOnlyRoom(maxPlayers = 3) {
+  return createRoom({
+    roomId: 'room',
+    hostId: 'host-manager',
+    hostParticipation: 'service-only',
     hostNickname: 'Alice',
     settings: {
       roomName: 'Friends',
@@ -42,6 +61,17 @@ describe('joinRoom', () => {
     ).toThrow('Room is full');
   });
 
+  it('suggests the next available recommended nickname', () => {
+    let current = room(4);
+    current = joinRoom(current, { playerId: 'bob', nickname: 'Bob' });
+    current = joinRoom(current, { playerId: 'carol', nickname: 'Carol' });
+    current = joinRoom(current, { playerId: 'player', nickname: 'Player' });
+
+    expect(suggestAvailableNickname(current, 'Alice')).toBe('Dave');
+    expect(suggestAvailableNickname(current, 'Bob')).toBe('Dave');
+    expect(suggestAvailableNickname(current, 'Player')).toBe('Dave');
+  });
+
   it('rejects a new participant after the first hand starts', () => {
     const started = Object.freeze({
       ...room(),
@@ -62,5 +92,29 @@ describe('joinRoom', () => {
       });
     }
     expect(current.players).toHaveLength(10);
+  });
+
+  it('does not count a service-only host toward capacity or seat allocation', () => {
+    let current = serviceOnlyRoom(2);
+    current = joinRoom(current, { playerId: 'bob', nickname: 'Bob' });
+    expect(current.players[0]).toMatchObject({
+      playerId: 'bob',
+      seatIndex: 0,
+      chips: 2_000,
+    });
+    current = joinRoom(current, { playerId: 'carol', nickname: 'Carol' });
+    expect(current.players.map(({ seatIndex }) => seatIndex)).toEqual([0, 1]);
+    expect(() =>
+      joinRoom(current, { playerId: 'dave', nickname: 'Dave' }),
+    ).toThrow('Room is full');
+  });
+
+  it('does not let a player reuse the host identity', () => {
+    expect(() =>
+      joinRoom(serviceOnlyRoom(), {
+        playerId: 'host-manager',
+        nickname: 'Bob',
+      }),
+    ).toThrow('Player id conflicts with host id');
   });
 });

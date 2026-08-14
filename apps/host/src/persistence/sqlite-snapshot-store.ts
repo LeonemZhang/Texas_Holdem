@@ -49,6 +49,48 @@ function freezeJson<Value>(value: Value): Value {
   return value;
 }
 
+function normalizeRecoveredRoom(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const hostPlayerId =
+    typeof value.hostPlayerId === 'string' ? value.hostPlayerId : '';
+  const players = Array.isArray(value.players) ? value.players : [];
+  const hostPlayer = players.find(
+    (player): player is Record<string, unknown> =>
+      isRecord(player) && player.playerId === hostPlayerId,
+  );
+  const hostNickname =
+    typeof value.hostNickname === 'string'
+      ? value.hostNickname
+      : typeof hostPlayer?.nickname === 'string'
+        ? hostPlayer.nickname
+        : 'Host';
+  return {
+    ...value,
+    hostId:
+      typeof value.hostId === 'string' && value.hostId.trim()
+        ? value.hostId
+        : hostPlayerId,
+    hostNickname,
+    hostParticipation:
+      value.hostParticipation === 'service-only' ? 'service-only' : 'player',
+    hostPlayerId,
+    players: players.map((player) => {
+      if (!isRecord(player)) return player;
+      const playerId =
+        typeof player.playerId === 'string' ? player.playerId : '';
+      return {
+        ...player,
+        roles: Array.isArray(player.roles)
+          ? player.roles
+          : playerId === hostPlayerId
+            ? ['host', 'player']
+            : ['player'],
+      };
+    }),
+  };
+}
+
 function parseRecoveryState(
   payload: Buffer,
   row: SnapshotRow,
@@ -76,7 +118,11 @@ function parseRecoveryState(
       'Snapshot identity or state shape is invalid',
     );
   }
-  return freezeJson(parsed) as unknown as RoomRecoveryState;
+  const normalized = {
+    ...parsed,
+    room: normalizeRecoveredRoom(parsed.room),
+  };
+  return freezeJson(normalized) as unknown as RoomRecoveryState;
 }
 
 export class SqliteSnapshotStore implements SnapshotStorePort {

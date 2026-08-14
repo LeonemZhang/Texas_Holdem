@@ -5,7 +5,7 @@ import {
 } from '@texas-holdem/poker-core';
 
 import { canHostStartFirstHand } from './lobby-ready.js';
-import { freezeRoom, type RoomState } from './room.js';
+import { freezeRoom, isHostIdentity, type RoomState } from './room.js';
 
 export interface FirstHandStartedResult {
   readonly room: RoomState;
@@ -14,17 +14,17 @@ export interface FirstHandStartedResult {
 
 export function startFirstHand(
   room: RoomState,
-  actorPlayerId: string,
+  actorHostId: string,
   handId: string,
   randomSource: RandomSource,
 ): FirstHandStartedResult {
   if (room.firstHandStarted) {
     throw new RangeError('First hand was already started');
   }
-  if (actorPlayerId !== room.hostPlayerId) {
+  if (!isHostIdentity(room, actorHostId)) {
     throw new RangeError('Only the host can start the first hand');
   }
-  if (!canHostStartFirstHand(room, actorPlayerId)) {
+  if (!canHostStartFirstHand(room, actorHostId)) {
     throw new RangeError('First-hand start requirements are not satisfied');
   }
   const hand = startHand({
@@ -37,7 +37,7 @@ export function startFirstHand(
         stack,
       })),
     previousButtonIndex: null,
-    smallBlind: room.settings.smallBlind,
+    smallBlind: room.currentSmallBlind,
     randomSource,
   });
   const nextRoom = freezeRoom({

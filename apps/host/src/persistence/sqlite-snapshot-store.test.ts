@@ -156,4 +156,35 @@ describe('SqliteSnapshotStore', () => {
       current.database.close();
     }
   });
+
+  it('defaults snapshots from before ROOMHOST-004 to a participating Host', async () => {
+    const current = await context();
+    try {
+      const legacy = JSON.parse(JSON.stringify(snapshot())) as {
+        state: { room: Record<string, unknown> };
+      };
+      delete legacy.state.room.hostId;
+      delete legacy.state.room.hostNickname;
+      delete legacy.state.room.hostParticipation;
+      for (const player of legacy.state.room.players as Record<
+        string,
+        unknown
+      >[]) {
+        delete player.roles;
+      }
+      current.store.save(legacy as unknown as StoredRoomSnapshot);
+      const restored = current.store.latest('room-1');
+      expect(restored?.state.room).toMatchObject({
+        hostId: 'host',
+        hostNickname: 'Alice',
+        hostParticipation: 'player',
+      });
+      expect(restored?.state.room.players[0]?.roles).toEqual([
+        'host',
+        'player',
+      ]);
+    } finally {
+      current.database.close();
+    }
+  });
 });

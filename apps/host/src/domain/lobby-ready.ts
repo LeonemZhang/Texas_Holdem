@@ -1,4 +1,4 @@
-import { freezeRoom, type RoomState } from './room.js';
+import { freezeRoom, isHostIdentity, type RoomState } from './room.js';
 
 export function setLobbyReady(
   room: RoomState,
@@ -16,7 +16,11 @@ export function setLobbyReady(
   if (!player || ['left', 'removed'].includes(player.status)) {
     throw new RangeError(`Player is not seated: ${playerId}`);
   }
-  if (player.playerId === room.hostPlayerId && !ready) {
+  if (
+    room.hostParticipation === 'player' &&
+    player.playerId === room.hostPlayerId &&
+    !ready
+  ) {
     throw new RangeError('Host remains ready before the first hand');
   }
   if (player.lobbyReady === ready) return room;
@@ -33,10 +37,10 @@ export function setLobbyReady(
 
 export function canHostStartFirstHand(
   room: RoomState,
-  actorPlayerId: string,
+  actorHostId: string,
 ): boolean {
   if (
-    actorPlayerId !== room.hostPlayerId ||
+    !isHostIdentity(room, actorHostId) ||
     room.phase !== 'lobby' ||
     room.firstHandStarted
   ) {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CreateRoomSessionRequestSchema,
   JoinRoomSessionRequestSchema,
+  RoomNicknameProbeResponseSchema,
   ResumeRoomSessionRequestSchema,
   RoomSessionResponseSchema,
 } from './room-session.js';
@@ -56,5 +57,42 @@ describe('room session bootstrap protocol', () => {
         socketPath: '/socket.io',
       }),
     ).toMatchObject({ roomId: 'room-1', playerId: 'bob' });
+  });
+
+  it('accepts an explicit service-only Host bootstrap while preserving old Player fields', () => {
+    expect(
+      CreateRoomSessionRequestSchema.parse({
+        hostNickname: 'Service Host',
+        hostParticipation: 'service-only',
+        settings: {
+          roomName: 'Friends',
+          maxPlayers: 6,
+          initialChips: 1_000,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      }).hostParticipation,
+    ).toBe('service-only');
+    expect(
+      ResumeRoomSessionRequestSchema.safeParse({
+        playerId: 'host-1',
+        hostId: 'host-1',
+        sessionType: 'host',
+        token: 'host-reconnect-token-123456',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('validates a nickname probe response', () => {
+    expect(
+      RoomNicknameProbeResponseSchema.parse({
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: 'room-1',
+        nickname: 'Bob',
+      }),
+    ).toMatchObject({ nickname: 'Bob' });
   });
 });

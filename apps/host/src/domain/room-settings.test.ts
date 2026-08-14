@@ -182,7 +182,7 @@ describe('updateRoomSettings', () => {
     ).not.toThrow();
   });
 
-  it('rejects non-host and post-first-hand updates', () => {
+  it('rejects non-host updates and locks base settings after the first hand', () => {
     let room = createRoom({
       roomId: 'room-1',
       hostPlayerId: 'host',
@@ -194,12 +194,14 @@ describe('updateRoomSettings', () => {
       'Only the host can update room settings',
     );
 
+    const started = {
+      ...room,
+      phase: 'playing' as const,
+      firstHandStarted: true,
+    };
+    expect(() => updateRoomSettings(started, 'host', input)).not.toThrow();
     expect(() =>
-      updateRoomSettings(
-        { ...room, phase: 'playing', firstHandStarted: true },
-        'host',
-        input,
-      ),
-    ).toThrow('Room settings can only change before the first hand');
+      updateRoomSettings(started, 'host', { ...input, initialChips: 200 }),
+    ).toThrow('locked after the first hand');
   });
 });

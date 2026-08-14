@@ -164,6 +164,57 @@ function reachShowdownWithFoldedPlayerReady(runtime: GameRuntime) {
 }
 
 describe('GameRuntime', () => {
+  it('uses a host-set current blind and grows from that level without replaying history', () => {
+    const runtime = new GameRuntime();
+    const { host, guest, send } = reachHandReady(runtime);
+
+    send(host.playerId, {
+      type: 'room.update-settings',
+      currentSmallBlind: 20,
+      settings: {
+        ...settings,
+        blindGrowth: {
+          enabled: true,
+          intervalHands: 1,
+          multiplier: 3,
+        },
+      },
+    });
+    expect(runtime.snapshot(host.roomId, host.playerId)?.room).toMatchObject({
+      phase: 'hand-ready',
+      smallBlind: 20,
+      bigBlind: 40,
+      settings: { smallBlind: 1 },
+    });
+
+    send(host.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    send(guest.playerId, {
+      type: 'hand-ready.set-choice',
+      choice: 'ready',
+    });
+    expect(runtime.snapshot(host.roomId, host.playerId)?.room.smallBlind).toBe(
+      20,
+    );
+
+    const actorId = runtime.snapshot(host.roomId, host.playerId)!.game!
+      .currentActorId!;
+    send(actorId, { type: 'game.fold' });
+    expect(runtime.snapshot(host.roomId, host.playerId)?.room).toMatchObject({
+      phase: 'hand-ready',
+      smallBlind: 60,
+      bigBlind: 120,
+    });
+    expect(
+      runtime.snapshot(host.roomId, host.playerId)?.room.settings,
+    ).toMatchObject({
+      smallBlind: 1,
+      blindGrowth: { multiplier: 3 },
+    });
+  });
+
   it('keeps one public history record per chip action across recovery', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-05T10:00:00.000Z'));
@@ -1264,6 +1315,46 @@ describe('GameRuntime', () => {
       room: { phase: 'hand-ready', completedHands: 1 },
     });
     expect(automatic).toHaveBeenCalledWith(host.roomId);
+    runtime.dispose();
+  });
+
+  it('keeps the current action deadline when the host changes the next timeout', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const runtime = new GameRuntime();
+    const host = runtime.create(
+      { hostNickname: 'Alice', settings },
+      'http://10.126.126.1:32100',
+    );
+    const guest = runtime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      'http://10.126.126.1:32100',
+    );
+    let commandNumber = 0;
+    const send = (playerId: string, command: Record<string, unknown>) =>
+      runtime.dispatch({
+        protocolVersion: PROTOCOL_VERSION,
+        commandId: `settings-deadline-${++commandNumber}`,
+        roomId: host.roomId,
+        playerId,
+        expectedVersion: runtime.snapshot(host.roomId, playerId)!.stateVersion,
+        ...command,
+      });
+    send(host.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(guest.playerId, { type: 'room.set-lobby-ready', ready: true });
+    send(host.playerId, {
+      type: 'room.start-first-hand',
+      handId: 'settings-deadline-hand',
+    });
+    const before = runtime.snapshot(host.roomId, host.playerId)!;
+    send(host.playerId, {
+      type: 'room.update-settings',
+      settings: { ...settings, actionTimeoutSeconds: 1 },
+    });
+    expect(
+      runtime.snapshot(host.roomId, host.playerId)?.game?.actionDeadlineMs,
+    ).toBe(before.game?.actionDeadlineMs);
     runtime.dispose();
   });
 

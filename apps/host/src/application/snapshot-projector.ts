@@ -1,5 +1,4 @@
 import {
-  calculateBlindLevel,
   HAND_CATEGORY,
   actionOrderForStreet,
   formatCard,
@@ -11,15 +10,22 @@ import {
   type UncontestedSettledHand,
 } from '@texas-holdem/poker-core';
 import {
+  HostManagementSnapshotSchema,
   PlayerSnapshotSchema,
   PROTOCOL_VERSION,
   type ChipActivity,
+  type HostManagementSnapshot,
   type PlayerSnapshot,
 } from '@texas-holdem/protocol';
 
 import type { ChipRequestBook } from '../domain/chip-requests.js';
 import type { HandReadyState } from '../domain/hand-ready.js';
-import type { RoomPlayer, RoomState } from '../domain/room.js';
+import {
+  normalizeRoomBlindState,
+  roomBlindLevel,
+  type RoomPlayer,
+  type RoomState,
+} from '../domain/room.js';
 
 export interface SnapshotPlayerStatistics {
   readonly playerId: string;
@@ -83,6 +89,14 @@ export interface SnapshotProjectionInput {
     readonly value: number | null;
   }[];
   readonly handPeaks?: SnapshotHandPeaks;
+}
+
+export interface HostSnapshotProjectionInput extends Omit<
+  SnapshotProjectionInput,
+  'viewerPlayerId'
+> {
+  readonly hostId: string;
+  readonly hostParticipation: 'player' | 'service-only';
 }
 
 function handPlayer(
@@ -304,11 +318,7 @@ export function projectPlayerSnapshot(
   const blindLevel =
     hand && input.room.phase !== 'hand-ready'
       ? hand
-      : calculateBlindLevel(
-          input.room.settings.smallBlind,
-          input.completedHands ?? 0,
-          input.room.settings.blindGrowth,
-        );
+      : roomBlindLevel(normalizeRoomBlindState(input.room, completedHands));
   const currentChips = (player: RoomPlayer) => player.chips;
   const statistics =
     input.statistics ??
@@ -457,5 +467,100 @@ export function projectPlayerSnapshot(
         hasLegacyCoverageGap: false,
       },
     },
+  });
+}
+
+/**
+ * Projects only public room/table state for the independent Host session.
+ * The implementation may reuse a Player projection as an internal source, but
+ * the returned schema is intentionally a different type with no private hand
+ * cards or per-player legal actions.
+ */
+export function projectHostManagementSnapshot(
+  input: HostSnapshotProjectionInput,
+): HostManagementSnapshot {
+  const sourcePlayerId = input.room.players[0]?.playerId;
+  const playerSnapshot = sourcePlayerId
+    ? projectPlayerSnapshot({ ...input, viewerPlayerId: sourcePlayerId })
+    : null;
+  const hand = playerSnapshot?.game;
+  const settings = playerSnapshot?.room.settings ?? {
+    roomName: input.room.settings.roomName,
+    maxPlayers: input.room.settings.maxPlayers,
+    initialChips: input.room.settings.initialChips,
+    smallBlind: input.room.settings.smallBlind,
+    actionTimeoutSeconds: input.room.settings.actionTimeoutSeconds,
+    handReadyTimeoutSeconds: input.room.settings.handReadyTimeoutSeconds,
+    blindGrowth: input.room.settings.blindGrowth,
+    zeroChipPolicy: input.room.settings.zeroChipPolicy,
+  };
+  const blindState = normalizeRoomBlindState(
+    input.room,
+    input.completedHands ?? 0,
+  );
+  const players =
+    playerSnapshot?.room.players ??
+    input.room.players.map((player) => ({
+      playerId: player.playerId,
+      nickname: player.nickname,
+      seatIndex: player.seatIndex,
+      chips: player.chips,
+      streetCommitted: 0,
+      totalCommitted: 0,
+      actionOrder: null,
+      lastAction: null,
+      status: player.status,
+      isHost: player.playerId === input.room.hostPlayerId,
+      lobbyReady: player.lobbyReady,
+    }));
+
+  return HostManagementSnapshotSchema.parse({
+    protocolVersion: PROTOCOL_VERSION,
+    roomId: input.room.roomId,
+    hostId: input.hostId,
+    hostParticipation: input.hostParticipation,
+    sequence: input.sequence,
+    stateVersion: input.room.version,
+    room: {
+      roomName: input.room.settings.roomName,
+      phase: input.room.phase,
+      settings,
+      currentSmallBlind: blindState.currentSmallBlind,
+      currentBigBlind: blindState.currentBigBlind,
+      completedHands: input.completedHands ?? 0,
+      players,
+    },
+    game: hand
+      ? {
+          handId: hand.handId,
+          ...(hand.handNumber === undefined
+            ? {}
+            : { handNumber: hand.handNumber }),
+          street: hand.street,
+          buttonPlayerId: hand.buttonPlayerId,
+          smallBlindPlayerId: hand.smallBlindPlayerId,
+          bigBlindPlayerId: hand.bigBlindPlayerId,
+          currentActorId: hand.currentActorId,
+          actionDeadlineMs: hand.actionDeadlineMs ?? null,
+          communityCards: hand.communityCards,
+          totalPot: hand.totalPot ?? 0,
+          streetPots: hand.streetPots ?? [],
+          ...(hand.showdownHoleCards === undefined
+            ? {}
+            : { showdownHoleCards: hand.showdownHoleCards }),
+          ...(hand.settlement === undefined
+            ? {}
+            : { settlement: hand.settlement }),
+        }
+      : null,
+    handReady: input.handReady
+      ? {
+          deadlineMs: input.handReady.deadlineMs,
+          players: input.handReady.players.map(({ playerId, choice }) => ({
+            playerId,
+            choice,
+          })),
+        }
+      : null,
   });
 }

@@ -1,5 +1,59 @@
 import { freezeRoom, type RoomState } from './room.js';
 
+const MAX_NICKNAME_LENGTH = 40;
+const RECOMMENDED_NICKNAMES = Object.freeze([
+  'Alice',
+  'Bob',
+  'Carol',
+  'Dave',
+  'Eve',
+  'Frank',
+  'Grace',
+  'Heidi',
+  'Ivan',
+  'Judy',
+] as const);
+
+function sameNickname(left: string, right: string): boolean {
+  return left.toLocaleLowerCase() === right.toLocaleLowerCase();
+}
+
+export function isNicknameTaken(
+  room: RoomState,
+  nickname: string,
+  exceptPlayerId?: string,
+): boolean {
+  return room.players.some(
+    (player) =>
+      player.playerId !== exceptPlayerId &&
+      sameNickname(player.nickname, nickname),
+  );
+}
+
+export function suggestAvailableNickname(
+  room: RoomState,
+  nickname: string,
+): string {
+  const normalized = nickname.trim();
+  if (!normalized) throw new RangeError('Nickname cannot be empty');
+  if (normalized.length > MAX_NICKNAME_LENGTH) {
+    throw new RangeError('Nickname is too long');
+  }
+  if (!isNicknameTaken(room, normalized)) return normalized;
+
+  const currentIndex = RECOMMENDED_NICKNAMES.findIndex((candidate) =>
+    sameNickname(candidate, normalized),
+  );
+  const candidates = [
+    ...RECOMMENDED_NICKNAMES.slice(currentIndex + 1),
+    ...RECOMMENDED_NICKNAMES.slice(0, currentIndex + 1),
+  ];
+  for (const candidate of candidates) {
+    if (!isNicknameTaken(room, candidate)) return candidate;
+  }
+  throw new RangeError('No recommended nickname is available');
+}
+
 export function joinRoom(
   room: RoomState,
   input: { readonly playerId: string; readonly nickname: string },
@@ -14,14 +68,15 @@ export function joinRoom(
   if (room.players.some((player) => player.playerId === playerId)) {
     throw new RangeError(`Player id already exists: ${playerId}`);
   }
-  if (
-    room.players.some(
-      (player) =>
-        player.nickname.toLocaleLowerCase() === nickname.toLocaleLowerCase(),
-    )
-  ) {
+  if (room.hostId === playerId) {
+    throw new RangeError(`Player id conflicts with host id: ${playerId}`);
+  }
+  if (isNicknameTaken(room, nickname)) {
     throw new RangeError(`Nickname already exists: ${nickname}`);
   }
+  // `players` is the complete actual-player collection. A service-only host
+  // has no placeholder entry, so it is naturally excluded from this count and
+  // from seat allocation.
   const seatedCount = room.players.filter(
     ({ status }) => !['left', 'removed'].includes(status),
   ).length;

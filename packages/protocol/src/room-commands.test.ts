@@ -66,6 +66,51 @@ describe('RoomCommandSchema', () => {
     ).toBe(true);
   });
 
+  it('expresses a service-only Host actor without changing the legacy playerId field', () => {
+    const result = RoomCommandSchema.safeParse({
+      ...identity,
+      actorType: 'host',
+      hostId: 'host-1',
+      hostParticipation: 'service-only',
+      type: 'room.create',
+      hostNickname: 'Service Host',
+      settings: {
+        roomName: 'Friends',
+        maxPlayers: 6,
+        initialChips: 1_000,
+        smallBlind: 1,
+        actionTimeoutSeconds: 30,
+        handReadyTimeoutSeconds: 30,
+        blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
+        zeroChipPolicy: 'request-chips',
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('parses a live current blind separately from the base blind', () => {
+    const result = RoomCommandSchema.safeParse({
+      ...identity,
+      type: 'room.update-settings',
+      currentSmallBlind: 20,
+      settings: {
+        roomName: 'Friends',
+        maxPlayers: 6,
+        initialChips: 1_000,
+        smallBlind: 1,
+        actionTimeoutSeconds: 30,
+        handReadyTimeoutSeconds: 30,
+        blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+        zeroChipPolicy: 'request-chips',
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'room.update-settings') {
+      expect(result.data.currentSmallBlind).toBe(20);
+      expect(result.data.settings.smallBlind).toBe(1);
+    }
+  });
+
   it('parses step growth and a small-blind cap', () => {
     const result = RoomCommandSchema.safeParse({
       ...identity,

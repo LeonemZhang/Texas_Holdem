@@ -16,6 +16,8 @@ export const CommandIdentitySchema = z.object({
   roomId: IdSchema,
   playerId: IdSchema,
   expectedVersion: StateVersionSchema,
+  /** Optional for wire compatibility; host commands use the independent host actor. */
+  actorType: z.enum(['player', 'host']).optional(),
 });
 
 export const ProtocolErrorCodeSchema = z.enum([

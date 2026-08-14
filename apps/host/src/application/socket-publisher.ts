@@ -1,6 +1,8 @@
 import {
   DomainEventSchema,
+  HostManagementSnapshotSchema,
   PlayerSnapshotSchema,
+  type HostManagementSnapshot,
   type DomainEvent,
   type PlayerSnapshot,
 } from '@texas-holdem/protocol';
@@ -18,6 +20,10 @@ export function privatePlayerChannel(roomId: string, playerId: string): string {
   return `${publicRoomChannel(roomId)}:player:${channelPart(playerId)}`;
 }
 
+export function hostControlChannel(roomId: string, hostId: string): string {
+  return `${publicRoomChannel(roomId)}:host:${channelPart(hostId)}`;
+}
+
 export class SocketPublisher {
   constructor(private readonly io: SocketIOServer) {}
 
@@ -31,5 +37,12 @@ export class SocketPublisher {
     this.io
       .to(privatePlayerChannel(parsed.roomId, parsed.playerId))
       .emit('state:snapshot', parsed);
+  }
+
+  publishHostSnapshot(snapshot: HostManagementSnapshot): void {
+    const parsed = HostManagementSnapshotSchema.parse(snapshot);
+    this.io
+      .to(hostControlChannel(parsed.roomId, parsed.hostId))
+      .emit('state:host-snapshot', parsed);
   }
 }

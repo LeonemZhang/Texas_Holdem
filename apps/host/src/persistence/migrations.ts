@@ -308,4 +308,25 @@ export const HOST_MIGRATIONS: readonly SqliteMigration[] = Object.freeze([
       `);
     },
   },
+  {
+    version: 10,
+    name: 'add_host_participation_and_identity',
+    up: (database) => {
+      database.exec(`
+        ALTER TABLE rooms ADD COLUMN host_id TEXT;
+        ALTER TABLE rooms ADD COLUMN host_nickname TEXT;
+        ALTER TABLE rooms ADD COLUMN host_participation TEXT NOT NULL DEFAULT 'player'
+          CHECK (host_participation IN ('player', 'service-only'));
+
+        CREATE TABLE host_reconnect_identities (
+          room_id TEXT PRIMARY KEY,
+          host_id TEXT NOT NULL,
+          token_salt BLOB NOT NULL,
+          token_hash BLOB NOT NULL,
+          updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0),
+          FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE
+        ) STRICT;
+      `);
+    },
+  },
 ]);

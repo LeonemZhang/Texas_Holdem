@@ -25,7 +25,10 @@ export const RoomRecordSummarySchema = z.object({
   createdAt: z.string().datetime(),
   lastActiveAt: z.string().datetime(),
   completedHands: z.number().int().nonnegative().safe(),
-  playerCount: z.number().int().min(1).max(10).safe(),
+  // Service-only hosts do not occupy a player seat, so a valid room record
+  // may have no persisted players yet. Keep the summary compatible with
+  // those records instead of forcing destructive history cleanup.
+  playerCount: z.number().int().nonnegative().max(10).safe(),
   network: RoomRecordNetworkSchema.nullable(),
 });
 

@@ -52,4 +52,50 @@ describe('createRoom', () => {
     expect(room.players[0]?.roles).toContain('player');
     expect(room.players[0]?.chips).toBe(room.settings.initialChips);
   });
+
+  it('keeps a service-only host outside the player collection', () => {
+    const room = createRoom({
+      roomId: 'room-1',
+      hostId: 'host-manager',
+      hostParticipation: 'service-only',
+      hostNickname: 'Alice',
+      settings: settings(),
+    });
+
+    expect(room).toMatchObject({
+      hostId: 'host-manager',
+      hostNickname: 'Alice',
+      hostParticipation: 'service-only',
+      hostPlayerId: '',
+      phase: 'lobby',
+    });
+    expect(room.players).toEqual([]);
+  });
+
+  it('supports distinct host and player identities in player mode', () => {
+    const room = createRoom({
+      roomId: 'room-1',
+      hostId: 'host-manager',
+      hostPlayerId: 'host-player',
+      hostNickname: 'Alice',
+      settings: settings(),
+    });
+
+    expect(room.hostId).toBe('host-manager');
+    expect(room.players[0]?.playerId).toBe('host-player');
+    expect(room.players[0]?.roles).toEqual(['host', 'player']);
+  });
+
+  it('does not accept a player identity for a service-only host', () => {
+    expect(() =>
+      createRoom({
+        roomId: 'room-1',
+        hostId: 'host-manager',
+        hostPlayerId: 'host-player',
+        hostParticipation: 'service-only',
+        hostNickname: 'Alice',
+        settings: settings(),
+      }),
+    ).toThrow('Service-only hosts cannot have a player identity');
+  });
 });

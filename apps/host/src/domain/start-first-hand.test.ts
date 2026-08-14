@@ -26,6 +26,29 @@ function readyRoom() {
   return setLobbyReady(room, 'bob', true);
 }
 
+function readyServiceOnlyRoom() {
+  let room = createRoom({
+    roomId: 'room',
+    hostId: 'host-manager',
+    hostParticipation: 'service-only',
+    hostNickname: 'Alice',
+    settings: {
+      roomName: 'Friends',
+      maxPlayers: 10,
+      initialChips: 2_000,
+      blind: { kind: 'preset', smallBlind: 1 },
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    },
+  });
+  room = joinRoom(room, { playerId: 'bob', nickname: 'Bob' });
+  room = joinRoom(room, { playerId: 'carol', nickname: 'Carol' });
+  room = setLobbyReady(room, 'bob', true);
+  return setLobbyReady(room, 'carol', true);
+}
+
 describe('startFirstHand', () => {
   it('lets only the ready host create the first hand directly', () => {
     const result = startFirstHand(readyRoom(), 'host', 'hand-1', {
@@ -56,5 +79,23 @@ describe('startFirstHand', () => {
     expect(() =>
       startFirstHand(started.room, 'host', 'hand-2', { next: () => 0 }),
     ).toThrow('First hand was already started');
+  });
+
+  it('starts a service-only room with actual players only', () => {
+    const result = startFirstHand(
+      readyServiceOnlyRoom(),
+      'host-manager',
+      'hand-1',
+      { next: () => 0 },
+    );
+
+    expect(result.hand.players).toHaveLength(2);
+    expect(result.hand.players.map(({ playerId }) => playerId)).toEqual([
+      'bob',
+      'carol',
+    ]);
+    expect(
+      result.room.players.every(({ playerId }) => playerId !== 'host-manager'),
+    ).toBe(true);
   });
 });

@@ -68,6 +68,8 @@ export const CreateRoomCommandSchema = z.object({
   ...CommandIdentityShape,
   type: z.literal('room.create'),
   hostNickname: z.string().trim().min(1),
+  hostId: IdSchema.optional(),
+  hostParticipation: z.enum(['player', 'service-only']).optional(),
   settings: RoomSettingsSchema,
 });
 
@@ -87,6 +89,8 @@ export const UpdateRoomSettingsCommandSchema = z.object({
   ...CommandIdentityShape,
   type: z.literal('room.update-settings'),
   settings: RoomSettingsSchema,
+  /** Optional live override; base settings.smallBlind remains immutable. */
+  currentSmallBlind: PositiveAmountSchema.optional(),
 });
 
 export const StartFirstHandCommandSchema = z.object({

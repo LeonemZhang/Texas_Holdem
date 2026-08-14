@@ -55,6 +55,22 @@ describe('room record protocol schemas', () => {
     ).toMatchObject({ status: 'recoverable', completedHands: 12 });
   });
 
+  it('accepts service-only and legacy records with no persisted players', () => {
+    expect(
+      RoomRecordSummarySchema.parse({
+        roomId: 'room-1',
+        roomName: 'Service table',
+        hostNickname: 'Alice',
+        status: 'recoverable',
+        createdAt: '2026-08-02T01:00:00.000Z',
+        lastActiveAt: '2026-08-02T02:00:00.000Z',
+        completedHands: 0,
+        playerCount: 0,
+        network: null,
+      }),
+    ).toMatchObject({ playerCount: 0 });
+  });
+
   it.each([
     { ...request, type: 'room-record.recover', roomId: '' },
     { ...request, type: 'room-record.list' },
@@ -66,7 +82,7 @@ describe('room record protocol schemas', () => {
       createdAt: 'not-a-date',
       lastActiveAt: '2026-08-02T02:00:00.000Z',
       completedHands: -1,
-      playerCount: 0,
+      playerCount: -1,
       network: null,
     },
   ])('rejects an invalid record management boundary', (value) => {

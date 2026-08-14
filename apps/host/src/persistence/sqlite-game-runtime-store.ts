@@ -7,6 +7,7 @@ import type { RoomRecoveryState } from '../application/persistence-ports.js';
 import type { SessionIdentity } from '../application/session-authenticator.js';
 import type { ReconnectRegistry, ResumeStatus } from '../domain/reconnect.js';
 import { SqliteReconnectIdentityStore } from './sqlite-reconnect-identity-store.js';
+import { SqliteHostReconnectIdentityStore } from './sqlite-host-reconnect-identity-store.js';
 import { SqliteRoomLifecycleStore } from './sqlite-room-lifecycle-store.js';
 import { SqliteSnapshotStore } from './sqlite-snapshot-store.js';
 
@@ -24,6 +25,7 @@ export class SqliteGameRuntimeStore {
   readonly #lifecycle: SqliteRoomLifecycleStore;
   readonly #snapshots: SqliteSnapshotStore;
   readonly #identities: SqliteReconnectIdentityStore;
+  readonly #hostIdentities: SqliteHostReconnectIdentityStore;
 
   constructor(
     private readonly database: DatabaseSync,
@@ -32,6 +34,7 @@ export class SqliteGameRuntimeStore {
     this.#lifecycle = new SqliteRoomLifecycleStore(database, network);
     this.#snapshots = new SqliteSnapshotStore(database);
     this.#identities = new SqliteReconnectIdentityStore(database);
+    this.#hostIdentities = new SqliteHostReconnectIdentityStore(database);
   }
 
   loadRecoverable(roomId: string): LoadedGameRuntimeState | null {
@@ -83,6 +86,7 @@ export class SqliteGameRuntimeStore {
           const player = runtime.room.players.find(
             (candidate) => candidate.playerId === playerId,
           );
+          if (!player) return [];
           if (player?.status === 'removed') return [];
           const resumeStatus: ResumeStatus =
             player?.status === 'disconnected'
@@ -95,9 +99,40 @@ export class SqliteGameRuntimeStore {
     if (registry.identities.length > 0) {
       this.#identities.save(runtime.room.roomId, registry, updatedAtMs);
     }
+    const hostToken =
+      runtime.reconnectTokens[
+        runtime.room.hostParticipation === 'service-only'
+          ? runtime.room.hostId
+          : runtime.room.hostPlayerId
+      ];
+    if (hostToken) {
+      this.#hostIdentities.save(
+        runtime.room.roomId,
+        runtime.room.hostId,
+        hostToken,
+        updatedAtMs,
+      );
+    }
   }
 
   authenticate(credentials: SocketAuthentication): SessionIdentity | null {
+    if (credentials.sessionType === 'host') {
+      const hostId = credentials.hostId ?? credentials.playerId;
+      if (credentials.playerId !== hostId) return null;
+      const identity = this.#hostIdentities.authenticate(
+        credentials.roomId,
+        hostId,
+        credentials.token,
+      );
+      return identity
+        ? Object.freeze({
+            roomId: credentials.roomId,
+            playerId: hostId,
+            hostId,
+            sessionType: 'host' as const,
+          })
+        : null;
+    }
     const identity = this.#identities.authenticate(
       credentials.roomId,
       credentials.token,

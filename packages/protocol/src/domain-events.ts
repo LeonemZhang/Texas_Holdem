@@ -31,7 +31,11 @@ const PlayerStatusSchema = z.enum([
 export const RoomCreatedEventSchema = z.object({
   ...EventMetadata,
   type: z.literal('room.created'),
-  hostPlayerId: IdSchema,
+  /** Legacy participant identity; absent for a service-only Host. */
+  hostPlayerId: IdSchema.optional(),
+  /** Independent management identity introduced by ROOMHOST-003. */
+  hostId: IdSchema.optional(),
+  hostParticipation: z.enum(['player', 'service-only']).optional(),
   settings: RoomSettingsSchema,
 });
 export const PlayerJoinedEventSchema = z.object({

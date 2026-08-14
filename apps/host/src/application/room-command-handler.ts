@@ -30,7 +30,12 @@ import { resumeLeftPlayer } from '../domain/reconnect.js';
 import { setLobbyReady } from '../domain/lobby-ready.js';
 import { reseatPlayer, shuffleLobbySeats } from '../domain/seat-management.js';
 import { leaveRoom, removePlayer } from '../domain/player-status.js';
-import { createRoom, freezeRoom, type RoomState } from '../domain/room.js';
+import {
+  advanceRoomBlindGrowth,
+  createRoom,
+  freezeRoom,
+  type RoomState,
+} from '../domain/room.js';
 import {
   closeRoom,
   pauseRoom,
@@ -65,6 +70,7 @@ function incrementVersion(room: RoomState): RoomState {
 }
 
 type CurrentBigBlindResolver = (roomId: string, room: RoomState) => number;
+type CompletedHandsResolver = (roomId: string, room: RoomState) => number;
 
 export class RoomCommandHandler {
   readonly handle: CommandHandler = (command, room) =>
@@ -81,7 +87,8 @@ export class RoomCommandHandler {
     private readonly currentBigBlind: CurrentBigBlindResolver = (
       _roomId,
       room,
-    ) => room.settings.bigBlind,
+    ) => room.currentBigBlind,
+    private readonly completedHands: CompletedHandsResolver = () => 0,
   ) {}
 
   getCurrentHand(roomId: string): StartedHandState | null {
@@ -101,6 +108,14 @@ export class RoomCommandHandler {
 
   getChipRequests(roomId: string): ChipRequestBook | null {
     return this.#chipRequests.get(roomId) ?? null;
+  }
+
+  advanceBlindGrowth(roomId: string, completedHands: number): RoomState | null {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+    const next = advanceRoomBlindGrowth(room, completedHands);
+    if (next !== room) this.rooms.save(next);
+    return next;
   }
 
   resumeLeftPlayer(
@@ -300,8 +315,14 @@ export class RoomCommandHandler {
       return this.accepted(
         createRoom({
           roomId: command.roomId,
-          hostPlayerId: command.playerId,
+          hostId: command.hostId ?? command.playerId,
+          ...(command.hostParticipation === 'service-only'
+            ? {}
+            : { hostPlayerId: command.playerId }),
           hostNickname: command.hostNickname,
+          ...(command.hostParticipation === undefined
+            ? {}
+            : { hostParticipation: command.hostParticipation }),
           settings: {
             ...command.settings,
             blind: blindSetting(command.settings.smallBlind),
@@ -325,10 +346,20 @@ export class RoomCommandHandler {
         );
       case 'room.update-settings':
         return this.accepted(
-          updateRoomSettings(room, command.playerId, {
-            ...command.settings,
-            blind: blindSetting(command.settings.smallBlind),
-          }),
+          updateRoomSettings(
+            room,
+            command.playerId,
+            {
+              ...command.settings,
+              blind: blindSetting(command.settings.smallBlind),
+            },
+            {
+              ...(command.currentSmallBlind === undefined
+                ? {}
+                : { currentSmallBlind: command.currentSmallBlind }),
+              completedHands: this.completedHands(room.roomId, room),
+            },
+          ),
         );
       case 'room.reseat-player':
         return this.accepted(

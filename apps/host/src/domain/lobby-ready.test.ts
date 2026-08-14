@@ -23,6 +23,29 @@ function twoPlayerRoom() {
   return joinRoom(room, { playerId: 'bob', nickname: 'Bob' });
 }
 
+function serviceOnlyTwoPlayerRoom() {
+  const room = createRoom({
+    roomId: 'room',
+    hostId: 'host-manager',
+    hostParticipation: 'service-only',
+    hostNickname: 'Alice',
+    settings: {
+      roomName: 'Friends',
+      maxPlayers: 10,
+      initialChips: 2_000,
+      blind: { kind: 'preset', smallBlind: 1 },
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    },
+  });
+  return joinRoom(joinRoom(room, { playerId: 'bob', nickname: 'Bob' }), {
+    playerId: 'carol',
+    nickname: 'Carol',
+  });
+}
+
 describe('lobby readiness', () => {
   it('requires at least two seated players and every non-host player ready', () => {
     let room = twoPlayerRoom();
@@ -56,5 +79,18 @@ describe('lobby readiness', () => {
     expect(() => setLobbyReady(room, 'host', false)).toThrow(
       'Host remains ready',
     );
+  });
+
+  it('counts only actual players for a service-only host', () => {
+    let room = serviceOnlyTwoPlayerRoom();
+    expect(room.players).toHaveLength(2);
+    expect(canHostStartFirstHand(room, 'host-manager')).toBe(false);
+    expect(() => setLobbyReady(room, 'host-manager', true)).toThrow(
+      'Player is not seated',
+    );
+    room = setLobbyReady(room, 'bob', true);
+    expect(canHostStartFirstHand(room, 'host-manager')).toBe(false);
+    room = setLobbyReady(room, 'carol', true);
+    expect(canHostStartFirstHand(room, 'host-manager')).toBe(true);
   });
 });

@@ -31,12 +31,14 @@ function insertRoom(
   {
     roomId,
     roomName,
+    includePlayer = true,
     normalClosed = false,
     network = null,
     updatedAtMs,
   }: {
     readonly roomId: string;
     readonly roomName: string;
+    readonly includePlayer?: boolean;
     readonly normalClosed?: boolean;
     readonly network?: {
       readonly name: string;
@@ -66,15 +68,21 @@ function insertRoom(
       network?.name ?? null,
       network?.address ?? null,
     );
-  database
-    .prepare(
-      `
-      INSERT INTO players (
-        room_id, player_id, nickname, seat_index, chips, status, is_host
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `,
-    )
-    .run(roomId, `${roomId}-host`, 'Alice', 0, 2_000, 'active', 1);
+  if (includePlayer) {
+    database
+      .prepare(
+        `
+        INSERT INTO players (
+          room_id, player_id, nickname, seat_index, chips, status, is_host
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      )
+      .run(roomId, `${roomId}-host`, 'Alice', 0, 2_000, 'active', 1);
+  } else {
+    database
+      .prepare('UPDATE rooms SET host_nickname = ? WHERE room_id = ?')
+      .run('Alice', roomId);
+  }
 }
 
 describe('SqliteRoomRecordCatalog', () => {
@@ -149,6 +157,28 @@ describe('SqliteRoomRecordCatalog', () => {
       catalog.setArchived('room-1', false);
       expect(catalog.list()).toEqual([
         expect.objectContaining({ roomId: 'room-1', status: 'recoverable' }),
+      ]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('lists a service-only or legacy record with zero persisted players', async () => {
+    const { database, catalog } = await catalogContext();
+    try {
+      insertRoom(database, {
+        roomId: 'service-only-room',
+        roomName: 'Service table',
+        includePlayer: false,
+        updatedAtMs: 2_000,
+      });
+
+      expect(catalog.list()).toEqual([
+        expect.objectContaining({
+          roomId: 'service-only-room',
+          hostNickname: 'Alice',
+          playerCount: 0,
+        }),
       ]);
     } finally {
       database.close();

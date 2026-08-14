@@ -1,4 +1,9 @@
-import { freezeRoom, type RoomPhase, type RoomState } from './room.js';
+import {
+  freezeRoom,
+  isHostIdentity,
+  type RoomPhase,
+  type RoomState,
+} from './room.js';
 
 type PausablePhase = Extract<RoomPhase, 'playing' | 'hand-ready'>;
 
@@ -14,17 +19,17 @@ export interface NormalRoomClosedEvent {
   readonly normal: true;
 }
 
-function requireHost(room: RoomState, actorPlayerId: string): void {
-  if (actorPlayerId !== room.hostPlayerId) {
+function requireHost(room: RoomState, actorHostId: string): void {
+  if (!isHostIdentity(room, actorHostId)) {
     throw new RangeError('Only the host can control the room');
   }
 }
 
 export function pauseRoom(
   room: RoomState,
-  actorPlayerId: string,
+  actorHostId: string,
 ): PausedRoomState {
-  requireHost(room, actorPlayerId);
+  requireHost(room, actorHostId);
   if (room.phase !== 'playing' && room.phase !== 'hand-ready') {
     throw new RangeError(`Room cannot pause from phase: ${room.phase}`);
   }
@@ -40,9 +45,9 @@ export function pauseRoom(
 
 export function resumeRoom(
   paused: PausedRoomState,
-  actorPlayerId: string,
+  actorHostId: string,
 ): RoomState {
-  requireHost(paused.room, actorPlayerId);
+  requireHost(paused.room, actorHostId);
   if (paused.room.phase !== 'paused') {
     throw new RangeError('Room is not paused');
   }
@@ -55,12 +60,12 @@ export function resumeRoom(
 
 export function closeRoom(
   room: RoomState,
-  actorPlayerId: string,
+  actorHostId: string,
 ): {
   readonly room: RoomState;
   readonly event: NormalRoomClosedEvent;
 } {
-  requireHost(room, actorPlayerId);
+  requireHost(room, actorHostId);
   if (room.phase === 'closed') throw new RangeError('Room is already closed');
   return Object.freeze({
     room: freezeRoom({
@@ -71,7 +76,7 @@ export function closeRoom(
     event: Object.freeze({
       type: 'room.closed',
       roomId: room.roomId,
-      actorPlayerId,
+      actorPlayerId: actorHostId,
       normal: true,
     }),
   });

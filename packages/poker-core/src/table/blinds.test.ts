@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { calculateBlindLevel } from './blinds.js';
+import { advanceBlindLevel, calculateBlindLevel } from './blinds.js';
 
 describe('calculateBlindLevel', () => {
   it('supports disabled growth regardless of completed hands', () => {
@@ -84,5 +84,38 @@ describe('calculateBlindLevel', () => {
       multiplier: 1.25,
     });
     expect(level.bigBlind).toBe(level.smallBlind * 2);
+  });
+});
+
+describe('advanceBlindLevel', () => {
+  it('advances from the authoritative current level without replaying history', () => {
+    expect(
+      advanceBlindLevel(20, {
+        enabled: true,
+        intervalHands: 10,
+        mode: 'multiplier',
+        multiplier: 3,
+      }),
+    ).toMatchObject({ smallBlind: 60, bigBlind: 120 });
+  });
+
+  it('does not change the level when growth is disabled or capped', () => {
+    expect(
+      advanceBlindLevel(20, {
+        enabled: false,
+        intervalHands: 10,
+        mode: 'multiplier',
+        multiplier: 2,
+      }),
+    ).toMatchObject({ smallBlind: 20, bigBlind: 40 });
+    expect(
+      advanceBlindLevel(20, {
+        enabled: true,
+        intervalHands: 10,
+        mode: 'multiplier',
+        multiplier: 2,
+        maxSmallBlind: 20,
+      }),
+    ).toMatchObject({ smallBlind: 20, bigBlind: 40 });
   });
 });

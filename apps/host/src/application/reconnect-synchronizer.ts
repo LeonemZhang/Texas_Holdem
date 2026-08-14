@@ -1,7 +1,10 @@
 import {
   PROTOCOL_VERSION,
+  ResyncHostResponseSchema,
   ResyncResponseSchema,
+  type HostManagementSnapshot,
   type PlayerSnapshot,
+  type ResyncHostResponse,
   type ResyncRequest,
   type ResyncResponse,
 } from '@texas-holdem/protocol';
@@ -11,9 +14,10 @@ import type { SessionIdentity } from './session-authenticator.js';
 
 export type SnapshotProvider = (
   roomId: string,
-  playerId: string,
+  identityId: string,
   sequence: number,
-) => PlayerSnapshot | null;
+  sessionType?: 'player' | 'host',
+) => PlayerSnapshot | HostManagementSnapshot | null;
 
 export class ReconnectSynchronizer {
   constructor(
@@ -24,13 +28,17 @@ export class ReconnectSynchronizer {
   synchronize(
     identity: SessionIdentity,
     request: ResyncRequest,
-  ): ResyncResponse {
+  ): ResyncResponse | ResyncHostResponse {
+    const responseSchema =
+      identity.sessionType === 'host'
+        ? ResyncHostResponseSchema
+        : ResyncResponseSchema;
     const read = this.events.readAfter(request.roomId, request.offset);
     if (
       request.roomId !== identity.roomId ||
       request.playerId !== identity.playerId
     ) {
-      return ResyncResponseSchema.parse({
+      return responseSchema.parse({
         protocolVersion: PROTOCOL_VERSION,
         status: 'failed',
         latestSequence: read.latestSequence,
@@ -40,8 +48,24 @@ export class ReconnectSynchronizer {
         },
       });
     }
+    if (
+      (request.sessionType ?? 'player') !==
+        (identity.sessionType ?? 'player') ||
+      (identity.sessionType === 'host' && request.hostId !== identity.hostId) ||
+      (request.hostId !== undefined && request.hostId !== identity.hostId)
+    ) {
+      return responseSchema.parse({
+        protocolVersion: PROTOCOL_VERSION,
+        status: 'failed',
+        latestSequence: read.latestSequence,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Resynchronization role does not match the session',
+        },
+      });
+    }
     if (read.continuous) {
-      return ResyncResponseSchema.parse({
+      return responseSchema.parse({
         protocolVersion: PROTOCOL_VERSION,
         status: 'events',
         latestSequence: read.latestSequence,
@@ -52,16 +76,17 @@ export class ReconnectSynchronizer {
       identity.roomId,
       identity.playerId,
       read.latestSequence,
+      identity.sessionType,
     );
     if (snapshot) {
-      return ResyncResponseSchema.parse({
+      return responseSchema.parse({
         protocolVersion: PROTOCOL_VERSION,
         status: 'snapshot',
         latestSequence: read.latestSequence,
         snapshot,
       });
     }
-    return ResyncResponseSchema.parse({
+    return responseSchema.parse({
       protocolVersion: PROTOCOL_VERSION,
       status: 'failed',
       latestSequence: read.latestSequence,

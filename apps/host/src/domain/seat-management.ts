@@ -1,12 +1,17 @@
 import type { RandomSource } from '@texas-holdem/poker-core';
 
-import { freezeRoom, type RoomPlayer, type RoomState } from './room.js';
+import {
+  freezeRoom,
+  isHostIdentity,
+  type RoomPlayer,
+  type RoomState,
+} from './room.js';
 
-function requireLobbyHost(room: RoomState, actorPlayerId: string): void {
+function requireLobbyHost(room: RoomState, actorHostId: string): void {
   if (
     room.phase !== 'lobby' ||
     room.firstHandStarted ||
-    actorPlayerId !== room.hostPlayerId
+    !isHostIdentity(room, actorHostId)
   ) {
     throw new RangeError('Only the host can manage seats in the lobby');
   }
@@ -28,11 +33,11 @@ function requireCompactSeats(players: readonly RoomPlayer[]): void {
 
 export function reseatPlayer(
   room: RoomState,
-  actorPlayerId: string,
+  actorHostId: string,
   targetPlayerId: string,
   seatIndex: number,
 ): RoomState {
-  requireLobbyHost(room, actorPlayerId);
+  requireLobbyHost(room, actorHostId);
   if (!Number.isInteger(seatIndex) || seatIndex < 0 || seatIndex > 9) {
     throw new RangeError('Seat index must be between 0 and 9');
   }
@@ -69,10 +74,10 @@ function compactOrder(players: readonly RoomPlayer[]): readonly string[] {
 
 export function shuffleLobbySeats(
   room: RoomState,
-  actorPlayerId: string,
+  actorHostId: string,
   randomSource: RandomSource,
 ): RoomState {
-  requireLobbyHost(room, actorPlayerId);
+  requireLobbyHost(room, actorHostId);
   const currentOrder = compactOrder(room.players);
   const shuffled = [...currentOrder];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {

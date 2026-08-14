@@ -4,6 +4,7 @@ import {
   BettingCommandSchema,
   PROTOCOL_VERSION,
   RoomRecordStatisticsSchema,
+  type HostManagementSnapshot,
   type CommandResponse,
   type ChipActivity,
   type CreateRoomSessionRequest,
@@ -36,9 +37,9 @@ import {
   type SessionIdentity,
 } from './session-authenticator.js';
 import { projectPlayerSnapshot } from './snapshot-projector.js';
+import { projectHostManagementSnapshot } from './snapshot-projector.js';
 import { createStatisticsView } from './statistics-view.js';
 import {
-  calculateBlindLevel,
   findBestAvailableFiveCardHand,
   formatCard,
   type HandSummaryEvent,
@@ -48,9 +49,12 @@ import {
 import type { RoomRecoveryState } from './persistence-ports.js';
 import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
 import type { ChipRequestBook } from '../domain/chip-requests.js';
+import { normalizeRoomBlindState } from '../domain/room.js';
+import { suggestAvailableNickname } from '../domain/join-room.js';
 
 export interface RoomSessionBootstrapService {
   currentRoomId(): string | null;
+  suggestNickname(roomId: string, nickname: string): string;
   create(
     request: CreateRoomSessionRequest,
     baseJoinUrl: string,
@@ -78,7 +82,10 @@ export class GameRuntime implements RoomSessionBootstrapService {
   readonly events = new InMemoryEventBuffer();
   readonly reconnect = new ReconnectSynchronizer(
     this.events,
-    (roomId, playerId) => this.snapshot(roomId, playerId),
+    (roomId, identityId, _sequence, sessionType) =>
+      sessionType === 'host'
+        ? this.hostSnapshot(roomId, identityId)
+        : this.snapshot(roomId, identityId),
   );
 
   readonly #roomHandler = new RoomCommandHandler(
@@ -86,12 +93,8 @@ export class GameRuntime implements RoomSessionBootstrapService {
     {
       next: () => Math.random(),
     },
-    (roomId, room) =>
-      calculateBlindLevel(
-        room.settings.smallBlind,
-        this.#completedHands.get(roomId) ?? 0,
-        room.settings.blindGrowth,
-      ).bigBlind,
+    (_roomId, room) => room.currentBigBlind,
+    (roomId) => this.#completedHands.get(roomId) ?? 0,
   );
   readonly #summaries = new Map<string, HandSummaryEvent[]>();
   readonly #facts = new Map<string, StoredStatisticsFact[]>();
@@ -130,6 +133,33 @@ export class GameRuntime implements RoomSessionBootstrapService {
     (command, room) => {
       if (command.type === 'room.create' || command.type === 'room.join') {
         return true;
+      }
+      const hostManagementCommands = [
+        'room.update-settings',
+        'room.reseat-player',
+        'room.shuffle-seats',
+        'room.start-first-hand',
+        'room.pause',
+        'room.resume',
+        'room.remove-player',
+        'room.close',
+      ];
+      if (command.actorType === 'host') {
+        return Boolean(
+          room &&
+          room.hostId === command.playerId &&
+          hostManagementCommands.includes(command.type),
+        );
+      }
+      if (hostManagementCommands.includes(command.type)) {
+        return Boolean(
+          room?.hostId === command.playerId ||
+          room?.players.some(
+            (player) =>
+              player.playerId === command.playerId &&
+              player.roles.includes('host'),
+          ),
+        );
       }
       const player = room?.players.find(
         ({ playerId }) => playerId === command.playerId,
@@ -196,10 +226,10 @@ export class GameRuntime implements RoomSessionBootstrapService {
       previousRoom?.phase === 'playing' &&
       afterCommand?.phase === 'hand-ready'
     ) {
-      this.#completedHands.set(
-        command.roomId,
-        (this.#completedHands.get(command.roomId) ?? 0) + 1,
-      );
+      const completedHands =
+        (this.#completedHands.get(command.roomId) ?? 0) + 1;
+      this.#completedHands.set(command.roomId, completedHands);
+      this.#roomHandler.advanceBlindGrowth(command.roomId, completedHands);
     }
     const sequence = (this.#sequences.get(command.roomId) ?? 0) + 1;
     this.syncChipActivity(
@@ -210,7 +240,9 @@ export class GameRuntime implements RoomSessionBootstrapService {
     );
     this.startNextHandIfReady(command.roomId, false);
     this.scheduleHandReadyTimeout(command.roomId);
-    this.scheduleActionTimeout(command.roomId);
+    this.scheduleActionTimeout(command.roomId, {
+      preserveExistingDeadline: command.type === 'room.update-settings',
+    });
     this.scheduleAutomaticRunout(command.roomId);
     this.#sequences.set(command.roomId, sequence);
     const sequenced = Object.freeze({
@@ -228,12 +260,23 @@ export class GameRuntime implements RoomSessionBootstrapService {
     return this.rooms.listRoomIds()[0] ?? null;
   }
 
+  suggestNickname(roomId: string, nickname: string): string {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new RangeError('Room is not available');
+    return suggestAvailableNickname(room, nickname);
+  }
+
   authenticate(credentials: SocketAuthentication): SessionIdentity | null {
     const identity = this.sessions.authenticate(credentials);
     if (!identity) return null;
-    const player = this.rooms
-      .get(identity.roomId)
-      ?.players.find(({ playerId }) => playerId === identity.playerId);
+    const room = this.rooms.get(identity.roomId);
+    if (!room) return null;
+    if ((identity.sessionType ?? 'player') === 'host') {
+      return identity.hostId === room.hostId ? identity : null;
+    }
+    const player = room.players.find(
+      ({ playerId }) => playerId === identity.playerId,
+    );
     return player && !['left', 'removed'].includes(player.status)
       ? identity
       : null;
@@ -277,23 +320,28 @@ export class GameRuntime implements RoomSessionBootstrapService {
     if (this.rooms.listRoomIds().length > 0) {
       throw new RangeError('Cannot restore over an active runtime');
     }
-    this.#roomHandler.restoreState(state);
-    this.#chipActivity.set(state.room.roomId, state.chipActivity);
-    for (const fact of state.pendingStatisticsFacts ?? []) {
+    const completedHands = this.#statisticsStore
+      ? this.#statisticsStore.loadSummaries(state.room.roomId).length
+      : 0;
+    const restoredState = Object.freeze({
+      ...state,
+      room: normalizeRoomBlindState(state.room, completedHands),
+    });
+    this.#roomHandler.restoreState(restoredState);
+    this.#chipActivity.set(
+      restoredState.room.roomId,
+      restoredState.chipActivity,
+    );
+    for (const fact of restoredState.pendingStatisticsFacts ?? []) {
       const facts = this.#facts.get(fact.event.handId) ?? [];
       facts.push(fact);
       this.#facts.set(fact.event.handId, facts);
     }
-    this.#sequences.set(state.room.roomId, sequence);
-    if (this.#statisticsStore) {
-      this.#completedHands.set(
-        state.room.roomId,
-        this.#statisticsStore.loadSummaries(state.room.roomId).length,
-      );
-    }
-    this.scheduleHandReadyTimeout(state.room.roomId);
-    this.scheduleActionTimeout(state.room.roomId);
-    this.scheduleAutomaticRunout(state.room.roomId);
+    this.#sequences.set(restoredState.room.roomId, sequence);
+    this.#completedHands.set(restoredState.room.roomId, completedHands);
+    this.scheduleHandReadyTimeout(restoredState.room.roomId);
+    this.scheduleActionTimeout(restoredState.room.roomId);
+    this.scheduleAutomaticRunout(restoredState.room.roomId);
   }
 
   createRecoveredHostSession(baseJoinUrl: string): RoomSessionResponse {
@@ -301,12 +349,27 @@ export class GameRuntime implements RoomSessionBootstrapService {
     if (!roomId) throw new RangeError('No recovered room is running');
     const room = this.rooms.get(roomId);
     if (!room) throw new RangeError('No recovered room is running');
-    const playerId = room.hostPlayerId;
+    const playerId =
+      room.hostParticipation === 'player' ? room.hostPlayerId : room.hostId;
     const token = this.issueToken();
-    this.sessions.register({ roomId, playerId }, token);
+    const identity =
+      room.hostParticipation === 'player'
+        ? { roomId, playerId }
+        : {
+            roomId,
+            playerId,
+            hostId: room.hostId,
+            sessionType: 'host' as const,
+          };
+    this.sessions.register(identity, token);
     this.rememberReconnectToken(roomId, playerId, token);
     this.#committedListeners.forEach((listener) => listener(roomId));
-    return this.sessionResponse(roomId, playerId, token, baseJoinUrl);
+    return room.hostParticipation === 'player'
+      ? this.sessionResponse(roomId, playerId, token, baseJoinUrl)
+      : this.sessionResponse(roomId, playerId, token, baseJoinUrl, {
+          hostId: room.hostId,
+          sessionType: 'host',
+        });
   }
 
   closeRunningRoom(): string {
@@ -318,7 +381,8 @@ export class GameRuntime implements RoomSessionBootstrapService {
       protocolVersion: PROTOCOL_VERSION,
       commandId: randomUUID(),
       roomId,
-      playerId: room.hostPlayerId,
+      playerId: room.hostId,
+      actorType: 'host',
       expectedVersion: room.version,
       type: 'room.close',
     });
@@ -365,25 +429,44 @@ export class GameRuntime implements RoomSessionBootstrapService {
       throw new RangeError('This host already has a room');
     }
     const roomId = randomUUID();
-    const playerId = randomUUID();
+    const hostId = randomUUID();
+    const hostParticipation = request.hostParticipation ?? 'player';
+    const playerId = hostId;
     const token = this.issueToken();
     const response = this.dispatch({
       protocolVersion: PROTOCOL_VERSION,
       commandId: randomUUID(),
       roomId,
       playerId,
+      actorType: hostParticipation === 'service-only' ? 'host' : 'player',
+      hostId,
       expectedVersion: 0,
       type: 'room.create',
       hostNickname: request.hostNickname,
+      hostParticipation,
       settings: request.settings,
     });
     if (response.status !== 'accepted') {
       throw new Error('Room creation was rejected');
     }
-    this.sessions.register({ roomId, playerId }, token);
+    const sessionType =
+      hostParticipation === 'service-only'
+        ? ('host' as const)
+        : ('player' as const);
+    this.sessions.register(
+      hostParticipation === 'service-only'
+        ? { roomId, playerId, hostId, sessionType }
+        : { roomId, playerId },
+      token,
+    );
     this.rememberReconnectToken(roomId, playerId, token);
     this.#committedListeners.forEach((listener) => listener(roomId));
-    return this.sessionResponse(roomId, playerId, token, baseJoinUrl);
+    return hostParticipation === 'service-only'
+      ? this.sessionResponse(roomId, playerId, token, baseJoinUrl, {
+          hostId,
+          sessionType,
+        })
+      : this.sessionResponse(roomId, playerId, token, baseJoinUrl);
   }
 
   join(
@@ -424,11 +507,14 @@ export class GameRuntime implements RoomSessionBootstrapService {
     if (!room || room.phase === 'closed') {
       throw new RangeError('Room is not available for recovery');
     }
+    const sessionType = request.sessionType ?? 'player';
     const identity = this.sessions.authenticate({
       protocolVersion: PROTOCOL_VERSION,
       roomId,
       playerId: request.playerId,
       token: request.token,
+      sessionType,
+      ...(request.hostId === undefined ? {} : { hostId: request.hostId }),
     });
     if (
       !identity ||
@@ -436,6 +522,20 @@ export class GameRuntime implements RoomSessionBootstrapService {
       identity.playerId !== request.playerId
     ) {
       throw new RangeError('Recovery identity is invalid');
+    }
+    if (sessionType === 'host') {
+      if (identity.hostId !== room.hostId) {
+        throw new RangeError('Recovery Host identity is invalid');
+      }
+      this.sessions.register(identity, request.token);
+      this.rememberReconnectToken(roomId, identity.playerId, request.token);
+      return this.sessionResponse(
+        roomId,
+        identity.playerId,
+        request.token,
+        baseJoinUrl,
+        { hostId: room.hostId, sessionType: 'host' },
+      );
     }
     const player = room.players.find(
       ({ playerId }) => playerId === identity.playerId,
@@ -468,6 +568,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
       identity.playerId,
       request.token,
       baseJoinUrl,
+      { hostId: room.hostId, sessionType: 'player' },
     );
   }
 
@@ -566,6 +667,28 @@ export class GameRuntime implements RoomSessionBootstrapService {
         return projected ? [projected] : [];
       }),
     );
+  }
+
+  hostSnapshot(roomId: string, hostId: string): HostManagementSnapshot | null {
+    const room = this.rooms.get(roomId);
+    if (!room || room.hostId !== hostId) return null;
+    return projectHostManagementSnapshot({
+      room,
+      hostId,
+      hostParticipation: room.hostParticipation,
+      sequence: this.#sequences.get(roomId) ?? 0,
+      hand: this.#roomHandler.getCurrentHand(roomId),
+      actionDeadlineMs: this.#actionDeadlines.get(roomId)?.deadlineMs ?? null,
+      handReady: this.#roomHandler.getHandReady(roomId),
+      completedHands: this.#completedHands.get(roomId) ?? 0,
+    });
+  }
+
+  hostSnapshotsForRoom(roomId: string): readonly HostManagementSnapshot[] {
+    const room = this.rooms.get(roomId);
+    if (!room) return Object.freeze([]);
+    const snapshot = this.hostSnapshot(roomId, room.hostId);
+    return snapshot ? Object.freeze([snapshot]) : Object.freeze([]);
   }
 
   private handle(
@@ -775,18 +898,12 @@ export class GameRuntime implements RoomSessionBootstrapService {
     const room = this.rooms.get(roomId);
     const ready = this.#roomHandler.getHandReady(roomId);
     if (!room || !ready || room.phase !== 'hand-ready') return false;
-    const completedHands = this.#completedHands.get(roomId) ?? 0;
-    const blindLevel = calculateBlindLevel(
-      room.settings.smallBlind,
-      completedHands,
-      room.settings.blindGrowth,
-    );
     const started = this.#roomHandler.startNextHandIfReady(roomId, {
       handId: randomUUID(),
       nowMs: Date.now(),
       deadlineElapsed,
-      smallBlind: blindLevel.smallBlind,
-      bigBlind: blindLevel.bigBlind,
+      smallBlind: room.currentSmallBlind,
+      bigBlind: room.currentBigBlind,
     });
     if (!started) return false;
     const timer = this.#handReadyTimers.get(roomId);
@@ -812,14 +929,28 @@ export class GameRuntime implements RoomSessionBootstrapService {
     this.#handReadyTimers.set(roomId, timer);
   }
 
-  private scheduleActionTimeout(roomId: string): void {
+  private scheduleActionTimeout(
+    roomId: string,
+    options: { readonly preserveExistingDeadline?: boolean } = {},
+  ): void {
+    const room = this.rooms.get(roomId);
+    const hand = this.#roomHandler.getCurrentHand(roomId);
+    const actorId = hand?.betting.currentActorId;
+    const existingDeadline = this.#actionDeadlines.get(roomId);
+    if (
+      options.preserveExistingDeadline &&
+      room?.phase === 'playing' &&
+      hand &&
+      actorId &&
+      existingDeadline?.handId === hand.handId &&
+      existingDeadline.actorId === actorId
+    ) {
+      return;
+    }
     const existing = this.#actionTimers.get(roomId);
     if (existing) clearTimeout(existing);
     this.#actionTimers.delete(roomId);
     this.#actionDeadlines.delete(roomId);
-    const room = this.rooms.get(roomId);
-    const hand = this.#roomHandler.getCurrentHand(roomId);
-    const actorId = hand?.betting.currentActorId;
     if (!room || room.phase !== 'playing' || !hand || !actorId) return;
     const legal = hand.betting.players.find(
       ({ playerId }) => playerId === actorId,
@@ -904,10 +1035,9 @@ export class GameRuntime implements RoomSessionBootstrapService {
       }
       const nextRoom = this.rooms.get(roomId);
       if (previousPhase === 'playing' && nextRoom?.phase === 'hand-ready') {
-        this.#completedHands.set(
-          roomId,
-          (this.#completedHands.get(roomId) ?? 0) + 1,
-        );
+        const completedHands = (this.#completedHands.get(roomId) ?? 0) + 1;
+        this.#completedHands.set(roomId, completedHands);
+        this.#roomHandler.advanceBlindGrowth(roomId, completedHands);
       }
       const sequence = (this.#sequences.get(roomId) ?? 0) + 1;
       this.#sequences.set(roomId, sequence);
@@ -954,6 +1084,10 @@ export class GameRuntime implements RoomSessionBootstrapService {
     playerId: string,
     token: string,
     baseJoinUrl: string,
+    options: {
+      readonly hostId?: string;
+      readonly sessionType?: 'player' | 'host';
+    } = {},
   ): RoomSessionResponse {
     const url = new URL(baseJoinUrl);
     url.searchParams.set('room', roomId);
@@ -961,6 +1095,10 @@ export class GameRuntime implements RoomSessionBootstrapService {
       protocolVersion: PROTOCOL_VERSION,
       roomId,
       playerId,
+      ...(options.hostId === undefined ? {} : { hostId: options.hostId }),
+      ...(options.sessionType === undefined
+        ? {}
+        : { sessionType: options.sessionType }),
       token,
       joinUrl: url.toString(),
       socketPath: '/socket.io',

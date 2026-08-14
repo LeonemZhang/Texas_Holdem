@@ -3,6 +3,8 @@ import type { SocketAuthentication } from '@texas-holdem/protocol';
 export interface SessionIdentity {
   readonly roomId: string;
   readonly playerId: string;
+  readonly sessionType?: 'player' | 'host';
+  readonly hostId?: string;
 }
 
 export interface SessionAuthenticator {
@@ -27,7 +29,9 @@ export class InMemorySessionAuthenticator implements SessionAuthenticator {
     if (
       existing &&
       (existing.roomId !== identity.roomId ||
-        existing.playerId !== identity.playerId)
+        existing.playerId !== identity.playerId ||
+        existing.sessionType !== identity.sessionType ||
+        existing.hostId !== identity.hostId)
     ) {
       throw new RangeError('Session token is already bound to another player');
     }
@@ -39,7 +43,11 @@ export class InMemorySessionAuthenticator implements SessionAuthenticator {
     if (!identity) return this.fallback?.(credentials) ?? null;
     if (
       identity.roomId !== credentials.roomId ||
-      identity.playerId !== credentials.playerId
+      identity.playerId !== credentials.playerId ||
+      (credentials.sessionType !== undefined &&
+        credentials.sessionType !== (identity.sessionType ?? 'player')) ||
+      (credentials.hostId !== undefined &&
+        credentials.hostId !== identity.hostId)
     ) {
       return null;
     }

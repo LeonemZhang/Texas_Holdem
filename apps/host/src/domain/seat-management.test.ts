@@ -24,6 +24,27 @@ function room() {
   return joinRoom(state, { playerId: 'carol', nickname: 'Carol' });
 }
 
+function serviceOnlyRoom() {
+  let state = createRoom({
+    roomId: 'room-1',
+    hostId: 'host-manager',
+    hostParticipation: 'service-only',
+    hostNickname: 'Alice',
+    settings: {
+      roomName: 'Friends',
+      maxPlayers: 3,
+      initialChips: 100,
+      blind: { kind: 'preset', smallBlind: 1 },
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    },
+  });
+  state = joinRoom(state, { playerId: 'bob', nickname: 'Bob' });
+  return joinRoom(state, { playerId: 'carol', nickname: 'Carol' });
+}
+
 describe('lobby seat management', () => {
   it('rejects moves to an empty seat so lobby seats stay compact', () => {
     const before = room();
@@ -82,5 +103,18 @@ describe('lobby seat management', () => {
         { next: () => 0.5 },
       ),
     ).toThrow('Only the host');
+  });
+
+  it('manages seats using the service-only host identity', () => {
+    const after = reseatPlayer(serviceOnlyRoom(), 'host-manager', 'bob', 1);
+    expect(
+      after.players.map(({ playerId, seatIndex }) => ({ playerId, seatIndex })),
+    ).toEqual([
+      { playerId: 'bob', seatIndex: 1 },
+      { playerId: 'carol', seatIndex: 0 },
+    ]);
+    expect(() => reseatPlayer(serviceOnlyRoom(), 'bob', 'carol', 1)).toThrow(
+      'Only the host',
+    );
   });
 });

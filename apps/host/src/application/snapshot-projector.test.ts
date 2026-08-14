@@ -57,7 +57,7 @@ describe('projectPlayerSnapshot', () => {
     expect(snapshot.room.settings?.smallBlind).toBe(1);
   });
 
-  it('projects the upcoming grown blind during hand readiness', () => {
+  it('projects the authoritative current blind during hand readiness', () => {
     const started = startedRoom();
     const room = { ...started.room, phase: 'hand-ready' as const };
     const snapshot = projectPlayerSnapshot({
@@ -68,8 +68,8 @@ describe('projectPlayerSnapshot', () => {
       hand: started.hand,
     });
 
-    expect(snapshot.room.smallBlind).toBe(2);
-    expect(snapshot.room.bigBlind).toBe(4);
+    expect(snapshot.room.smallBlind).toBe(1);
+    expect(snapshot.room.bigBlind).toBe(2);
   });
 
   it('keeps the settled hand number until the next hand is projected', () => {

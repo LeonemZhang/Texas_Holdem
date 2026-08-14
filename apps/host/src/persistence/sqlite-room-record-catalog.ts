@@ -77,13 +77,13 @@ export class SqliteRoomRecordCatalog {
           rooms.archived,
           rooms.created_at_ms,
           rooms.updated_at_ms,
-          host.nickname AS host_nickname,
+          COALESCE(rooms.host_nickname, host.nickname) AS host_nickname,
           (SELECT COUNT(*) FROM players WHERE room_id = rooms.room_id) AS player_count,
           (SELECT COUNT(*) FROM hand_summaries WHERE room_id = rooms.room_id) AS completed_hands
           , rooms.network_name
           , rooms.network_address
         FROM rooms
-        INNER JOIN players AS host
+        LEFT JOIN players AS host
           ON host.room_id = rooms.room_id
           AND host.player_id = rooms.host_player_id
         WHERE ? = 1 OR rooms.archived = 0

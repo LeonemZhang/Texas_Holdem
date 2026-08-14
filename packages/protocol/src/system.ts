@@ -11,6 +11,8 @@ export const SocketAuthenticationSchema = z.object({
   roomId: z.string().trim().min(1).max(128),
   playerId: z.string().trim().min(1).max(128),
   token: z.string().min(16).max(512),
+  sessionType: z.enum(['player', 'host']).optional(),
+  hostId: z.string().trim().min(1).max(128).optional(),
 });
 
 export const SystemHelloResponseSchema = z.object({

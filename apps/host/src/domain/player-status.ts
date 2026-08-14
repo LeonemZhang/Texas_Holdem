@@ -1,4 +1,10 @@
-import { freezeRoom, type RoomPlayerStatus, type RoomState } from './room.js';
+import {
+  freezeRoom,
+  isHostIdentity,
+  isHostPlayer,
+  type RoomPlayerStatus,
+  type RoomState,
+} from './room.js';
 
 function updateStatus(
   room: RoomState,
@@ -21,7 +27,7 @@ function updateStatus(
 }
 
 export function leaveRoom(room: RoomState, playerId: string): RoomState {
-  if (playerId === room.hostPlayerId) {
+  if (isHostIdentity(room, playerId) || isHostPlayer(room, playerId)) {
     throw new RangeError('The host must close the room instead of leaving');
   }
   return updateStatus(room, playerId, 'left');
@@ -29,13 +35,16 @@ export function leaveRoom(room: RoomState, playerId: string): RoomState {
 
 export function removePlayer(
   room: RoomState,
-  actorPlayerId: string,
+  actorHostId: string,
   targetPlayerId: string,
 ): RoomState {
-  if (actorPlayerId !== room.hostPlayerId) {
+  if (!isHostIdentity(room, actorHostId)) {
     throw new RangeError('Only the host can remove a player');
   }
-  if (targetPlayerId === room.hostPlayerId) {
+  if (
+    isHostIdentity(room, targetPlayerId) ||
+    isHostPlayer(room, targetPlayerId)
+  ) {
     throw new RangeError('The host cannot remove themselves');
   }
   if (room.phase !== 'lobby' && room.phase !== 'hand-ready') {

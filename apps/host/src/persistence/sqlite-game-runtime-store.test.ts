@@ -107,6 +107,76 @@ describe('SqliteGameRuntimeStore', () => {
     }
   });
 
+  it('persists a service-only Host identity without creating a Host player row', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'texas-service-host-store-'),
+    );
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'room.sqlite');
+    const database = openSqliteDatabase(path);
+    runSqliteMigrations(database, HOST_MIGRATIONS);
+    const store = new SqliteGameRuntimeStore(database);
+    const runtime = new GameRuntime({
+      sessionFallback: (credentials) => store.authenticate(credentials),
+    });
+    runtime.onStateCommitted((roomId) => {
+      const state = runtime.exportState(roomId);
+      if (state) store.save(state, 1);
+    });
+
+    const host = runtime.create(
+      {
+        hostNickname: 'Service Host',
+        hostParticipation: 'service-only',
+        settings: {
+          roomName: 'Service table',
+          maxPlayers: 4,
+          initialChips: 100,
+          smallBlind: 1,
+          actionTimeoutSeconds: 30,
+          handReadyTimeoutSeconds: 30,
+          blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
+          zeroChipPolicy: 'request-chips',
+        },
+      },
+      'http://10.126.126.1:32100',
+    );
+    runtime.join(host.roomId, { nickname: 'Alice' }, host.joinUrl);
+    const roomRow = database
+      .prepare(
+        'SELECT host_id, host_nickname, host_participation FROM rooms WHERE room_id = ?',
+      )
+      .get(host.roomId) as {
+      host_id: string;
+      host_nickname: string;
+      host_participation: string;
+    };
+    expect(roomRow).toMatchObject({
+      host_id: host.hostId,
+      host_nickname: 'Service Host',
+      host_participation: 'service-only',
+    });
+    expect(
+      database
+        .prepare(
+          'SELECT COUNT(*) AS count FROM players WHERE room_id = ? AND is_host = 1',
+        )
+        .get(host.roomId),
+    ).toMatchObject({ count: 0 });
+    expect(
+      store.authenticate({
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: host.roomId,
+        playerId: host.playerId,
+        hostId: host.hostId,
+        sessionType: 'host',
+        token: host.token,
+      }),
+    ).toMatchObject({ hostId: host.hostId, sessionType: 'host' });
+    runtime.dispose();
+    database.close();
+  });
+
   it('keeps an in-game removal terminal after runtime recovery', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'texas-removed-store-'));
     temporaryDirectories.push(directory);

@@ -28,6 +28,26 @@ function room(policy: 'request-chips' | 'eliminate' = 'request-chips') {
   return joinRoom(state, { playerId: 'bob', nickname: 'Bob' });
 }
 
+function serviceOnlyRoom() {
+  const state = createRoom({
+    roomId: 'room',
+    hostId: 'host-manager',
+    hostParticipation: 'service-only',
+    hostNickname: 'Alice',
+    settings: {
+      roomName: 'Friends',
+      maxPlayers: 10,
+      initialChips: 100,
+      blind: { kind: 'preset', smallBlind: 1 },
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: true, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    },
+  });
+  return joinRoom(state, { playerId: 'bob', nickname: 'Bob' });
+}
+
 describe('room player statuses', () => {
   it('retains a voluntarily leaving player history but releases participation', () => {
     const left = leaveRoom(room(), 'bob');
@@ -122,6 +142,21 @@ describe('room player statuses', () => {
     });
     expect(() => removePlayer(removed, 'host', 'bob')).toThrow(
       'Player cannot be removed',
+    );
+  });
+
+  it('keeps service-only host identity outside player status operations', () => {
+    const state = serviceOnlyRoom();
+    expect(() => leaveRoom(state, 'host-manager')).toThrow(
+      'The host must close the room instead of leaving',
+    );
+    const removed = removePlayer(state, 'host-manager', 'bob');
+    expect(removed.players[0]).toMatchObject({
+      playerId: 'bob',
+      status: 'removed',
+    });
+    expect(() => removePlayer(state, 'bob', 'host-manager')).toThrow(
+      'Only the host can remove a player',
     );
   });
 });

@@ -111,12 +111,18 @@ const host =
         snapshotProvider: (roomId, playerId) =>
           runtime.snapshot(roomId, playerId),
         roomSnapshotsProvider: (roomId) => runtime.snapshotsForRoom(roomId),
+        hostSnapshotProvider: (roomId, hostId) =>
+          runtime.hostSnapshot(roomId, hostId),
+        hostSnapshotsProvider: (roomId) => runtime.hostSnapshotsForRoom(roomId),
         onClosedRoomPublished: (roomId) => runtime.retireClosedRoom(roomId),
       })
     : null;
 const stopAutomaticUpdates = runtime.onAutomaticStateChange((roomId) => {
   for (const snapshot of runtime.snapshotsForRoom(roomId)) {
     host?.publisher.publishSnapshot(snapshot);
+  }
+  for (const snapshot of runtime.hostSnapshotsForRoom(roomId)) {
+    host?.publisher.publishHostSnapshot(snapshot);
   }
 });
 const discovery =

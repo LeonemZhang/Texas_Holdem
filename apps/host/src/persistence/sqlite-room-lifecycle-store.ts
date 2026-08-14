@@ -37,11 +37,15 @@ export class SqliteRoomLifecycleStore {
       .prepare(
         `
         INSERT INTO rooms (
-          room_id, host_player_id, phase, state_version, normal_closed,
-          settings_json, created_at_ms, updated_at_ms, network_name, network_address
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          room_id, host_player_id, host_id, host_nickname, host_participation,
+          phase, state_version, normal_closed, settings_json, created_at_ms,
+          updated_at_ms, network_name, network_address
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(room_id) DO UPDATE SET
           host_player_id = excluded.host_player_id,
+          host_id = excluded.host_id,
+          host_nickname = excluded.host_nickname,
+          host_participation = excluded.host_participation,
           phase = excluded.phase,
           state_version = excluded.state_version,
           normal_closed = excluded.normal_closed,
@@ -54,6 +58,9 @@ export class SqliteRoomLifecycleStore {
       .run(
         room.roomId,
         room.hostPlayerId,
+        room.hostId,
+        room.hostNickname,
+        room.hostParticipation,
         room.phase,
         room.version,
         normallyClosed ? 1 : 0,

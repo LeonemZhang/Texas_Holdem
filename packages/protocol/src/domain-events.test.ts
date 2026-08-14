@@ -124,6 +124,21 @@ describe('DomainEventSchema', () => {
     }
   });
 
+  it('accepts room creation without a Player identity for a service-only Host', () => {
+    expect(
+      DomainEventSchema.parse({
+        ...metadata,
+        type: 'room.created',
+        hostId: 'host-manager',
+        hostParticipation: 'service-only',
+        settings: events[0]!.settings,
+      }),
+    ).toMatchObject({
+      hostId: 'host-manager',
+      hostParticipation: 'service-only',
+    });
+  });
+
   it.each(['sequence', 'stateVersion'])(
     'requires %s on every event',
     (field) => {
