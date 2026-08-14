@@ -50,7 +50,10 @@ import type { RoomRecoveryState } from './persistence-ports.js';
 import type { PlayerActionEvent } from '../statistics/basic-statistics.js';
 import type { ChipRequestBook } from '../domain/chip-requests.js';
 import { normalizeRoomBlindState } from '../domain/room.js';
-import { suggestAvailableNickname } from '../domain/join-room.js';
+import {
+  canAcceptNewPlayer,
+  suggestAvailableNickname,
+} from '../domain/join-room.js';
 
 export interface RoomSessionBootstrapService {
   currentRoomId(): string | null;
@@ -475,7 +478,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
     baseJoinUrl: string,
   ): RoomSessionResponse {
     const room = this.rooms.get(roomId);
-    if (!room || room.phase !== 'lobby' || room.firstHandStarted) {
+    if (!room || !canAcceptNewPlayer(room)) {
       throw new RangeError('Room is not accepting new players');
     }
     const playerId = randomUUID();

@@ -322,6 +322,24 @@ describe('TableSeats', () => {
     );
   });
 
+  it('labels a waiting late joiner as waiting for the next hand', () => {
+    render(
+      <TableSeats
+        players={[
+          {
+            playerId: 'late',
+            nickname: 'Carol',
+            seatIndex: 0,
+            chips: 100,
+            status: 'waiting',
+          },
+        ]}
+        ownPlayerId="late"
+      />,
+    );
+    expect(screen.getAllByText('等待下一局')).toHaveLength(2);
+  });
+
   it('keeps dealer and small-blind labels on one row for the same player', () => {
     const { container } = render(
       <TableSeats

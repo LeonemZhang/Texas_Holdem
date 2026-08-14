@@ -210,6 +210,28 @@ describe('RoomCommandHandler', () => {
     handler.handle(
       {
         ...identity,
+        commandId: 'late-join',
+        playerId: 'carol',
+        type: 'room.join',
+        nickname: 'Carol',
+      },
+      room,
+    );
+    room = rooms.get('room-1')!;
+    expect(
+      room.players.find(({ playerId }) => playerId === 'carol'),
+    ).toMatchObject({
+      status: 'waiting',
+      chips: 100,
+    });
+    expect(handler.getHandReady('room-1')?.players).toContainEqual({
+      playerId: 'carol',
+      choice: 'pending',
+    });
+
+    handler.handle(
+      {
+        ...identity,
         commandId: 'choice',
         type: 'hand-ready.set-choice',
         choice: 'ready',
@@ -242,7 +264,7 @@ describe('RoomCommandHandler', () => {
     );
 
     const nextRoom = rooms.get('room-1')!;
-    expect(nextRoom.players.map(({ chips }) => chips)).toEqual([79, 118]);
+    expect(nextRoom.players.map(({ chips }) => chips)).toEqual([79, 118, 100]);
     expect(handler.getHandReady('room-1')?.players[0]?.choice).toBe('ready');
     expect(handler.getChipRequests('room-1')?.requests[0]?.status).toBe(
       'completed',

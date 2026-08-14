@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  addPlayerToHandReady,
   canBeginNextHand,
   normalizeHandReadyAtDeadline,
   setHandReadyChoice,
@@ -81,5 +82,13 @@ describe('hand-ready actions', () => {
       { playerId: 'host', choice: 'sitting-out' },
       { playerId: 'bob', choice: 'sitting-out' },
     ]);
+  });
+
+  it('adds a late joiner to the active readiness context as pending', () => {
+    const { handReady } = phase();
+    expect(addPlayerToHandReady(handReady, 'carol').players).toContainEqual({
+      playerId: 'carol',
+      choice: 'pending',
+    });
   });
 });

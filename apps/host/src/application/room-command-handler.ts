@@ -20,6 +20,7 @@ import type {
 } from '../domain/hand-ready.js';
 import {
   canBeginNextHand,
+  addPlayerToHandReady,
   normalizeHandReadyAtDeadline,
   removePlayerFromHandReady,
   restorePlayerToHandReady,
@@ -241,6 +242,14 @@ export class RoomCommandHandler {
     return { stateVersion: room.version, sequence: 0 };
   }
 
+  private hasHandReadyContext(roomId: string, room: RoomState): boolean {
+    return (
+      room.phase === 'hand-ready' ||
+      (room.phase === 'paused' &&
+        this.#paused.get(roomId)?.pausedFrom === 'hand-ready')
+    );
+  }
+
   private requireRoom(room: RoomState | null): RoomState {
     if (!room) throw new RangeError('Room not found');
     return room;
@@ -333,13 +342,20 @@ export class RoomCommandHandler {
 
     const room = this.requireRoom(currentRoom);
     switch (command.type) {
-      case 'room.join':
-        return this.accepted(
-          joinRoom(room, {
-            playerId: command.playerId,
-            nickname: command.nickname,
-          }),
-        );
+      case 'room.join': {
+        const joined = joinRoom(room, {
+          playerId: command.playerId,
+          nickname: command.nickname,
+        });
+        if (this.hasHandReadyContext(room.roomId, room)) {
+          const context = this.requireHandReady(room.roomId);
+          this.#handReady.set(
+            room.roomId,
+            addPlayerToHandReady(context.ready, command.playerId),
+          );
+        }
+        return this.accepted(joined);
+      }
       case 'room.set-lobby-ready':
         return this.accepted(
           setLobbyReady(room, command.playerId, command.ready),

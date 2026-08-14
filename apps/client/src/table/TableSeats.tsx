@@ -39,7 +39,7 @@ export interface TableSeatsProps {
 }
 
 const statusLabels: Record<TableSeatStatus, string> = {
-  waiting: '等待中',
+  waiting: '等待下一局',
   active: '在局',
   folded: '已弃牌',
   'all-in': '全押',

@@ -24,6 +24,7 @@
 | ADR-007 | Android/mobile 仅作为普通玩家客户端          | `docs/product-specs/room-experience.md`    | `client`、`desktop`                                                      |
 | ADR-008 | 房主参与模式与玩家身份分离                   | `docs/product-specs/room-experience.md`    | `room-domain`、`protocol-and-sync`、`persistence-and-recovery`、`client` |
 | ADR-009 | 房主动态房间配置的字段与生效边界             | `docs/product-specs/room-experience.md`    | `room-domain`、`hand-lifecycle`、`protocol-and-sync`、`client`           |
+| ADR-010 | 首局开始后新玩家等待下一局参赛               | `docs/product-specs/gameplay.md`           | `room-domain`、`hand-lifecycle`、`protocol-and-sync`、`client`           |
 
 ## ADR 文档
 

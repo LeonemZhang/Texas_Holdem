@@ -54,12 +54,21 @@ export function suggestAvailableNickname(
   throw new RangeError('No recommended nickname is available');
 }
 
+export function canAcceptNewPlayer(room: RoomState): boolean {
+  if (!room.firstHandStarted) return room.phase === 'lobby';
+  return (
+    room.phase === 'playing' ||
+    room.phase === 'hand-ready' ||
+    room.phase === 'paused'
+  );
+}
+
 export function joinRoom(
   room: RoomState,
   input: { readonly playerId: string; readonly nickname: string },
 ): RoomState {
-  if (room.phase !== 'lobby' || room.firstHandStarted) {
-    throw new RangeError('New players cannot join after the first hand starts');
+  if (!canAcceptNewPlayer(room)) {
+    throw new RangeError('New players cannot join in the current room phase');
   }
   const playerId = input.playerId.trim();
   const nickname = input.nickname.trim();

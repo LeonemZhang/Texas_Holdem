@@ -37,5 +37,6 @@
 - [`host-participation`](completed/host-participation/plan.md)：完成 Windows 服务型 Host、Host/Player 身份分离、管理快照、本地 SQLite 恢复和客户端控制台。
 - [`host-observation-and-invariants`](completed/host-observation-and-invariants/plan.md)：为仅提供服务的 Host 增加只读观战牌桌，并补齐生命周期、持久化确认顺序和 workspace 架构边界的自动化证据。
 - [`room-management-and-authoritative-blinds`](completed/room-management-and-authoritative-blinds/plan.md)：完成房主大厅/局内管理、只读观战体验、权威当前盲注和动态房间配置。
+- [`late-join-next-hand`](completed/late-join-next-hand/plan.md)：允许首局开始后新玩家加入房间，但等待牌局准备阶段并主动选择后再参加下一局。
 
 归档只改变目录状态，不改变计划目录结构。正常完成的计划不能残留 `pending`、`active` 或 `blocked`；结构化证据契约建立前完成且只有聚合证据的历史计划使用 `legacy`；被后续事实来源取代、且无法安全回填历史状态或证据的计划使用 `superseded`，其中旧状态不得用于判断当前实现。`legacy` 与 `superseded` 都不能用于规避新计划的逐任务证据要求。

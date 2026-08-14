@@ -72,15 +72,32 @@ describe('joinRoom', () => {
     expect(suggestAvailableNickname(current, 'Player')).toBe('Dave');
   });
 
-  it('rejects a new participant after the first hand starts', () => {
+  it('lets new participants join an active room while keeping them waiting', () => {
     const started = Object.freeze({
       ...room(),
       phase: 'playing' as const,
       firstHandStarted: true,
     });
+    expect(
+      joinRoom(started, { playerId: 'bob', nickname: 'Bob' }).players,
+    ).toContainEqual(
+      expect.objectContaining({
+        playerId: 'bob',
+        status: 'waiting',
+        chips: 2_000,
+      }),
+    );
+  });
+
+  it('rejects joins after the room is closed', () => {
+    const closed = Object.freeze({
+      ...room(),
+      phase: 'closed' as const,
+      firstHandStarted: true,
+    });
     expect(() =>
-      joinRoom(started, { playerId: 'bob', nickname: 'Bob' }),
-    ).toThrow('New players cannot join after the first hand starts');
+      joinRoom(closed, { playerId: 'bob', nickname: 'Bob' }),
+    ).toThrow('New players cannot join in the current room phase');
   });
 
   it('supports the documented maximum of ten players', () => {

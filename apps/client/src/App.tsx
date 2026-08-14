@@ -369,7 +369,7 @@ export function App() {
       }
       setJoinError(
         message === 'Room is not accepting new players'
-          ? '对局已经开始：只有原玩家可使用本机保存的身份恢复，不能以新昵称加入。'
+          ? '房间当前不接受新玩家加入，可能已关闭或尚未进入可加入阶段。'
           : message?.startsWith('Nickname already exists:')
             ? '该昵称已被房间中的其他玩家使用，请更换昵称。'
             : networkErrorMessage(message),

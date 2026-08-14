@@ -164,6 +164,46 @@ function reachShowdownWithFoldedPlayerReady(runtime: GameRuntime) {
 }
 
 describe('GameRuntime', () => {
+  it('keeps a hand-ready late joiner out of the settled hand until the next hand', () => {
+    const runtime = new GameRuntime();
+    const { host, guest, send } = reachHandReady(runtime);
+    const settled = runtime.snapshot(host.roomId, host.playerId)!;
+    const settledHandId = settled.game?.handId;
+
+    const late = runtime.join(
+      host.roomId,
+      { nickname: 'Carol' },
+      'http://10.126.126.1:32100',
+    );
+    const lateSnapshot = runtime.snapshot(host.roomId, late.playerId)!;
+    expect(lateSnapshot.room.players).toContainEqual(
+      expect.objectContaining({
+        playerId: late.playerId,
+        status: 'waiting',
+        chips: 100,
+      }),
+    );
+    expect(lateSnapshot.game?.handId).toBe(settledHandId);
+    expect(lateSnapshot.game?.ownHoleCards).toBeNull();
+    expect(lateSnapshot.handReady?.ownChoice).toBe('pending');
+
+    send(host.playerId, { type: 'hand-ready.set-choice', choice: 'ready' });
+    send(guest.playerId, { type: 'hand-ready.set-choice', choice: 'ready' });
+    expect(runtime.snapshot(host.roomId, host.playerId)?.room.phase).toBe(
+      'hand-ready',
+    );
+    send(late.playerId, { type: 'hand-ready.set-choice', choice: 'ready' });
+
+    const started = runtime.snapshot(host.roomId, late.playerId)!;
+    expect(started.room.phase).toBe('playing');
+    expect(
+      started.room.players.find(({ playerId }) => playerId === late.playerId)
+        ?.status,
+    ).toBe('active');
+    expect(started.game?.handId).not.toBe(settledHandId);
+    expect(started.game?.ownHoleCards).toHaveLength(2);
+  });
+
   it('uses a host-set current blind and grows from that level without replaying history', () => {
     const runtime = new GameRuntime();
     const { host, guest, send } = reachHandReady(runtime);

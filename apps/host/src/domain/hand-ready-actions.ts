@@ -85,6 +85,20 @@ export function removePlayerFromHandReady(
   });
 }
 
+export function addPlayerToHandReady(
+  state: HandReadyState,
+  playerId: string,
+): HandReadyState {
+  if (!playerId.trim()) throw new RangeError('Player id cannot be empty');
+  if (state.players.some((player) => player.playerId === playerId)) {
+    throw new RangeError(`Player is already in hand readiness: ${playerId}`);
+  }
+  return freezeHandReady({
+    ...state,
+    players: [...state.players, { playerId, choice: 'pending' }],
+  });
+}
+
 export function restorePlayerToHandReady(
   state: HandReadyState,
   playerId: string,
