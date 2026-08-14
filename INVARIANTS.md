@@ -99,12 +99,8 @@
 完整行为规范：[玩法规格：牌局生命周期](docs/product-specs/gameplay.md#牌局生命周期)
 
 执行方式：test + architecture
-覆盖状态：partial
-证据：[牌局生命周期设计](docs/design-docs/hand-lifecycle.md)、[完整牌局结算集成测试](packages/poker-core/src/hand/complete-hand.integration.test.ts)、[下一局创建测试](apps/host/src/domain/start-next-hand.test.ts)、[Host 快照投影测试](apps/host/src/application/snapshot-projector.test.ts)、[Host 生命周期测试](apps/host/src/application/game-runtime.test.ts)
-
-缺口：核心结算和下一局创建已有测试，但尚无单一房主运行时用例贯通下注轮关闭、跨街、结算持久化、准备阶段和下一局启动。
-责任边界：`packages/poker-core` 负责单局状态机，`apps/host` 负责连续牌局编排、持久化和快照发布。
-跟进：下一次修改跨街或连续牌局编排时，补房主运行时端到端状态序列测试。
+覆盖状态：complete
+证据：[牌局生命周期设计](docs/design-docs/hand-lifecycle.md)、[完整牌局结算集成测试](packages/poker-core/src/hand/complete-hand.integration.test.ts)、[下一局创建测试](apps/host/src/domain/start-next-hand.test.ts)、[Host 快照投影测试](apps/host/src/application/snapshot-projector.test.ts)、[Host 生命周期测试](apps/host/src/application/game-runtime.test.ts)、[MCP Agent 闭环测试](apps/mcp-server/src/__tests__/closed-loop.e2e.test.ts)
 
 ### INV-HAND-002 — 牌局内不能有重复牌
 

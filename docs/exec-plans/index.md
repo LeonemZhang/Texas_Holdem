@@ -4,9 +4,12 @@
 
 ## 进行中
 
-当前没有仓库级进行中的执行计划。
+- [`mcp-agent-closed-loop`](active/mcp-agent-closed-loop/plan.md)：以真实 Host、独立 stdio MCP Agent 和本机 SQLite 完成三手四街对局，验证双方进程重启后的同身份恢复与持久化边界。
+- [`client-reconnection`](active/client-reconnection/plan.md)：为玩家与房主客户端补齐固定 `500 ms` 间隔、最多 `20` 次自动重连和同参数手动重连周期，并以权威快照匹配作为恢复操作门控；不修改 Host 权威、协议幂等或持久化。
+- [`current-hand-number`](active/current-hand-number/plan.md)：将当前局号改为 Host 权威投影，结算和准备阶段稳定显示刚结束的第 N 局，下一局创建后再显示第 N+1 局；不改变 `completedHands`、盲注增长、发牌时机或持久化。
+- [`automatic-runout-street-reveal`](active/automatic-runout-street-reveal/plan.md)：自动 Runout 时由服务端逐街公开公共牌并控制摊牌结算节奏；不改协议字段或客户端规则。
 
-`active/` 由[目录说明](active/README.md)保持在 Git 中。复杂变更需要多个可独立验收步骤时，复制[标准模板](template/plan.md)到 `active/<change>/`；普通小修、诊断、评审和文档整理直接以用户请求作为任务边界，不创建空计划或虚构 task ID。
+复杂变更需要多个可独立验收步骤时，复制[标准模板](template/plan.md)到 `active/<change>/`；普通小修、诊断、评审和文档整理直接以用户请求作为任务边界，不创建空计划或虚构 task ID。
 
 每个进行中的计划至少包含 `plan.md`、`verification.md` 和 `tasks/`。`plan.md` 只保存目标、范围、依赖图和唯一任务状态表；任务详情放在 `tasks/<TASK_ID>.md`，状态表的 `Detail` 必须链接对应文件。
 

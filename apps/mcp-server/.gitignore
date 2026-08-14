@@ -1,0 +1,5 @@
+# AI driver runtime state (live room/player IDs and recovery tokens)
+agent/observe.json
+agent/resume.json
+agent/decision.json
+agent/stop.flag
