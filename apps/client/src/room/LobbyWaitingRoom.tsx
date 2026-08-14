@@ -23,17 +23,24 @@ export interface LobbyPlayerView {
 
 export interface LobbyWaitingRoomProps {
   readonly roomName: string;
-  readonly currentPlayerId: string;
+  readonly currentPlayerId?: string;
   readonly players: readonly LobbyPlayerView[];
   readonly joinUrl?: string;
   readonly settings?: RoomSettingsMessage;
-  readonly onSetReady: (ready: boolean) => void;
-  readonly onUpdateSettings?: (settings: RoomSettingsMessage) => void;
+  readonly currentSmallBlind?: number;
+  readonly phase?: 'lobby' | 'playing' | 'hand-ready' | 'paused' | 'closed';
+  readonly isHost?: boolean;
+  readonly onSetReady?: (ready: boolean) => void;
+  readonly onUpdateSettings?: (
+    settings: RoomSettingsMessage,
+    currentSmallBlind?: number,
+  ) => void;
   readonly onStartFirstHand: () => void;
   readonly onRemovePlayer?: (playerId: string) => void;
   readonly onCloseRoom?: () => void;
   readonly onReseatPlayer?: (playerId: string, seatIndex: number) => void;
   readonly onShuffleSeats?: () => void;
+  readonly onEnterSpectator?: () => void;
 }
 
 export function LobbyWaitingRoom({
@@ -42,6 +49,9 @@ export function LobbyWaitingRoom({
   players,
   joinUrl,
   settings,
+  currentSmallBlind,
+  phase = 'lobby',
+  isHost: hostOverride,
   onSetReady,
   onStartFirstHand,
   onUpdateSettings,
@@ -49,6 +59,7 @@ export function LobbyWaitingRoom({
   onCloseRoom,
   onReseatPlayer,
   onShuffleSeats,
+  onEnterSpectator,
 }: LobbyWaitingRoomProps) {
   const [removeCandidate, setRemoveCandidate] =
     useState<LobbyPlayerView | null>(null);
@@ -71,18 +82,21 @@ export function LobbyWaitingRoom({
     ({ ready, connected }) => ready && connected,
   ).length;
   const canStartFirstHand =
+    phase === 'lobby' &&
     seatedPlayers.length >= 2 &&
     seatedPlayers.every(({ ready, connected }) => ready && connected);
   const waitingPlayerCount = seatedPlayers.length - readyPlayerCount;
-  const isHost = currentPlayer?.isHost === true;
+  const isHost = hostOverride ?? currentPlayer?.isHost === true;
   const seatsAreCompact = seatedPlayers.every(
     ({ seatIndex }, index) => seatIndex === index,
   );
-  const canDragSeats = isHost && seatsAreCompact;
+  const canDragSeats = isHost && phase === 'lobby' && seatsAreCompact;
   const shuffleDisabled =
     seatedPlayers.length === 0 ||
     (seatedPlayers.length === 1 && seatedPlayers[0]?.seatIndex === 0);
   const seatCount = settings?.maxPlayers ?? 10;
+  const showCurrentSmallBlind =
+    phase !== 'lobby' && currentSmallBlind !== undefined;
 
   const clearSeatDrag = () => {
     draggedPlayerIdRef.current = null;
@@ -127,14 +141,20 @@ export function LobbyWaitingRoom({
 
   return (
     <section
-      className={`lobby${currentPlayer?.isHost && joinUrl ? ' lobby--with-invite' : ''}`}
+      className={`lobby${isHost && joinUrl ? ' lobby--with-invite' : ''}`}
       aria-labelledby="lobby-title"
     >
       <header className="lobby__heading">
         <div>
-          <p className="connection-home__kicker">第一局开始前</p>
+          <p className="connection-home__kicker">
+            {phase === 'lobby' ? '第一局开始前' : '房间大厅'}
+          </p>
           <h2 id="lobby-title">{roomName}</h2>
-          <p>房主默认已准备；其他玩家准备后，由房主手动开始游戏。</p>
+          <p>
+            {phase === 'lobby'
+              ? '房主默认已准备；其他玩家准备后，由房主手动开始游戏。'
+              : '牌局已开始，玩家状态和房间配置仍由房主统一管理。'}
+          </p>
         </div>
         <div className="lobby__heading-actions">
           <strong className="lobby__count">
@@ -143,7 +163,7 @@ export function LobbyWaitingRoom({
         </div>
       </header>
 
-      {currentPlayer?.isHost && joinUrl ? (
+      {isHost && joinUrl ? (
         <RoomInviteShare joinUrl={joinUrl} className="lobby__invite" />
       ) : null}
 
@@ -201,8 +221,9 @@ export function LobbyWaitingRoom({
                     <span>等待准备</span>
                   )}
                 </span>
-                {currentPlayer?.isHost &&
-                player.playerId !== currentPlayerId ? (
+                {isHost &&
+                player.playerId !== currentPlayerId &&
+                (phase === 'lobby' || phase === 'hand-ready') ? (
                   <button
                     className="lobby-player__remove"
                     type="button"
@@ -254,12 +275,22 @@ export function LobbyWaitingRoom({
                 onCancel={() => setSettingsOpen(false)}
               >
                 <RoomSettingsEditor
-                  key={`${settings.roomName}-${settings.initialChips}-${settings.smallBlind}-${settings.maxPlayers}-${settings.actionTimeoutSeconds}-${settings.handReadyTimeoutSeconds}-${settings.blindGrowth.enabled}-${settings.blindGrowth.intervalHands}-${settings.blindGrowth.mode ?? 'multiplier'}-${settings.blindGrowth.multiplier ?? ''}-${settings.blindGrowth.increment ?? ''}-${settings.blindGrowth.maxSmallBlind ?? ''}-${settings.zeroChipPolicy}`}
+                  key={`${settings.roomName}-${settings.initialChips}-${settings.smallBlind}-${settings.maxPlayers}-${settings.actionTimeoutSeconds}-${settings.handReadyTimeoutSeconds}-${settings.blindGrowth.enabled}-${settings.blindGrowth.intervalHands}-${settings.blindGrowth.mode ?? 'multiplier'}-${settings.blindGrowth.multiplier ?? ''}-${settings.blindGrowth.increment ?? ''}-${settings.blindGrowth.maxSmallBlind ?? ''}-${settings.zeroChipPolicy}-${showCurrentSmallBlind ? (currentSmallBlind ?? '') : 'hidden'}`}
                   settings={settings}
+                  lockedFields={
+                    phase === 'lobby'
+                      ? []
+                      : ['maxPlayers', 'initialChips', 'smallBlind']
+                  }
+                  {...(showCurrentSmallBlind ? { currentSmallBlind } : {})}
                   formId={settingsFormId}
                   showSubmitButton={false}
-                  onSubmit={(nextSettings) => {
-                    onUpdateSettings?.(nextSettings);
+                  onSubmit={(nextSettings, nextCurrentSmallBlind) => {
+                    if (nextCurrentSmallBlind === undefined) {
+                      onUpdateSettings?.(nextSettings);
+                    } else {
+                      onUpdateSettings?.(nextSettings, nextCurrentSmallBlind);
+                    }
                     setSettingsOpen(false);
                   }}
                 />
@@ -270,37 +301,53 @@ export function LobbyWaitingRoom({
       </div>
 
       <footer className="lobby__actions">
-        {!currentPlayer?.isHost ? (
+        {!isHost && currentPlayer ? (
           <button
             className="button button--secondary"
             type="button"
             disabled={!currentPlayer?.connected}
-            onClick={() => onSetReady(!currentPlayer?.ready)}
+            onClick={() => onSetReady?.(!currentPlayer.ready)}
           >
             {currentPlayer?.ready ? '取消准备' : '准备'}
           </button>
         ) : null}
-        {currentPlayer?.isHost ? (
+        {isHost ? (
           <div className="lobby__start-control">
-            <button
-              className="button button--primary"
-              type="button"
-              disabled={!canStartFirstHand}
-              aria-describedby="lobby-start-status"
-              onClick={() => canStartFirstHand && onStartFirstHand()}
-            >
-              开始游戏
-            </button>
+            <div className="lobby__start-buttons">
+              {phase === 'lobby' ? (
+                <button
+                  className="button button--primary"
+                  type="button"
+                  disabled={!canStartFirstHand}
+                  aria-describedby="lobby-start-status"
+                  onClick={() => canStartFirstHand && onStartFirstHand()}
+                >
+                  开始游戏
+                </button>
+              ) : null}
+              {onEnterSpectator ? (
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={phase === 'lobby'}
+                  onClick={onEnterSpectator}
+                >
+                  加入观战
+                </button>
+              ) : null}
+            </div>
             <small id="lobby-start-status">
-              {canStartFirstHand
-                ? '全员已准备，可以开始游戏'
-                : `还有 ${waitingPlayerCount} 位玩家未准备`}
+              {phase !== 'lobby'
+                ? '牌局已开始，可从观战牌桌旁管理房间'
+                : canStartFirstHand
+                  ? '全员已准备，可以开始游戏'
+                  : `还有 ${waitingPlayerCount} 位玩家未准备`}
             </small>
           </div>
         ) : (
           <p>等待房主开始游戏</p>
         )}
-        {currentPlayer?.isHost ? (
+        {isHost ? (
           <button
             className="button button--danger"
             type="button"

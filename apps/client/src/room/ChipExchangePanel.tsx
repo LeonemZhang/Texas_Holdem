@@ -184,6 +184,14 @@ export function ChipExchangePanel({
     if (!confirmation) return;
     onAction(confirmation);
     setConfirmation(null);
+    if (confirmation.type === 'approve' || confirmation.type === 'request') {
+      setOpen(false);
+    }
+  };
+
+  const rejectIncomingRequest = (requestId: string) => {
+    onAction({ type: 'reject', requestId });
+    setOpen(false);
   };
 
   const confirmationText = useMemo(() => {
@@ -402,12 +410,7 @@ export function ChipExchangePanel({
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          onAction({
-                            type: 'reject',
-                            requestId: record.requestId,
-                          })
-                        }
+                        onClick={() => rejectIncomingRequest(record.requestId)}
                       >
                         拒绝
                       </button>

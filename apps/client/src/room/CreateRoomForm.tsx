@@ -7,6 +7,7 @@ import {
 
 export interface CreateRoomFormValue {
   readonly hostNickname: string;
+  readonly hostParticipation?: 'player' | 'service-only';
   readonly settings: RoomSettingsMessage;
 }
 
@@ -29,6 +30,9 @@ function normalizeMinimumInput(value: string, minimum: number): string {
 }
 
 export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
+  const [hostParticipation, setHostParticipation] = useState<
+    'player' | 'service-only'
+  >('player');
   const [smallBlind, setSmallBlind] = useState(1);
   const [blindGrowthMode, setBlindGrowthMode] =
     useState<BlindGrowthSelection>('none');
@@ -55,7 +59,7 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const hostNickname = String(form.get('hostNickname') ?? '').trim();
-    if (!hostNickname) {
+    if (hostParticipation === 'player' && !hostNickname) {
       setError('请输入房主昵称');
       return;
     }
@@ -92,7 +96,11 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
       return;
     }
     setError(null);
-    onCreate({ hostNickname, settings: parsed.data });
+    onCreate({
+      hostNickname,
+      ...(hostParticipation === 'service-only' ? { hostParticipation } : {}),
+      settings: parsed.data,
+    });
   };
 
   return (
@@ -102,10 +110,48 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
         <h2>创建朋友牌桌</h2>
       </header>
       <div className="room-form__grid">
-        <label>
-          房主昵称
-          <input name="hostNickname" defaultValue="Alice" />
-        </label>
+        <div className="room-form__host-row">
+          <fieldset className="room-form__host-participation">
+            <legend>房主参与方式</legend>
+            <div
+              className="room-form__segmented-control"
+              role="tablist"
+              aria-label="房主参与方式"
+            >
+              <button
+                className="room-form__segment"
+                type="button"
+                role="tab"
+                aria-label="参与游戏"
+                aria-selected={hostParticipation === 'player'}
+                onClick={() => setHostParticipation('player')}
+              >
+                参与游戏
+              </button>
+              <button
+                className="room-form__segment"
+                type="button"
+                role="tab"
+                aria-label="仅提供服务"
+                aria-selected={hostParticipation === 'service-only'}
+                onClick={() => setHostParticipation('service-only')}
+              >
+                仅提供服务
+              </button>
+            </div>
+            <p className="form-help">
+              仅提供服务时，本机只负责房间、计时和牌局服务，不占用玩家座位。
+            </p>
+          </fieldset>
+          {hostParticipation === 'player' ? (
+            <label>
+              房主昵称
+              <input name="hostNickname" defaultValue="Alice" />
+            </label>
+          ) : (
+            <input type="hidden" name="hostNickname" value="房主服务" />
+          )}
+        </div>
         <label>
           房间名称
           <input name="roomName" defaultValue="朋友局" />
@@ -130,30 +176,32 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
             defaultValue="100"
           />
         </label>
-        <label>
-          小盲
-          <select
-            name="smallBlind"
-            value={smallBlind}
-            onChange={(event) => {
-              updateSmallBlind(Number(event.target.value));
-            }}
-          >
-            {blindOptions.map((blind) => (
-              <option key={blind} value={blind}>
-                {blind}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          大盲（小盲 × 2）
-          <input
-            aria-label="大盲（小盲 × 2）"
-            value={smallBlind * 2}
-            readOnly
-          />
-        </label>
+        <div className="room-form__blind-pair">
+          <label>
+            小盲
+            <select
+              name="smallBlind"
+              value={smallBlind}
+              onChange={(event) => {
+                updateSmallBlind(Number(event.target.value));
+              }}
+            >
+              {blindOptions.map((blind) => (
+                <option key={blind} value={blind}>
+                  {blind}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            大盲（小盲 × 2）
+            <input
+              aria-label="大盲（小盲 × 2）"
+              value={smallBlind * 2}
+              readOnly
+            />
+          </label>
+        </div>
       </div>
       <details className="room-form__advanced">
         <summary>高级规则：行动时间、盲注增长与零筹码规则</summary>

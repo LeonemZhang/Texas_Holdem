@@ -30,6 +30,7 @@ describe('LobbyWaitingRoom', () => {
         roomName="朋友局"
         currentPlayerId="host"
         players={players(true)}
+        currentSmallBlind={10}
         settings={{
           roomName: '朋友局',
           maxPlayers: 10,
@@ -60,6 +61,7 @@ describe('LobbyWaitingRoom', () => {
     });
     expect(settingsDialog).toHaveClass('modal-dialog--room-settings');
     expect(settingsDialog).toContainElement(screen.getByLabelText('初始筹码'));
+    expect(screen.queryByLabelText('当前小盲')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('初始筹码'), {
       target: { value: '250' },
     });
@@ -160,6 +162,39 @@ describe('LobbyWaitingRoom', () => {
     expect(screen.getByRole('button', { name: '开始游戏' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: '取消准备' })).toBeNull();
     expect(onStartFirstHand).not.toHaveBeenCalled();
+  });
+
+  it('keeps joining spectator mode disabled before the first hand starts', () => {
+    const onEnterSpectator = vi.fn();
+    const { rerender } = render(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={players(true)}
+        phase="lobby"
+        onStartFirstHand={vi.fn()}
+        onEnterSpectator={onEnterSpectator}
+      />,
+    );
+
+    const spectatorButton = screen.getByRole('button', { name: '加入观战' });
+    expect(spectatorButton).toBeDisabled();
+    fireEvent.click(spectatorButton);
+    expect(onEnterSpectator).not.toHaveBeenCalled();
+
+    rerender(
+      <LobbyWaitingRoom
+        roomName="朋友局"
+        currentPlayerId="host"
+        players={players(true)}
+        phase="playing"
+        onStartFirstHand={vi.fn()}
+        onEnterSpectator={onEnterSpectator}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '加入观战' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '加入观战' }));
+    expect(onEnterSpectator).toHaveBeenCalledOnce();
   });
 
   it('enables start once every non-host connected player is ready', () => {

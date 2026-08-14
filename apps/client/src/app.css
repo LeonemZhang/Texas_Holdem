@@ -1140,6 +1140,17 @@ body:has(.poker-table-page) .game-room-shell {
   margin: 0.75rem 0;
 }
 
+.room-form__blind-pair {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.room-form__blind-pair label {
+  min-width: 0;
+}
+
 .room-settings-editor .room-form__advanced {
   margin-bottom: 0.75rem;
 }
@@ -3542,6 +3553,7 @@ body:has(.poker-table-page) .poker-table-controls {
   }
 
   .room-form__grid,
+  .room-form__host-row,
   .room-form__growth-tabs,
   .room-form__growth-values {
     grid-template-columns: 1fr;
@@ -5400,6 +5412,111 @@ body:has(.room-closed) .room-closed {
   font-size: 0.88rem;
 }
 
+.room-form__host-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1rem;
+}
+
+.room-form__host-participation {
+  display: grid;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid rgb(167 243 208 / 18%);
+  border-radius: 0.8rem;
+  background: rgb(4 17 14 / 24%);
+  gap: 0.65rem;
+}
+
+.room-form__host-participation legend {
+  padding-inline: 0.35rem;
+}
+
+.room-form__segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.room-form__segment {
+  min-height: 48px;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgb(167 243 208 / 28%);
+  color: #a7f3d0;
+  background: rgb(4 17 14 / 75%);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.room-form__segment:first-child {
+  border-radius: 0.7rem 0 0 0.7rem;
+}
+
+.room-form__segment:last-child {
+  border-left: 0;
+  border-radius: 0 0.7rem 0.7rem 0;
+}
+
+.room-form__segment[aria-selected='true'] {
+  position: relative;
+  z-index: 1;
+  border-color: rgb(45 212 191 / 75%);
+  color: #ecfdf5;
+  background: rgb(13 148 136 / 34%);
+  box-shadow: inset 0 0 0 1px rgb(45 212 191 / 25%);
+}
+
+.room-form select:disabled,
+.room-form input:disabled {
+  color: #6ee7b7;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.lobby__start-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.host-console {
+  display: grid;
+  gap: 1rem;
+}
+
+.host-console__heading {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.host-console__heading h1,
+.host-console__heading p {
+  margin: 0;
+}
+
+.host-controls__settings {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.host-controls__settings > .button {
+  width: 100%;
+}
+
+.hand-ready-overlay--spectator {
+  pointer-events: auto;
+}
+
+.hand-ready-overlay--spectator .hand-ready-card {
+  border-color: rgb(56 189 248 / 40%);
+  background: rgb(7 26 22 / 96%);
+}
+
 .chip-exchange__forms {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5948,5 +6065,235 @@ body:has(.lobby) .lobby-player--drop-target {
     transform: translateX(var(--street-pot-history-offset-x, 0px))
       scale(var(--street-pot-history-scale, 1));
     transform-origin: left center;
+  }
+}
+
+.host-console > header {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.host-spectator__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+.host-spectator__settlement {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgb(15 23 42 / 78%);
+  color: #f8fafc;
+  text-align: center;
+}
+
+@media (max-width: 599px) {
+  .host-spectator__controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* Keep the room settings form and host lobby inside a narrow viewport. */
+@media (max-width: 599px), (min-width: 600px) and (max-aspect-ratio: 5/6) {
+  .modal-backdrop:has(.modal-dialog--room-settings) {
+    place-items: stretch;
+    padding: 0.5rem;
+  }
+
+  .modal-dialog--room-settings {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 1rem);
+    min-height: 0;
+    padding: 0.75rem;
+    overflow: hidden;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 0.6rem;
+  }
+
+  .modal-dialog--room-settings .modal-dialog__content {
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.15rem;
+  }
+
+  .modal-dialog--room-settings .room-settings-editor,
+  .modal-dialog--room-settings .room-form__grid,
+  .modal-dialog--room-settings .room-form__advanced,
+  .modal-dialog--room-settings .room-form__blind-pair {
+    min-width: 0;
+  }
+
+  .modal-dialog--room-settings .room-settings-editor {
+    padding: 0.25rem 0;
+  }
+
+  .modal-dialog--room-settings .room-form__grid {
+    gap: 0.6rem;
+    margin: 0.5rem 0;
+  }
+
+  .modal-dialog--room-settings .room-form__blind-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .modal-dialog--room-settings .room-form__blind-pair label {
+    overflow-wrap: anywhere;
+  }
+
+  .modal-dialog--room-settings .modal-dialog__actions {
+    flex-shrink: 0;
+  }
+
+  body:has(.lobby) .game-room-shell {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    padding: 0.5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body:has(.lobby) .lobby {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-height: calc(100dvh - 1rem);
+    padding: 0.75rem;
+    overflow: visible;
+  }
+
+  body:has(.lobby) .lobby__heading {
+    align-items: stretch;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.5rem;
+  }
+
+  body:has(.lobby) .lobby__heading > div,
+  body:has(.lobby) .lobby__heading h2,
+  body:has(.lobby) .lobby__heading p {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  body:has(.lobby) .lobby__heading h2,
+  body:has(.lobby) .lobby__heading p,
+  body:has(.lobby) .lobby__actions p {
+    overflow-wrap: anywhere;
+  }
+
+  body:has(.lobby) .lobby__heading-actions {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  body:has(.lobby) .lobby__invite {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+  }
+
+  body:has(.lobby) .lobby__invite > div,
+  body:has(.lobby) .room-invite__details {
+    align-items: stretch;
+    flex-wrap: wrap;
+    width: 100%;
+    min-width: 0;
+  }
+
+  body:has(.lobby) .room-invite__details code {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  body:has(.lobby) .room-invite__details .button {
+    width: 100%;
+  }
+
+  body:has(.lobby) .lobby__seat-area {
+    display: block;
+    min-width: 0;
+  }
+
+  body:has(.lobby) .lobby__players {
+    max-height: none;
+    overflow: visible;
+  }
+
+  body:has(.lobby) .lobby__seat-controls {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin-top: 0.65rem;
+  }
+
+  body:has(.lobby) .lobby__seat-action {
+    display: flex;
+    align-items: stretch;
+    flex-wrap: wrap;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    gap: 0.45rem;
+  }
+
+  body:has(.lobby) .lobby__seat-action > .button {
+    flex: 1 1 calc(50% - 0.45rem);
+    min-width: 0;
+  }
+
+  body:has(.lobby) .lobby__seat-action .lobby__seat-hint {
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  body:has(.lobby) .lobby__actions {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    margin-top: 0.75rem;
+    gap: 0.65rem;
+  }
+
+  body:has(.lobby) .lobby__start-control {
+    justify-items: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+
+  body:has(.lobby) .lobby__start-buttons {
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  body:has(.lobby) .lobby__start-buttons > .button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  body:has(.lobby) .lobby__start-control small {
+    overflow-wrap: anywhere;
+  }
+
+  body:has(.lobby) .lobby__actions > .button--danger {
+    width: 100%;
+    min-width: 0;
   }
 }

@@ -72,6 +72,29 @@ describe('RoomSessionClient', () => {
     ]);
   });
 
+  it('probes a nickname and accepts the host recommendation', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          protocolVersion: '3',
+          roomId: 'room-1',
+          nickname: 'Bob',
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new RoomSessionClient('http://10.126.126.1:32100', fetcher);
+
+    await expect(client.probeNickname(' Alice ')).resolves.toMatchObject({
+      roomId: 'room-1',
+      nickname: 'Bob',
+    });
+    expect(fetcher).toHaveBeenCalledWith(expect.any(URL), undefined);
+    expect(String(fetcher.mock.calls[0]?.[0])).toBe(
+      'http://10.126.126.1:32100/api/rooms/current?nickname=Alice',
+    );
+  });
+
   it('surfaces the host error message', async () => {
     const client = new RoomSessionClient(
       'http://10.126.126.1:32100',

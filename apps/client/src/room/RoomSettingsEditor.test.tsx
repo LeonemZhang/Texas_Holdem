@@ -44,6 +44,33 @@ describe('RoomSettingsEditor', () => {
     expect(screen.getByLabelText('大盲上限')).toHaveValue('20');
   });
 
+  it('keeps the small and big blind controls in the small-blind grid area', () => {
+    render(<RoomSettingsEditor settings={settings} onSubmit={vi.fn()} />);
+
+    const blindPair = document.querySelector('.room-form__blind-pair');
+    expect(blindPair).toBeInTheDocument();
+    expect(blindPair).toHaveTextContent('小盲');
+    expect(blindPair).toContainElement(
+      screen.getByLabelText('大盲（小盲 × 2）'),
+    );
+  });
+
+  it('keeps the current small and big blind together while editing in-game', () => {
+    render(
+      <RoomSettingsEditor
+        settings={settings}
+        currentSmallBlind={10}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const blindPair = document.querySelector('.room-form__blind-pair');
+    expect(blindPair).toHaveTextContent('当前小盲');
+    expect(blindPair).toContainElement(
+      screen.getByLabelText('当前大盲（当前小盲 × 2）'),
+    );
+  });
+
   it('submits step growth and keeps the big-blind cap in sync', () => {
     const onSubmit = vi.fn();
     render(<RoomSettingsEditor settings={settings} onSubmit={onSubmit} />);
@@ -95,5 +122,55 @@ describe('RoomSettingsEditor', () => {
     fireEvent.blur(maxSmallBlind);
     expect(increment).toHaveValue(5);
     expect(maxSmallBlind).toHaveValue(5);
+  });
+
+  it('links the in-game current small blind to the base blind and cap', () => {
+    const onSubmit = vi.fn();
+    render(
+      <RoomSettingsEditor
+        settings={{
+          ...settings,
+          blindGrowth: {
+            ...settings.blindGrowth,
+            enabled: true,
+            maxSmallBlind: 20,
+          },
+        }}
+        currentSmallBlind={15}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    const currentSmallBlind = screen.getByLabelText('当前小盲');
+    const maxSmallBlind = screen.getByLabelText('小盲上限（可选）');
+    expect(currentSmallBlind).toHaveAttribute('min', '5');
+    expect(currentSmallBlind).toHaveAttribute('max', '20');
+
+    fireEvent.change(currentSmallBlind, { target: { value: '2' } });
+    fireEvent.blur(currentSmallBlind);
+    expect(currentSmallBlind).toHaveValue(5);
+
+    fireEvent.change(currentSmallBlind, { target: { value: '15' } });
+    fireEvent.blur(currentSmallBlind);
+    expect(currentSmallBlind).toHaveValue(15);
+
+    fireEvent.change(maxSmallBlind, { target: { value: '8' } });
+    fireEvent.blur(maxSmallBlind);
+    expect(maxSmallBlind).toHaveValue(8);
+    expect(currentSmallBlind).toHaveValue(8);
+    expect(currentSmallBlind).toHaveAttribute('max', '8');
+
+    fireEvent.change(currentSmallBlind, { target: { value: '12' } });
+    fireEvent.blur(currentSmallBlind);
+    expect(currentSmallBlind).toHaveValue(8);
+
+    fireEvent.click(screen.getByRole('button', { name: '保存房间配置' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blindGrowth: expect.objectContaining({ maxSmallBlind: 8 }),
+      }),
+      8,
+    );
   });
 });

@@ -18,20 +18,47 @@ function normalizeMinimumInput(value: string, minimum: number): string {
   return String(clampToMinimum(Number(value), minimum));
 }
 
+function getSmallBlindCap(value: string, minimum: number): number | undefined {
+  if (value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? clampToMinimum(parsed, minimum) : undefined;
+}
+
+function clampCurrentSmallBlind(
+  value: number,
+  minimum: number,
+  maximum?: number,
+): number {
+  const normalized = clampToMinimum(value, minimum);
+  return maximum === undefined ? normalized : Math.min(normalized, maximum);
+}
+
 export interface RoomSettingsEditorProps {
   readonly settings: RoomSettingsMessage;
-  readonly onSubmit: (settings: RoomSettingsMessage) => void;
+  readonly currentSmallBlind?: number;
+  readonly lockedFields?: readonly (
+    'maxPlayers' | 'initialChips' | 'smallBlind'
+  )[];
+  readonly onSubmit: (
+    settings: RoomSettingsMessage,
+    currentSmallBlind?: number,
+  ) => void;
   readonly formId?: string;
   readonly showSubmitButton?: boolean;
 }
 
 export function RoomSettingsEditor({
   settings,
+  currentSmallBlind: initialCurrentSmallBlind,
+  lockedFields = [],
   onSubmit,
   formId,
   showSubmitButton = true,
 }: RoomSettingsEditorProps) {
   const [smallBlind, setSmallBlind] = useState(settings.smallBlind);
+  const [currentSmallBlind, setCurrentSmallBlind] = useState(
+    initialCurrentSmallBlind ?? settings.smallBlind,
+  );
   const [blindMode, setBlindMode] = useState<'preset' | 'custom'>(
     blindOptions.includes(settings.smallBlind as (typeof blindOptions)[number])
       ? 'preset'
@@ -62,19 +89,50 @@ export function RoomSettingsEditor({
         ),
   );
   const [error, setError] = useState<string | null>(null);
+  const locked = new Set(lockedFields);
+  const showCurrentSmallBlind = initialCurrentSmallBlind !== undefined;
   const isPreset = blindMode === 'preset';
   const updateSmallBlind = (nextSmallBlind: number) => {
     const normalizedSmallBlind = clampToMinimum(nextSmallBlind, 1);
+    const normalizedMaxSmallBlind =
+      maxSmallBlind.trim() === ''
+        ? ''
+        : normalizeMinimumInput(maxSmallBlind, normalizedSmallBlind);
     setSmallBlind(normalizedSmallBlind);
     setBlindGrowthIncrement((current) =>
       current.trim() === ''
         ? String(normalizedSmallBlind)
         : normalizeMinimumInput(current, normalizedSmallBlind),
     );
-    setMaxSmallBlind((current) =>
-      current.trim() === ''
-        ? ''
-        : normalizeMinimumInput(current, normalizedSmallBlind),
+    setMaxSmallBlind(normalizedMaxSmallBlind);
+    setCurrentSmallBlind((current) =>
+      clampCurrentSmallBlind(
+        current,
+        normalizedSmallBlind,
+        getSmallBlindCap(normalizedMaxSmallBlind, normalizedSmallBlind),
+      ),
+    );
+  };
+  const normalizeMaxSmallBlind = (value: string) =>
+    value.trim() === '' ? '' : normalizeMinimumInput(value, smallBlind);
+  const handleMaxSmallBlindBlur = () => {
+    const normalized = normalizeMaxSmallBlind(maxSmallBlind);
+    setMaxSmallBlind(normalized);
+    setCurrentSmallBlind((current) =>
+      clampCurrentSmallBlind(
+        current,
+        smallBlind,
+        getSmallBlindCap(normalized, smallBlind),
+      ),
+    );
+  };
+  const handleCurrentSmallBlindBlur = () => {
+    setCurrentSmallBlind((current) =>
+      clampCurrentSmallBlind(
+        current,
+        smallBlind,
+        getSmallBlindCap(maxSmallBlind, smallBlind),
+      ),
     );
   };
 
@@ -91,11 +149,18 @@ export function RoomSettingsEditor({
       maxSmallBlind.trim() === ''
         ? null
         : clampToMinimum(Number(maxSmallBlind), smallBlind);
+    const baseSmallBlind = locked.has('smallBlind')
+      ? settings.smallBlind
+      : smallBlind;
     const parsed = RoomSettingsSchema.safeParse({
       roomName: String(form.get('roomName') ?? ''),
-      maxPlayers: Number(form.get('maxPlayers')),
-      initialChips: Number(form.get('initialChips')),
-      smallBlind,
+      maxPlayers: locked.has('maxPlayers')
+        ? settings.maxPlayers
+        : Number(form.get('maxPlayers')),
+      initialChips: locked.has('initialChips')
+        ? settings.initialChips
+        : Number(form.get('initialChips')),
+      smallBlind: baseSmallBlind,
       actionTimeoutSeconds: Number(form.get('actionTimeoutSeconds')),
       handReadyTimeoutSeconds: Number(form.get('handReadyTimeoutSeconds')),
       blindGrowth: {
@@ -114,8 +179,86 @@ export function RoomSettingsEditor({
       return;
     }
     setError(null);
-    onSubmit(parsed.data);
+    if (showCurrentSmallBlind) {
+      onSubmit(
+        parsed.data,
+        clampCurrentSmallBlind(
+          currentSmallBlind,
+          smallBlind,
+          normalizedMaxSmallBlind === null
+            ? undefined
+            : normalizedMaxSmallBlind,
+        ),
+      );
+    } else {
+      onSubmit(parsed.data);
+    }
   };
+
+  const smallBlindControl = (
+    <label>
+      {locked.has('smallBlind') ? '基础小盲（已锁定）' : '小盲'}
+      <select
+        value={isPreset ? String(smallBlind) : 'custom'}
+        disabled={locked.has('smallBlind')}
+        onChange={(event) => {
+          if (event.target.value === 'custom') {
+            setBlindMode('custom');
+            return;
+          }
+          setBlindMode('preset');
+          updateSmallBlind(Number(event.target.value));
+        }}
+      >
+        {blindOptions.map((blind) => (
+          <option key={blind} value={blind}>
+            {blind}
+          </option>
+        ))}
+        <option value="custom">自定义</option>
+      </select>
+      {!isPreset ? (
+        <input
+          aria-label="自定义小盲"
+          type="number"
+          min="1"
+          step="1"
+          value={smallBlind}
+          disabled={locked.has('smallBlind')}
+          onChange={(event) => updateSmallBlind(Number(event.target.value))}
+        />
+      ) : null}
+    </label>
+  );
+  const currentSmallBlindControl = (
+    <label>
+      当前小盲
+      <input
+        aria-label="当前小盲"
+        type="number"
+        min={smallBlind}
+        max={getSmallBlindCap(maxSmallBlind, smallBlind)}
+        step="1"
+        value={currentSmallBlind}
+        onChange={(event) => setCurrentSmallBlind(Number(event.target.value))}
+        onBlur={handleCurrentSmallBlindBlur}
+      />
+    </label>
+  );
+  const bigBlindControl = (
+    <label>
+      {showCurrentSmallBlind ? '当前大盲（当前小盲 × 2）' : '大盲（小盲 × 2）'}
+      <input
+        aria-label={
+          showCurrentSmallBlind
+            ? '当前大盲（当前小盲 × 2）'
+            : '大盲（小盲 × 2）'
+        }
+        value={(showCurrentSmallBlind ? currentSmallBlind : smallBlind) * 2}
+        readOnly
+      />
+    </label>
+  );
 
   return (
     <form
@@ -131,7 +274,11 @@ export function RoomSettingsEditor({
         </label>
         <label>
           最大人数
-          <select name="maxPlayers" defaultValue={String(settings.maxPlayers)}>
+          <select
+            name="maxPlayers"
+            defaultValue={String(settings.maxPlayers)}
+            disabled={locked.has('maxPlayers')}
+          >
             {Array.from({ length: 9 }, (_, index) => index + 2).map((count) => (
               <option key={count} value={count}>
                 {count} 人
@@ -147,47 +294,23 @@ export function RoomSettingsEditor({
             min="1"
             step="1"
             defaultValue={settings.initialChips}
+            disabled={locked.has('initialChips')}
           />
         </label>
-        <label>
-          小盲
-          <select
-            value={isPreset ? String(smallBlind) : 'custom'}
-            onChange={(event) => {
-              if (event.target.value === 'custom') {
-                setBlindMode('custom');
-                return;
-              }
-              setBlindMode('preset');
-              updateSmallBlind(Number(event.target.value));
-            }}
-          >
-            {blindOptions.map((blind) => (
-              <option key={blind} value={blind}>
-                {blind}
-              </option>
-            ))}
-            <option value="custom">自定义</option>
-          </select>
-          {!isPreset ? (
-            <input
-              aria-label="自定义小盲"
-              type="number"
-              min="1"
-              step="1"
-              value={smallBlind}
-              onChange={(event) => updateSmallBlind(Number(event.target.value))}
-            />
-          ) : null}
-        </label>
-        <label>
-          大盲（小盲 × 2）
-          <input
-            aria-label="大盲（小盲 × 2）"
-            value={smallBlind * 2}
-            readOnly
-          />
-        </label>
+        {showCurrentSmallBlind ? (
+          <>
+            <div className="room-form__blind-pair">
+              {currentSmallBlindControl}
+              {bigBlindControl}
+            </div>
+            {smallBlindControl}
+          </>
+        ) : (
+          <div className="room-form__blind-pair">
+            {smallBlindControl}
+            {bigBlindControl}
+          </div>
+        )}
       </div>
       <details className="room-form__advanced" open>
         <summary>高级规则：行动时间、盲注增长与零筹码规则</summary>
@@ -305,13 +428,7 @@ export function RoomSettingsEditor({
                   value={maxSmallBlind ?? ''}
                   placeholder="不设上限"
                   onChange={(event) => setMaxSmallBlind(event.target.value)}
-                  onBlur={() =>
-                    setMaxSmallBlind((current) =>
-                      current.trim() === ''
-                        ? ''
-                        : normalizeMinimumInput(current, smallBlind),
-                    )
-                  }
+                  onBlur={handleMaxSmallBlindBlur}
                 />
               </label>
               <label>

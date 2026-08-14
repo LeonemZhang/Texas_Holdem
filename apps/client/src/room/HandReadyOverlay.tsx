@@ -11,6 +11,7 @@ export interface HandReadyRequestView {
 }
 
 export interface HandReadyOverlayProps {
+  readonly spectator?: boolean;
   readonly ownPlayerId?: string;
   readonly deadlineMs: number;
   readonly ownChoice: 'pending' | 'ready' | 'sitting-out';
@@ -25,6 +26,7 @@ export interface HandReadyOverlayProps {
   readonly onApproveRequest?: (requestId: string) => void;
   readonly onRejectRequest?: (requestId: string) => void;
   readonly onSettlementCollapsedChange?: (collapsed: boolean) => void;
+  readonly settlementCollapsed?: boolean;
   readonly settlement?: {
     readonly handId: string;
     /** The human-facing hand number for this settlement, not the opaque hand id. */
@@ -150,6 +152,7 @@ function settlementNetChangeClassName(netChange: number) {
 }
 
 export function HandReadyOverlay({
+  spectator = false,
   ownPlayerId,
   deadlineMs,
   ownChoice,
@@ -164,10 +167,13 @@ export function HandReadyOverlay({
   onApproveRequest,
   onRejectRequest,
   onSettlementCollapsedChange,
+  settlementCollapsed: controlledSettlementCollapsed,
   settlement = null,
 }: HandReadyOverlayProps) {
   const currentTime = useCurrentTime(nowMs);
   const [settlementCollapsed, setSettlementCollapsed] = useState(false);
+  const isSettlementCollapsed =
+    controlledSettlementCollapsed === true || settlementCollapsed;
   const actionsHeaderRef = useRef<HTMLElement | null>(null);
   const settlementCommunityCards = settlement?.communityCards ?? [];
   const ownSettlementNetChange =
@@ -277,13 +283,13 @@ export function HandReadyOverlay({
     onSettlementCollapsedChange?.(true);
   };
 
-  if (complete) return null;
+  if (complete || (spectator && !settlement)) return null;
 
-  if (settlement && settlementCollapsed) {
+  if (settlement && isSettlementCollapsed) {
     return (
       <section
         className="hand-ready-overlay hand-ready-overlay--collapsed"
-        aria-label="发牌前准备"
+        aria-label={spectator ? '观战结算' : '发牌前准备'}
       >
         <button
           className="hand-ready-card__settlement-expand"
@@ -293,68 +299,73 @@ export function HandReadyOverlay({
             onSettlementCollapsedChange?.(false);
           }}
         >
-          结算详情 · {secondsLeft}s
+          {spectator ? '公开结算详情' : `结算详情 · ${secondsLeft}s`}
         </button>
       </section>
     );
   }
 
   return (
-    <section className="hand-ready-overlay" aria-label="发牌前准备">
+    <section
+      className={`hand-ready-overlay${spectator ? ' hand-ready-overlay--spectator' : ''}`}
+      aria-label={spectator ? '观战结算' : '发牌前准备'}
+    >
       <div className="hand-ready-card">
-        <header ref={actionsHeaderRef}>
-          <strong
-            className={`hand-ready-card__timer${secondsLeft === 0 ? ' hand-ready-card__timer--waiting' : ''}`}
-            aria-label={
-              secondsLeft > 0
-                ? `剩余 ${secondsLeft} 秒`
-                : '等待至少两名玩家就绪'
-            }
-          >
-            {secondsLeft > 0 ? `${secondsLeft}s` : '等待就绪'}
-          </strong>
-          <div
-            className="hand-ready-card__actions"
-            role="group"
-            aria-label="准备操作"
-          >
-            <button
-              className={`button button--primary hand-ready-card__choice-button${
-                ownChoice === 'sitting-out'
-                  ? ' hand-ready-card__choice-button--join'
-                  : ''
-              }`}
-              type="button"
-              disabled={ownChoice === 'ready' || ownChips < bigBlind}
-              onClick={() => onChoose('ready')}
+        {!spectator ? (
+          <header ref={actionsHeaderRef}>
+            <strong
+              className={`hand-ready-card__timer${secondsLeft === 0 ? ' hand-ready-card__timer--waiting' : ''}`}
+              aria-label={
+                secondsLeft > 0
+                  ? `剩余 ${secondsLeft} 秒`
+                  : '等待至少两名玩家就绪'
+              }
             >
-              {ownChoice === 'ready'
-                ? '已就绪'
-                : ownChoice === 'sitting-out'
-                  ? '加入下一局'
-                  : '就绪'}
-            </button>
-            {settlement && onShowHoleCards ? (
+              {secondsLeft > 0 ? `${secondsLeft}s` : '等待就绪'}
+            </strong>
+            <div
+              className="hand-ready-card__actions"
+              role="group"
+              aria-label="准备操作"
+            >
               <button
-                className="button hand-ready-card__show-hole-cards"
+                className={`button button--primary hand-ready-card__choice-button${
+                  ownChoice === 'sitting-out'
+                    ? ' hand-ready-card__choice-button--join'
+                    : ''
+                }`}
                 type="button"
-                onClick={onShowHoleCards}
+                disabled={ownChoice === 'ready' || ownChips < bigBlind}
+                onClick={() => onChoose('ready')}
               >
-                摊牌
+                {ownChoice === 'ready'
+                  ? '已就绪'
+                  : ownChoice === 'sitting-out'
+                    ? '加入下一局'
+                    : '就绪'}
               </button>
-            ) : null}
-            <button
-              className="button button--secondary"
-              type="button"
-              disabled={ownChoice === 'sitting-out'}
-              onClick={() => onChoose('sitting-out')}
-            >
-              暂不参与
-            </button>
-          </div>
-        </header>
+              {settlement && onShowHoleCards ? (
+                <button
+                  className="button hand-ready-card__show-hole-cards"
+                  type="button"
+                  onClick={onShowHoleCards}
+                >
+                  摊牌
+                </button>
+              ) : null}
+              <button
+                className="button button--secondary"
+                type="button"
+                disabled={ownChoice === 'sitting-out'}
+                onClick={() => onChoose('sitting-out')}
+              >
+                暂不参与
+              </button>
+            </div>
+          </header>
+        ) : null}
 
-        {requestToReview ? (
+        {!spectator && requestToReview ? (
           <section
             className="hand-ready-card__request-prompt"
             role="alertdialog"
@@ -395,11 +406,17 @@ export function HandReadyOverlay({
                 {settlementTitle}
                 {settlement.reason === 'showdown' ? ' · 摊牌' : ''}
               </strong>
-              <strong
-                className={`hand-ready-card__settlement-outcome ${settlementOutcomeClassName}`}
-              >
-                {settlementOutcomeLabel}
-              </strong>
+              {spectator ? (
+                <strong className="hand-ready-card__settlement-outcome">
+                  公开信息
+                </strong>
+              ) : (
+                <strong
+                  className={`hand-ready-card__settlement-outcome ${settlementOutcomeClassName}`}
+                >
+                  {settlementOutcomeLabel}
+                </strong>
+              )}
               <button
                 className="hand-ready-card__settlement-collapse"
                 type="button"
@@ -539,7 +556,7 @@ export function HandReadyOverlay({
           </section>
         ) : null}
 
-        {pendingRequests.length > 0 ? (
+        {!spectator && pendingRequests.length > 0 ? (
           <div className="hand-ready-card__requests" role="status">
             <strong>尚有筹码请求待处理</strong>
             <ul>

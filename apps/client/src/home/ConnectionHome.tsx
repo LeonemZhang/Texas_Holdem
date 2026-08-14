@@ -13,13 +13,14 @@ export interface ConnectionHomeProps {
   readonly onOpenDiagnostics?: () => void;
   readonly joinReady: boolean;
   readonly initialNickname?: string;
+  readonly nicknameSuggestion?: string | null;
   readonly resumeNicknameChange?: boolean;
   readonly joinError?: string | null;
   readonly runningRoomRecord?: RoomRecordSummary | null;
   readonly recoveringRunningRoom?: boolean;
   readonly runningRoomRecoveryError?: string | null;
   readonly onRecoverRunningRoom?: () => void;
-  readonly onProbeAddress: (url: string) => Promise<boolean>;
+  readonly onProbeAddress: (url: string, nickname: string) => Promise<boolean>;
   readonly onResetProbe: () => void;
   readonly onJoin: (nickname: string) => void;
 }
@@ -33,6 +34,7 @@ export function ConnectionHome({
   onOpenDiagnostics,
   joinReady,
   initialNickname,
+  nicknameSuggestion = null,
   resumeNicknameChange = false,
   joinError = null,
   runningRoomRecord = null,
@@ -55,13 +57,22 @@ export function ConnectionHome({
     }
   }, [initialNickname, resumeNicknameChange]);
 
+  useEffect(() => {
+    if (nicknameSuggestion) setNickname(nicknameSuggestion);
+  }, [nicknameSuggestion]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
       const url = parseManualJoinAddress(address);
+      const normalizedNickname = nickname.trim();
+      if (!normalizedNickname) {
+        setError('请输入昵称');
+        return;
+      }
       setError(null);
       setChecking(true);
-      await onProbeAddress(url.toString());
+      await onProbeAddress(url.toString(), normalizedNickname);
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : '请输入有效的房主 IP',
@@ -195,6 +206,11 @@ export function ConnectionHome({
             <strong>
               {resumeNicknameChange ? '恢复原身份' : '牌桌连接正常'}
             </strong>
+            {nicknameSuggestion ? (
+              <p className="form-help">
+                当前昵称已被占用，已推荐“{nicknameSuggestion}”。
+              </p>
+            ) : null}
             {resumeNicknameChange ? (
               <p className="form-help">使用原令牌恢复，不会创建新的座位。</p>
             ) : null}

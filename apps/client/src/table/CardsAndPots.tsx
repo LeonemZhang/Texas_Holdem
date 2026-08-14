@@ -17,6 +17,7 @@ export interface CardsAndPotsProps {
     readonly nickname: string;
     readonly cards: readonly string[];
   }[];
+  readonly hideHoleCards?: boolean;
 }
 
 const suitSymbols: Record<string, string> = {
@@ -71,6 +72,7 @@ export function CardsAndPots({
   ownHoleCards = null,
   ownHandType = null,
   showdownHands = [],
+  hideHoleCards = false,
 }: CardsAndPotsProps) {
   const potHistoryRef = useRef<HTMLDivElement>(null);
 
@@ -212,7 +214,7 @@ export function CardsAndPots({
             </li>
           ))}
         </ul>
-      ) : (
+      ) : hideHoleCards ? null : (
         <div className="hole-cards" aria-label="我的底牌">
           {ownHandType ? (
             <span

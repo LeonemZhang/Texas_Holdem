@@ -3,13 +3,17 @@ import { io, type Socket } from 'socket.io-client';
 import {
   CommandResponseSchema,
   DomainEventSchema,
+  HostManagementSnapshotSchema,
   PlayerSnapshotSchema,
+  ResyncHostResponseSchema,
   ResyncResponseSchema,
   type CommandResponse,
   type DomainEvent,
+  type HostManagementSnapshot,
   type PlayerSnapshot,
   type ResyncRequest,
   type ResyncResponse,
+  type ResyncHostResponse,
   type SocketAuthentication,
 } from '@texas-holdem/protocol';
 
@@ -27,6 +31,7 @@ export interface ClientSocketPort {
   on(event: 'disconnect', listener: (reason: string) => void): void;
   on(event: 'event:domain', listener: (payload: unknown) => void): void;
   on(event: 'state:snapshot', listener: (payload: unknown) => void): void;
+  on(event: 'state:host-snapshot', listener: (payload: unknown) => void): void;
   off(event: string, listener: (...arguments_: never[]) => void): void;
   timeout(milliseconds: number): {
     emit(event: string, payload: unknown, acknowledge: Acknowledge): void;
@@ -67,6 +72,9 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
   readonly #lostListeners = new Set<(reason: string) => void>();
   readonly #eventListeners = new Set<(event: DomainEvent) => void>();
   readonly #snapshotListeners = new Set<(snapshot: PlayerSnapshot) => void>();
+  readonly #hostSnapshotListeners = new Set<
+    (snapshot: HostManagementSnapshot) => void
+  >();
   #socket: ClientSocketPort | null = null;
   #generation = 0;
   #pendingConnection: {
@@ -108,6 +116,10 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
         socket.off(
           'state:snapshot',
           snapshot as (...arguments_: never[]) => void,
+        );
+        socket.off(
+          'state:host-snapshot',
+          hostSnapshot as (...arguments_: never[]) => void,
         );
         if (this.#socketCleanup === cleanup) this.#socketCleanup = null;
         if (
@@ -173,11 +185,21 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
           this.#snapshotListeners.forEach((listener) => listener(parsed.data));
         }
       };
+      const hostSnapshot = (payload: unknown) => {
+        if (!isCurrent()) return;
+        const parsed = HostManagementSnapshotSchema.safeParse(payload);
+        if (parsed.success) {
+          this.#hostSnapshotListeners.forEach((listener) =>
+            listener(parsed.data),
+          );
+        }
+      };
       socket.on('connect', connected);
       socket.on('connect_error', failed);
       socket.on('disconnect', disconnected);
       socket.on('event:domain', domainEvent);
       socket.on('state:snapshot', snapshot);
+      socket.on('state:host-snapshot', hostSnapshot);
       this.#socketCleanup = cleanup;
       this.#pendingConnection = { generation, reject };
       socket.connect();
@@ -220,6 +242,18 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
     );
   }
 
+  requestHostResync(
+    request: ResyncRequest,
+    timeoutMs = 5_000,
+  ): Promise<ResyncHostResponse> {
+    return this.emitWithAck(
+      'state:resync',
+      { ...request, sessionType: 'host' },
+      timeoutMs,
+      (response) => ResyncHostResponseSchema.safeParse(response),
+    );
+  }
+
   onConnectionLost(listener: (reason: string) => void): () => void {
     this.#lostListeners.add(listener);
     return () => this.#lostListeners.delete(listener);
@@ -233,6 +267,13 @@ export class SocketIoConnectionAdapter implements ConnectionAdapter {
   onSnapshot(listener: (snapshot: PlayerSnapshot) => void): () => void {
     this.#snapshotListeners.add(listener);
     return () => this.#snapshotListeners.delete(listener);
+  }
+
+  onHostSnapshot(
+    listener: (snapshot: HostManagementSnapshot) => void,
+  ): () => void {
+    this.#hostSnapshotListeners.add(listener);
+    return () => this.#hostSnapshotListeners.delete(listener);
   }
 
   private ensureCommandId(command: unknown): unknown {

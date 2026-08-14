@@ -1,7 +1,10 @@
 import { PageShell } from '@texas-holdem/ui';
 import { useEffect, useMemo, useState } from 'react';
 
-import { PROTOCOL_VERSION } from '@texas-holdem/protocol';
+import {
+  PROTOCOL_VERSION,
+  type RoomSettingsMessage,
+} from '@texas-holdem/protocol';
 
 import { ConnectionHome } from '../home/ConnectionHome';
 import { DiscoveryJoinDialog } from '../home/DiscoveryJoinDialog';
@@ -35,6 +38,22 @@ import {
 
 const noop = () => undefined;
 const previewHandNumber = 9;
+const previewRoomSettings: RoomSettingsMessage = {
+  roomName: '朋友局',
+  maxPlayers: 10,
+  initialChips: 1_000,
+  smallBlind: 5,
+  actionTimeoutSeconds: 30,
+  handReadyTimeoutSeconds: 30,
+  blindGrowth: {
+    enabled: true,
+    intervalHands: 10,
+    mode: 'multiplier',
+    multiplier: 2,
+    maxSmallBlind: 1_000,
+  },
+  zeroChipPolicy: 'request-chips',
+};
 const previewHostService = {
   port: 32_100,
   advertisedAddress: '10.126.126.1',
@@ -807,10 +826,13 @@ export function UiSmokePreview({ page }: { readonly page: string }) {
             connected: player.status !== 'disconnected',
           }))}
           joinUrl="http://10.126.126.1:32100/?room=preview"
+          settings={previewRoomSettings}
           onSetReady={noop}
+          onUpdateSettings={noop}
           onStartFirstHand={noop}
           onRemovePlayer={noop}
           onCloseRoom={noop}
+          onEnterSpectator={noop}
         />
       </div>
     );

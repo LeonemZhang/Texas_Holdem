@@ -1027,6 +1027,10 @@ describe('GameRoom', () => {
         }),
       ),
     );
+    expect(screen.getByLabelText('本局结算玩家牌型')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: '筹码交换' }),
+    ).not.toBeInTheDocument();
 
     const statisticsButton = screen.getByRole('button', { name: '查看统计' });
     expect(statisticsButton).toHaveClass('button', 'button--secondary');

@@ -18,6 +18,7 @@ import {
 } from './home/RoomDiscoveryList.js';
 import { DesktopRoomSetup } from './room/DesktopRoomSetup.js';
 import { GameRoom } from './room/GameRoom.js';
+import { HostConsole } from './room/HostConsole.js';
 import { RoomRecordManager } from './room/RoomRecordManager.js';
 import {
   getRuntimeAdapter,
@@ -31,6 +32,11 @@ import { UiSmokePreview } from './test/UiSmokePreview.js';
 interface JoinTarget {
   readonly baseUrl: string;
   readonly roomId: string;
+}
+
+interface JoinResolution {
+  readonly target: JoinTarget;
+  readonly probedNickname?: string;
 }
 
 interface PendingLobbyResume {
@@ -94,6 +100,9 @@ export function App() {
   const [managingRecords, setManagingRecords] = useState(false);
   const [homeDataPage, setHomeDataPage] = useState<HomeDataPage | null>(null);
   const [joinTarget, setJoinTarget] = useState<JoinTarget | null>(null);
+  const [nicknameSuggestion, setNicknameSuggestion] = useState<string | null>(
+    null,
+  );
   const [pendingLobbyResume, setPendingLobbyResume] =
     useState<PendingLobbyResume | null>(null);
   const [session, setSession] = useState<RoomSessionResponse | null>(null);
@@ -262,14 +271,22 @@ export function App() {
 
   const resolveJoinTarget = async (
     address: string,
-  ): Promise<JoinTarget | null> => {
+    nickname?: string,
+  ): Promise<JoinResolution | null> => {
     setJoinError(null);
     try {
       const url = new URL(address);
+      const client = new RoomSessionClient(url.origin);
+      const probe =
+        nickname === undefined ? null : await client.probeNickname(nickname);
       const roomId =
         url.searchParams.get('room') ??
-        (await new RoomSessionClient(url.origin).currentRoomId());
-      return { baseUrl: url.origin, roomId };
+        probe?.roomId ??
+        (await client.currentRoomId());
+      return {
+        target: { baseUrl: url.origin, roomId },
+        ...(probe ? { probedNickname: probe.nickname } : {}),
+      };
     } catch (reason) {
       setJoinError(
         networkErrorMessage(reason instanceof Error ? reason.message : null),
@@ -278,9 +295,22 @@ export function App() {
     }
   };
 
-  const selectHost = async (address: string): Promise<boolean> => {
-    const target = await resolveJoinTarget(address);
-    if (!target) return false;
+  const selectHost = async (
+    address: string,
+    nickname?: string,
+  ): Promise<boolean> => {
+    setNicknameSuggestion(null);
+    const resolution = await resolveJoinTarget(address, nickname);
+    if (!resolution) return false;
+    const target = resolution.target;
+    if (
+      nickname !== undefined &&
+      resolution.probedNickname !== undefined &&
+      resolution.probedNickname !== nickname.trim() &&
+      pendingLobbyResume?.roomId !== target.roomId
+    ) {
+      setNicknameSuggestion(resolution.probedNickname);
+    }
     if (pendingLobbyResume?.roomId === target.roomId) {
       setJoinTarget(target);
       return true;
@@ -353,10 +383,12 @@ export function App() {
     if (!room || joiningDiscoveredRoom) return;
     setJoiningDiscoveredRoom(true);
     try {
-      const target = await resolveJoinTarget(
+      const resolution = await resolveJoinTarget(
         `http://${room.hostAddress}:${room.httpPort}`,
+        nickname,
       );
-      if (!target) return;
+      if (!resolution) return;
+      const target = resolution.target;
       if (
         pendingLobbyResume?.roomId !== target.roomId &&
         (await restoreStoredSession(target.baseUrl, target.roomId))
@@ -438,6 +470,34 @@ export function App() {
   if (preview) return <UiSmokePreview page={preview} />;
 
   if (session) {
+    if (session.sessionType === 'host') {
+      if (runtime?.kind !== 'desktop') {
+        return (
+          <PageShell title="Texas Hold'em" subtitle="私人局域网德州牌桌">
+            <section className="connection-home game-lobby" aria-live="polite">
+              <h2>浏览器仅支持玩家入口</h2>
+              <p>房主控制台仅在 Windows 桌面端可用。</p>
+            </section>
+          </PageShell>
+        );
+      }
+      return (
+        <HostConsole
+          session={session}
+          onCommandPortChange={(port) => {
+            roomCommand.current = port;
+          }}
+          onExited={() => {
+            setJoinTarget(null);
+            setSession(null);
+            void adapter.setWindowRoomContext({ inRoom: false, isHost: false });
+          }}
+          {...(runtime?.kind === 'desktop'
+            ? { onHostRoomClosed: () => adapter.stopHostService() }
+            : {})}
+        />
+      );
+    }
     return (
       <GameRoom
         session={session}
@@ -497,6 +557,7 @@ export function App() {
             ? { onOpenDiagnostics: () => setHomeDataPage('diagnostics') }
             : {})}
           joinReady={joinTarget !== null}
+          nicknameSuggestion={nicknameSuggestion}
           {...(pendingLobbyResume
             ? { initialNickname: pendingLobbyResume.nickname }
             : {})}
@@ -510,6 +571,7 @@ export function App() {
           onResetProbe={() => {
             setJoinError(null);
             setJoinTarget(null);
+            setNicknameSuggestion(null);
           }}
           onJoin={(nickname) => void join(nickname)}
         />

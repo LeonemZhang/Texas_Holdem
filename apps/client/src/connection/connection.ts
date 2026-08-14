@@ -1,9 +1,11 @@
 import type {
   CommandResponse,
   DomainEvent,
+  HostManagementSnapshot,
   PlayerSnapshot,
   ResyncRequest,
   ResyncResponse,
+  ResyncHostResponse,
   SocketAuthentication,
 } from '@texas-holdem/protocol';
 
@@ -32,6 +34,10 @@ export interface ConnectionAdapter {
   onConnectionLost(listener: (reason: string) => void): () => void;
   onDomainEvent(listener: (event: DomainEvent) => void): () => void;
   onSnapshot(listener: (snapshot: PlayerSnapshot) => void): () => void;
+  onHostSnapshot?: (
+    listener: (snapshot: HostManagementSnapshot) => void,
+  ) => () => void;
+  requestHostResync?: (request: ResyncRequest) => Promise<ResyncHostResponse>;
 }
 
 export function reduceConnectionState(

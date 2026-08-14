@@ -40,6 +40,7 @@ describe('ConnectionHome', () => {
     await waitFor(() =>
       expect(props.onProbeAddress).toHaveBeenCalledWith(
         'http://10.126.126.1:32100/',
+        'Bob',
       ),
     );
   });
@@ -83,6 +84,25 @@ describe('ConnectionHome', () => {
     expect(screen.getByText('牌桌连接正常')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '确认加入' }));
     expect(props.onJoin).toHaveBeenCalledWith('Bob');
+  });
+
+  it('submits the current nickname while re-detecting a room', async () => {
+    const props = { ...handlers(), joinReady: true };
+    render(<ConnectionHome runtimeKind="browser" {...props} />);
+    fireEvent.change(screen.getByLabelText('IP 直连到房主牌桌'), {
+      target: { value: '10.126.126.1' },
+    });
+    fireEvent.change(screen.getByLabelText('玩家昵称'), {
+      target: { value: 'Carol' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '重新检测' }));
+
+    await waitFor(() =>
+      expect(props.onProbeAddress).toHaveBeenCalledWith(
+        'http://10.126.126.1:32100/',
+        'Carol',
+      ),
+    );
   });
 
   it('shows the original nickname when a lobby recovery is waiting for confirmation', () => {

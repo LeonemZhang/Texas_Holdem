@@ -139,7 +139,82 @@ describe('ChipExchangePanel', () => {
         onAction={onAction}
       />,
     );
+    fireEvent.click(screen.getByRole('button', { name: '筹码交换' }));
     fireEvent.click(screen.getByRole('button', { name: '撤销' }));
     expect(onAction).toHaveBeenCalledWith({ type: 'revoke', requestId: 'r1' });
+  });
+
+  it('closes after approving an incoming request', () => {
+    const onAction = vi.fn();
+    const onOpenChange = vi.fn();
+    render(
+      <ChipExchangePanel
+        phase="hand-ready"
+        currentPlayerId="alice"
+        players={players}
+        records={[pendingRecord]}
+        presentation="drawer"
+        open
+        onOpenChange={onOpenChange}
+        onAction={onAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '同意' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认' }));
+
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'approve', requestId: 'r1' }),
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('closes after the requester confirms a chip request', () => {
+    const onAction = vi.fn();
+    const onOpenChange = vi.fn();
+    render(
+      <ChipExchangePanel
+        phase="hand-ready"
+        currentPlayerId="alice"
+        players={players}
+        records={[]}
+        presentation="drawer"
+        open
+        onOpenChange={onOpenChange}
+        onAction={onAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '发起请求' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认' }));
+
+    expect(onAction).toHaveBeenCalledWith({
+      type: 'request',
+      targetPlayerId: 'bob',
+      amount: 100,
+    });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('closes after rejecting an incoming request', () => {
+    const onAction = vi.fn();
+    const onOpenChange = vi.fn();
+    render(
+      <ChipExchangePanel
+        phase="hand-ready"
+        currentPlayerId="alice"
+        players={players}
+        records={[pendingRecord]}
+        presentation="drawer"
+        open
+        onOpenChange={onOpenChange}
+        onAction={onAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '拒绝' }));
+
+    expect(onAction).toHaveBeenCalledWith({ type: 'reject', requestId: 'r1' });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

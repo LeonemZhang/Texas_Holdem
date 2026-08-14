@@ -115,4 +115,13 @@ describe('UiSmokePreview', () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText('玩家昵称')).toHaveValue('Bob');
   });
+
+  it('shows the host room controls in the lobby preview', () => {
+    render(<UiSmokePreview page="lobby" />);
+
+    expect(
+      screen.getByRole('button', { name: '修改房间配置' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '加入观战' })).toBeDisabled();
+  });
 });

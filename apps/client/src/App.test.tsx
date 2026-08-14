@@ -312,6 +312,16 @@ describe('application shell', () => {
         if (url.endsWith('/api/rooms/current')) {
           return new Response(JSON.stringify({ roomId }));
         }
+        if (url.includes('/api/rooms/current?nickname=')) {
+          const nickname = new URL(url).searchParams.get('nickname');
+          return new Response(
+            JSON.stringify({
+              protocolVersion: PROTOCOL_VERSION,
+              roomId,
+              nickname,
+            }),
+          );
+        }
         return new Response(
           JSON.stringify({
             protocolVersion: PROTOCOL_VERSION,
@@ -478,22 +488,33 @@ describe('application shell', () => {
       bigBlind: 2,
       phase: 'lobby' as const,
     };
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/api/rooms/current')) {
-        return new Response(JSON.stringify({ roomId: room.roomId }));
-      }
-      return new Response(
-        JSON.stringify({
-          protocolVersion: PROTOCOL_VERSION,
-          roomId: room.roomId,
-          playerId: 'bob',
-          token: 'bob-reconnect-token-123456',
-          joinUrl: 'http://10.126.126.1:32100/?room=room-1',
-          socketPath: '/socket.io',
-        }),
-      );
-    });
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, _init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith('/api/rooms/current')) {
+          return new Response(JSON.stringify({ roomId: room.roomId }));
+        }
+        if (url.includes('/api/rooms/current?nickname=')) {
+          return new Response(
+            JSON.stringify({
+              protocolVersion: PROTOCOL_VERSION,
+              roomId: room.roomId,
+              nickname: 'Alice',
+            }),
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            protocolVersion: PROTOCOL_VERSION,
+            roomId: room.roomId,
+            playerId: 'bob',
+            token: 'bob-reconnect-token-123456',
+            joinUrl: 'http://10.126.126.1:32100/?room=room-1',
+            socketPath: '/socket.io',
+          }),
+        );
+      },
+    );
     vi.stubGlobal('fetch', fetcher);
     window.texasHoldemDesktop = desktopRuntime({
       scanLanRooms: async () => [room],
@@ -518,9 +539,18 @@ describe('application shell', () => {
 
     expect(await screen.findByText('已恢复对局：room-1')).toBeInTheDocument();
     expect(fetcher.mock.calls.map(([input]) => String(input))).toEqual([
-      'http://10.126.126.1:32100/api/rooms/current',
+      'http://10.126.126.1:32100/api/rooms/current?nickname=Carol',
       'http://10.126.126.1:32100/api/rooms/room-1/join',
     ]);
+    expect(
+      JSON.parse(
+        String(
+          fetcher.mock.calls.find(([input]) =>
+            String(input).endsWith('/join'),
+          )?.[1]?.body,
+        ),
+      ),
+    ).toMatchObject({ nickname: 'Carol' });
   });
 
   it('uses a new nickname when a player exits, rescans, and resumes a lobby room', async () => {
@@ -547,6 +577,16 @@ describe('application shell', () => {
         const url = String(input);
         if (url.endsWith('/api/rooms/current')) {
           return new Response(JSON.stringify({ roomId }));
+        }
+        if (url.includes('/api/rooms/current?nickname=')) {
+          const nickname = new URL(url).searchParams.get('nickname');
+          return new Response(
+            JSON.stringify({
+              protocolVersion: PROTOCOL_VERSION,
+              roomId,
+              nickname,
+            }),
+          );
         }
         const response = {
           protocolVersion: PROTOCOL_VERSION,

@@ -380,6 +380,9 @@ export function GameRoom({
   const sendHostControl = (intent: HostControlIntent) => {
     void send(intent);
   };
+  const closeChipExchangePanel = () => {
+    if (activeUtilityPanel === 'chip-exchange') closeUtilityPanel();
+  };
   const sendChipIntent = (intent: ChipExchangeIntent) => {
     switch (intent.type) {
       case 'request':
@@ -389,6 +392,7 @@ export function GameRoom({
           targetPlayerId: intent.targetPlayerId,
           amount: intent.amount,
         });
+        closeChipExchangePanel();
         break;
       case 'give':
         void send({
@@ -404,9 +408,11 @@ export function GameRoom({
           requestId: intent.requestId,
           transferId: createRandomId(),
         });
+        closeChipExchangePanel();
         break;
       case 'reject':
         void send({ type: 'chips.reject', requestId: intent.requestId });
+        closeChipExchangePanel();
         break;
       case 'revoke':
         void send({ type: 'chips.revoke', requestId: intent.requestId });
@@ -499,8 +505,15 @@ export function GameRoom({
           onSetReady={(ready) =>
             void send({ type: 'room.set-lobby-ready', ready })
           }
-          onUpdateSettings={(settings: RoomSettingsMessage) =>
-            void send({ type: 'room.update-settings', settings })
+          onUpdateSettings={(
+            settings: RoomSettingsMessage,
+            currentSmallBlind?: number,
+          ) =>
+            void send({
+              type: 'room.update-settings',
+              settings,
+              ...(currentSmallBlind === undefined ? {} : { currentSmallBlind }),
+            })
           }
           onStartFirstHand={() =>
             void send({
@@ -824,6 +837,10 @@ export function GameRoom({
               }
               phase={snapshot.room.phase}
               joinUrl={session.joinUrl}
+              {...(snapshot.room.settings
+                ? { settings: snapshot.room.settings }
+                : {})}
+              currentSmallBlind={snapshot.room.smallBlind}
               players={snapshot.room.players.filter(
                 ({ status }) => !['left', 'removed'].includes(status),
               )}

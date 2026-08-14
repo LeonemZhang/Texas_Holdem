@@ -1,10 +1,12 @@
 import {
   CreateRoomSessionRequestSchema,
   JoinRoomSessionRequestSchema,
+  RoomNicknameProbeResponseSchema,
   ResumeRoomSessionRequestSchema,
   RoomSessionResponseSchema,
   type CreateRoomSessionRequest,
   type JoinRoomSessionRequest,
+  type RoomNicknameProbeResponse,
   type ResumeRoomSessionRequest,
   type RoomSessionResponse,
 } from '@texas-holdem/protocol';
@@ -51,6 +53,14 @@ export class RoomSessionClient {
       throw new RoomSessionRequestError('房主返回的房间信息无效', 502);
     }
     return value.roomId;
+  }
+
+  async probeNickname(nickname: string): Promise<RoomNicknameProbeResponse> {
+    const normalized = JoinRoomSessionRequestSchema.parse({ nickname });
+    const response = await this.request(
+      `/api/rooms/current?nickname=${encodeURIComponent(normalized.nickname)}`,
+    );
+    return RoomNicknameProbeResponseSchema.parse(await response.json());
   }
 
   async create(input: CreateRoomSessionRequest): Promise<RoomSessionResponse> {

@@ -11,6 +11,9 @@ describe('CreateRoomForm', () => {
     expect(smallBlind).toHaveValue('1');
     expect(bigBlind).toHaveValue('2');
     expect(bigBlind).toHaveAttribute('readonly');
+    const blindPair = smallBlind.closest('.room-form__blind-pair');
+    expect(blindPair).toBeInTheDocument();
+    expect(blindPair).toContainElement(bigBlind);
 
     fireEvent.change(smallBlind, { target: { value: '5' } });
     expect(bigBlind).toHaveValue('10');
@@ -107,5 +110,19 @@ describe('CreateRoomForm', () => {
     fireEvent.click(screen.getByRole('button', { name: '创建房间' }));
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('submits the service-only Host participation choice', () => {
+    const onCreate = vi.fn();
+    render(<CreateRoomForm onCreate={onCreate} />);
+    fireEvent.click(screen.getByLabelText('仅提供服务'));
+    expect(screen.queryByLabelText('房主昵称')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '创建房间' }));
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostNickname: '房主服务',
+        hostParticipation: 'service-only',
+      }),
+    );
   });
 });

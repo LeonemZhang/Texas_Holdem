@@ -1,12 +1,20 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
+
+import type { RoomSettingsMessage } from '@texas-holdem/protocol';
 
 import { ModalDialog } from './ModalDialog.js';
 import { RoomInviteShare } from './RoomInviteShare.js';
+import { RoomSettingsEditor } from './RoomSettingsEditor.js';
 import { UtilityPanelHeader } from './UtilityPanel.js';
 
 export type HostControlIntent =
   | { readonly type: 'room.pause' }
   | { readonly type: 'room.resume' }
+  | {
+      readonly type: 'room.update-settings';
+      readonly settings: RoomSettingsMessage;
+      readonly currentSmallBlind?: number;
+    }
   | { readonly type: 'room.remove-player'; readonly targetPlayerId: string }
   | { readonly type: 'room.close' };
 
@@ -20,6 +28,8 @@ export interface HostControlsProps {
   readonly hostPlayerId: string;
   readonly phase: 'lobby' | 'playing' | 'hand-ready' | 'paused' | 'closed';
   readonly joinUrl?: string;
+  readonly settings?: RoomSettingsMessage;
+  readonly currentSmallBlind?: number;
   readonly players: readonly HostControlPlayer[];
   readonly presentation?: 'inline' | 'drawer';
   readonly open?: boolean;
@@ -32,6 +42,8 @@ export function HostControls({
   hostPlayerId,
   phase,
   joinUrl,
+  settings,
+  currentSmallBlind,
   players,
   presentation = 'inline',
   open: controlledOpen,
@@ -41,6 +53,8 @@ export function HostControls({
   const [internalOpen, setInternalOpen] = useState(false);
   const [dangerousIntent, setDangerousIntent] =
     useState<HostControlIntent | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsFormId = useId();
   if (!isHost) return null;
 
   const confirmDangerous = () => {
@@ -57,6 +71,8 @@ export function HostControls({
   const canRemovePlayer = phase === 'lobby' || phase === 'hand-ready';
   const drawer = presentation === 'drawer';
   const open = controlledOpen ?? internalOpen;
+  const showCurrentSmallBlind =
+    phase !== 'lobby' && currentSmallBlind !== undefined;
   const setOpen = (next: boolean) => {
     if (controlledOpen === undefined) setInternalOpen(next);
     onOpenChange?.(next);
@@ -90,6 +106,49 @@ export function HostControls({
               joinUrl={joinUrl}
               className="host-controls__invite"
             />
+          ) : null}
+          {settings ? (
+            <section className="host-controls__settings" aria-label="房间配置">
+              <button
+                className="button button--secondary"
+                type="button"
+                aria-expanded={settingsOpen}
+                onClick={() => setSettingsOpen((open) => !open)}
+              >
+                {settingsOpen ? '收起房间配置' : '修改房间配置'}
+              </button>
+              {settingsOpen ? (
+                <ModalDialog
+                  title="修改房间配置"
+                  className="modal-dialog--room-settings"
+                  confirmAction={{
+                    label: '保存房间配置',
+                    type: 'submit',
+                    form: settingsFormId,
+                  }}
+                  onCancel={() => setSettingsOpen(false)}
+                >
+                  <RoomSettingsEditor
+                    key={`${settings.roomName}-${settings.actionTimeoutSeconds}-${settings.handReadyTimeoutSeconds}-${settings.blindGrowth.enabled}-${settings.blindGrowth.intervalHands}-${settings.blindGrowth.mode ?? 'multiplier'}-${settings.blindGrowth.multiplier ?? ''}-${settings.blindGrowth.increment ?? ''}-${settings.blindGrowth.maxSmallBlind ?? ''}-${settings.zeroChipPolicy}-${showCurrentSmallBlind ? (currentSmallBlind ?? '') : 'hidden'}`}
+                    settings={settings}
+                    {...(!showCurrentSmallBlind ? {} : { currentSmallBlind })}
+                    lockedFields={['maxPlayers', 'initialChips', 'smallBlind']}
+                    formId={settingsFormId}
+                    showSubmitButton={false}
+                    onSubmit={(nextSettings, nextCurrentSmallBlind) => {
+                      onCommand({
+                        type: 'room.update-settings',
+                        settings: nextSettings,
+                        ...(nextCurrentSmallBlind === undefined
+                          ? {}
+                          : { currentSmallBlind: nextCurrentSmallBlind }),
+                      });
+                      setSettingsOpen(false);
+                    }}
+                  />
+                </ModalDialog>
+              ) : null}
+            </section>
           ) : null}
           <div
             className="host-controls__game-actions"
