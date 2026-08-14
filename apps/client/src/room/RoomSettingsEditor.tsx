@@ -14,6 +14,10 @@ function clampToMinimum(value: number, minimum: number): number {
     : minimum;
 }
 
+function normalizeMinimumInput(value: string, minimum: number): string {
+  return String(clampToMinimum(Number(value), minimum));
+}
+
 export interface RoomSettingsEditorProps {
   readonly settings: RoomSettingsMessage;
   readonly onSubmit: (settings: RoomSettingsMessage) => void;
@@ -38,17 +42,24 @@ export function RoomSettingsEditor({
       ? (settings.blindGrowth.mode ?? 'multiplier')
       : 'none',
   );
-  const [blindGrowthIncrement, setBlindGrowthIncrement] = useState(
-    clampToMinimum(
-      settings.blindGrowth.increment ?? settings.smallBlind,
-      settings.smallBlind,
+  const [blindGrowthIncrement, setBlindGrowthIncrement] = useState(() =>
+    String(
+      clampToMinimum(
+        settings.blindGrowth.increment ?? settings.smallBlind,
+        settings.smallBlind,
+      ),
     ),
   );
-  const [maxSmallBlind, setMaxSmallBlind] = useState<number | null>(
+  const [maxSmallBlind, setMaxSmallBlind] = useState(() =>
     settings.blindGrowth.maxSmallBlind === undefined ||
-      settings.blindGrowth.maxSmallBlind === null
-      ? null
-      : clampToMinimum(settings.blindGrowth.maxSmallBlind, settings.smallBlind),
+    settings.blindGrowth.maxSmallBlind === null
+      ? ''
+      : String(
+          clampToMinimum(
+            settings.blindGrowth.maxSmallBlind,
+            settings.smallBlind,
+          ),
+        ),
   );
   const [error, setError] = useState<string | null>(null);
   const isPreset = blindMode === 'preset';
@@ -56,12 +67,14 @@ export function RoomSettingsEditor({
     const normalizedSmallBlind = clampToMinimum(nextSmallBlind, 1);
     setSmallBlind(normalizedSmallBlind);
     setBlindGrowthIncrement((current) =>
-      current < normalizedSmallBlind ? normalizedSmallBlind : current,
+      current.trim() === ''
+        ? String(normalizedSmallBlind)
+        : normalizeMinimumInput(current, normalizedSmallBlind),
     );
     setMaxSmallBlind((current) =>
-      current !== null && current < normalizedSmallBlind
-        ? normalizedSmallBlind
-        : current,
+      current.trim() === ''
+        ? ''
+        : normalizeMinimumInput(current, normalizedSmallBlind),
     );
   };
 
@@ -70,6 +83,14 @@ export function RoomSettingsEditor({
     const form = new FormData(event.currentTarget);
     const selection = blindGrowthMode;
     const mode = selection === 'increment' ? 'increment' : 'multiplier';
+    const normalizedIncrement = clampToMinimum(
+      Number(blindGrowthIncrement),
+      smallBlind,
+    );
+    const normalizedMaxSmallBlind =
+      maxSmallBlind.trim() === ''
+        ? null
+        : clampToMinimum(Number(maxSmallBlind), smallBlind);
     const parsed = RoomSettingsSchema.safeParse({
       roomName: String(form.get('roomName') ?? ''),
       maxPlayers: Number(form.get('maxPlayers')),
@@ -82,9 +103,9 @@ export function RoomSettingsEditor({
         intervalHands: Number(form.get('blindGrowthIntervalHands')),
         mode,
         ...(mode === 'increment'
-          ? { increment: blindGrowthIncrement }
+          ? { increment: normalizedIncrement }
           : { multiplier: Number(form.get('blindGrowthMultiplier')) }),
-        maxSmallBlind,
+        maxSmallBlind: normalizedMaxSmallBlind,
       },
       zeroChipPolicy: form.get('zeroChipPolicy'),
     });
@@ -252,8 +273,11 @@ export function RoomSettingsEditor({
                     step="1"
                     value={blindGrowthIncrement}
                     onChange={(event) =>
-                      setBlindGrowthIncrement(
-                        clampToMinimum(Number(event.target.value), smallBlind),
+                      setBlindGrowthIncrement(event.target.value)
+                    }
+                    onBlur={() =>
+                      setBlindGrowthIncrement((current) =>
+                        normalizeMinimumInput(current, smallBlind),
                       )
                     }
                   />
@@ -280,14 +304,14 @@ export function RoomSettingsEditor({
                   step="1"
                   value={maxSmallBlind ?? ''}
                   placeholder="不设上限"
-                  onChange={(event) => {
-                    const value = event.target.value.trim();
-                    setMaxSmallBlind(
-                      value === ''
-                        ? null
-                        : clampToMinimum(Number(value), smallBlind),
-                    );
-                  }}
+                  onChange={(event) => setMaxSmallBlind(event.target.value)}
+                  onBlur={() =>
+                    setMaxSmallBlind((current) =>
+                      current.trim() === ''
+                        ? ''
+                        : normalizeMinimumInput(current, smallBlind),
+                    )
+                  }
                 />
               </label>
               <label>
@@ -295,7 +319,9 @@ export function RoomSettingsEditor({
                 <input
                   aria-label="大盲上限"
                   value={
-                    maxSmallBlind === null ? '不设上限' : maxSmallBlind * 2
+                    maxSmallBlind.trim() === ''
+                      ? '不设上限'
+                      : clampToMinimum(Number(maxSmallBlind), smallBlind) * 2
                   }
                   readOnly
                 />

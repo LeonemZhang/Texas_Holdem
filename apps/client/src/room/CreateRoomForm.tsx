@@ -24,24 +24,30 @@ function clampToMinimum(value: number, minimum: number): number {
     : minimum;
 }
 
+function normalizeMinimumInput(value: string, minimum: number): string {
+  return String(clampToMinimum(Number(value), minimum));
+}
+
 export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
   const [smallBlind, setSmallBlind] = useState(1);
   const [blindGrowthMode, setBlindGrowthMode] =
     useState<BlindGrowthSelection>('none');
-  const [blindGrowthIncrement, setBlindGrowthIncrement] = useState(1);
-  const [maxSmallBlind, setMaxSmallBlind] = useState<number | null>(null);
+  const [blindGrowthIncrement, setBlindGrowthIncrement] = useState('1');
+  const [maxSmallBlind, setMaxSmallBlind] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const updateSmallBlind = (nextSmallBlind: number) => {
     const normalizedSmallBlind = clampToMinimum(nextSmallBlind, 1);
     setSmallBlind(normalizedSmallBlind);
     setBlindGrowthIncrement((current) =>
-      current < normalizedSmallBlind ? normalizedSmallBlind : current,
+      current.trim() === ''
+        ? String(normalizedSmallBlind)
+        : normalizeMinimumInput(current, normalizedSmallBlind),
     );
     setMaxSmallBlind((current) =>
-      current !== null && current < normalizedSmallBlind
-        ? normalizedSmallBlind
-        : current,
+      current.trim() === ''
+        ? ''
+        : normalizeMinimumInput(current, normalizedSmallBlind),
     );
   };
 
@@ -55,6 +61,14 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
     }
     const selection = blindGrowthMode;
     const mode = selection === 'increment' ? 'increment' : 'multiplier';
+    const normalizedIncrement = clampToMinimum(
+      Number(blindGrowthIncrement),
+      smallBlind,
+    );
+    const normalizedMaxSmallBlind =
+      maxSmallBlind.trim() === ''
+        ? null
+        : clampToMinimum(Number(maxSmallBlind), smallBlind);
     const parsed = RoomSettingsSchema.safeParse({
       roomName: String(form.get('roomName') ?? ''),
       maxPlayers: Number(form.get('maxPlayers')),
@@ -67,9 +81,9 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
         intervalHands: Number(form.get('blindGrowthIntervalHands')),
         mode,
         ...(mode === 'increment'
-          ? { increment: blindGrowthIncrement }
+          ? { increment: normalizedIncrement }
           : { multiplier: Number(form.get('blindGrowthMultiplier')) }),
-        maxSmallBlind,
+        maxSmallBlind: normalizedMaxSmallBlind,
       },
       zeroChipPolicy: form.get('zeroChipPolicy'),
     });
@@ -225,8 +239,11 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
                     step="1"
                     value={blindGrowthIncrement}
                     onChange={(event) =>
-                      setBlindGrowthIncrement(
-                        clampToMinimum(Number(event.target.value), smallBlind),
+                      setBlindGrowthIncrement(event.target.value)
+                    }
+                    onBlur={() =>
+                      setBlindGrowthIncrement((current) =>
+                        normalizeMinimumInput(current, smallBlind),
                       )
                     }
                   />
@@ -250,14 +267,14 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
                   step="1"
                   value={maxSmallBlind ?? ''}
                   placeholder="不设上限"
-                  onChange={(event) => {
-                    const value = event.target.value.trim();
-                    setMaxSmallBlind(
-                      value === ''
-                        ? null
-                        : clampToMinimum(Number(value), smallBlind),
-                    );
-                  }}
+                  onChange={(event) => setMaxSmallBlind(event.target.value)}
+                  onBlur={() =>
+                    setMaxSmallBlind((current) =>
+                      current.trim() === ''
+                        ? ''
+                        : normalizeMinimumInput(current, smallBlind),
+                    )
+                  }
                 />
               </label>
               <label>
@@ -265,7 +282,9 @@ export function CreateRoomForm({ onCreate }: CreateRoomFormProps) {
                 <input
                   aria-label="大盲上限"
                   value={
-                    maxSmallBlind === null ? '不设上限' : maxSmallBlind * 2
+                    maxSmallBlind.trim() === ''
+                      ? '不设上限'
+                      : clampToMinimum(Number(maxSmallBlind), smallBlind) * 2
                   }
                   readOnly
                 />
