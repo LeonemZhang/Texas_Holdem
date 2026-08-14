@@ -60,6 +60,9 @@ export interface RecoveredHostSession {
   readonly protocolVersion: '3';
   readonly roomId: string;
   readonly playerId: string;
+  /** Present when the recovered room uses the independent Host session. */
+  readonly sessionType?: 'player' | 'host';
+  readonly hostId?: string;
   readonly token: string;
   readonly joinUrl: string;
   readonly socketPath: '/socket.io';

@@ -28,6 +28,8 @@ interface RoomSessionLike {
   readonly protocolVersion?: unknown;
   readonly roomId?: unknown;
   readonly playerId?: unknown;
+  readonly sessionType?: unknown;
+  readonly hostId?: unknown;
   readonly token?: unknown;
   readonly joinUrl?: unknown;
   readonly socketPath?: unknown;
@@ -71,10 +73,26 @@ function sessionFromResult(result: unknown): RecoveredHostSession {
   ) {
     throw new Error('Invalid room recovery response');
   }
+  const sessionType =
+    session.sessionType === 'player' || session.sessionType === 'host'
+      ? session.sessionType
+      : undefined;
+  if (session.sessionType !== undefined && sessionType === undefined) {
+    throw new Error('Invalid room recovery response');
+  }
+  const hostId =
+    typeof session.hostId === 'string' && session.hostId.trim()
+      ? session.hostId
+      : undefined;
+  if (sessionType === 'host' && !hostId) {
+    throw new Error('Invalid room recovery response');
+  }
   return {
     protocolVersion: '3',
     roomId: session.roomId,
     playerId: session.playerId,
+    ...(sessionType ? { sessionType } : {}),
+    ...(hostId ? { hostId } : {}),
     token: session.token,
     joinUrl: session.joinUrl,
     socketPath: '/socket.io',

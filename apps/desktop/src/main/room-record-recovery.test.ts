@@ -34,7 +34,10 @@ const session = {
   socketPath: '/socket.io' as const,
 };
 
-function controller(record: unknown): RoomRecordRecoveryHostController & {
+function controller(
+  record: unknown,
+  recoveredSession: unknown = session,
+): RoomRecordRecoveryHostController & {
   readonly manage: ReturnType<typeof vi.fn>;
   readonly start: ReturnType<typeof vi.fn>;
   readonly stop: ReturnType<typeof vi.fn>;
@@ -44,7 +47,7 @@ function controller(record: unknown): RoomRecordRecoveryHostController & {
     manage: vi
       .fn()
       .mockResolvedValueOnce({ record })
-      .mockResolvedValueOnce({ session }),
+      .mockResolvedValueOnce({ session: recoveredSession }),
     start: vi.fn(async () => service),
     stop: vi.fn(async () => undefined),
   };
@@ -76,6 +79,27 @@ describe('recoverRoomRecordFromHost', () => {
       type: 'room-record.recover',
       roomId: 'room-1',
     });
+  });
+
+  it('preserves the independent Host session metadata for service-only rooms', async () => {
+    const recoveredSession = {
+      ...session,
+      sessionType: 'host' as const,
+      hostId: 'host',
+    };
+    const host = controller(
+      { network: { name: network.name, address: network.address } },
+      recoveredSession,
+    );
+
+    await expect(
+      recoverRoomRecordFromHost({
+        controller: host,
+        input: { roomId: 'room-1' },
+        networkInterfaces: () => [network],
+        createRequestId: vi.fn(() => 'request-id'),
+      }),
+    ).resolves.toEqual(recoveredSession);
   });
 
   it('recovers a legacy record with the one-time network selected by the renderer', async () => {
