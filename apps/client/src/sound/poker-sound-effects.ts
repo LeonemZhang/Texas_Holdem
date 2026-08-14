@@ -1,6 +1,9 @@
 import type { PlayerSnapshot } from '@texas-holdem/protocol';
 
 const DEFAULT_SOUND_VOLUME_MULTIPLIER = 18;
+const RUNOUT_SOUND_TARGET_GAIN = 0.3;
+const RUNOUT_SOUND_BASE_VOLUME =
+  RUNOUT_SOUND_TARGET_GAIN / DEFAULT_SOUND_VOLUME_MULTIPLIER;
 const TURN_CLOCK_PERIOD_MS = 2_000;
 const TURN_CLOCK_TICK_DURATION_MS = 160;
 const TURN_CLOCK_TOCK_DURATION_MS = 100;
@@ -236,11 +239,19 @@ export class PokerSoundEffects {
             680 + index * 42,
             start + offset,
             0.075,
-            index === 4 ? 0.052 : 0.042,
+            RUNOUT_SOUND_BASE_VOLUME,
             'square',
           ),
         );
-        this.tone(context, 360, start + 1.78, 0.18, 0.045, 'triangle', 620);
+        this.tone(
+          context,
+          360,
+          start + 1.78,
+          0.18,
+          RUNOUT_SOUND_BASE_VOLUME,
+          'triangle',
+          620,
+        );
         return;
       case 'runout-reveal':
         [920, 1_040, 1_160].forEach((frequency, index) =>
@@ -249,12 +260,20 @@ export class PokerSoundEffects {
             frequency,
             start + index * 0.08,
             0.1,
-            0.052,
+            RUNOUT_SOUND_BASE_VOLUME,
             'square',
             frequency + 60,
           ),
         );
-        this.tone(context, 740, start + 0.18, 0.5, 0.045, 'triangle', 1_180);
+        this.tone(
+          context,
+          740,
+          start + 0.18,
+          0.5,
+          RUNOUT_SOUND_BASE_VOLUME,
+          'triangle',
+          1_180,
+        );
         return;
       case 'ready':
         this.tone(context, 440, start, 0.08, 0.055);
