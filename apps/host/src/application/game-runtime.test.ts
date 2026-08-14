@@ -1154,7 +1154,7 @@ describe('GameRuntime', () => {
       });
     }
 
-    await vi.advanceTimersByTimeAsync(7_000);
+    await vi.advanceTimersByTimeAsync(8_000);
 
     const title = runtime
       .snapshot(host.roomId, host.playerId)!
