@@ -4,6 +4,18 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import type { CreateRoomRecordRequest } from '@texas-holdem/protocol';
+
+import {
+  recoverRoomRecordFromHost,
+  type RoomRecordRecoveryHostController,
+} from '../apps/desktop/src/main/room-record-recovery.js';
+import type {
+  DesktopNetworkInterface,
+  HostServiceInfo,
+} from '../apps/desktop/src/shared/runtime.js';
+import { GameRuntime } from '../apps/host/src/application/game-runtime.js';
+import { RoomRecordManagementService } from '../apps/host/src/application/room-record-management.js';
 import { recoverRoom } from '../apps/host/src/application/room-recovery.js';
 import { closeRoom } from '../apps/host/src/domain/room-control.js';
 import { createRoom, freezeRoom } from '../apps/host/src/domain/room.js';
@@ -15,7 +27,9 @@ import {
 import { SqliteEventStore } from '../apps/host/src/persistence/sqlite-event-command-store.js';
 import { SqliteRoomLifecycleStore } from '../apps/host/src/persistence/sqlite-room-lifecycle-store.js';
 import { SqliteRoomRecoveryCatalog } from '../apps/host/src/persistence/sqlite-room-recovery-catalog.js';
+import { SqliteRoomRecordCatalog } from '../apps/host/src/persistence/sqlite-room-record-catalog.js';
 import { SqliteSnapshotStore } from '../apps/host/src/persistence/sqlite-snapshot-store.js';
+import { SqliteGameRuntimeStore } from '../apps/host/src/persistence/sqlite-game-runtime-store.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -89,7 +103,164 @@ function recover(path: string) {
   return { database, state };
 }
 
+const recoveryNetwork: DesktopNetworkInterface = {
+  name: 'Home LAN',
+  address: '127.0.0.1',
+  netmask: '255.0.0.0',
+  mac: '00:11:22:33:44:55',
+};
+
+const recoveryService: HostServiceInfo = {
+  port: 32_100,
+  advertisedAddress: recoveryNetwork.address,
+  joinUrl: 'http://127.0.0.1:32100',
+  dataDirectory: 'temporary-room-data',
+  networkName: recoveryNetwork.name,
+};
+
+function createRecordRequest(): CreateRoomRecordRequest {
+  return {
+    protocolVersion: '3',
+    requestId: 'lifecycle-create',
+    type: 'room-record.create',
+    hostNickname: 'Alice',
+    settings: {
+      roomName: 'Lifecycle evidence',
+      maxPlayers: 4,
+      initialChips: 100,
+      smallBlind: 1,
+      actionTimeoutSeconds: 30,
+      handReadyTimeoutSeconds: 30,
+      blindGrowth: { enabled: false, intervalHands: 10, multiplier: 2 },
+      zeroChipPolicy: 'request-chips',
+    },
+  };
+}
+
+function createRuntimeNode(path: string) {
+  const database = openSqliteDatabase(path);
+  runSqliteMigrations(database, HOST_MIGRATIONS);
+  const store = new SqliteGameRuntimeStore(database, {
+    name: recoveryNetwork.name,
+    address: recoveryNetwork.address,
+  });
+  const runtime = new GameRuntime({
+    sessionFallback: (credentials) => store.authenticate(credentials),
+  });
+  let updatedAtMs = 1;
+  const stopPersistence = runtime.onStateCommitted((roomId) => {
+    const state = runtime.exportState(roomId);
+    if (state) store.save(state, updatedAtMs++);
+  });
+  const records = new RoomRecordManagementService(
+    runtime,
+    new SqliteRoomRecordCatalog(database),
+    store,
+  );
+  return {
+    database,
+    records,
+    runtime,
+    close() {
+      stopPersistence();
+      runtime.dispose();
+      database.close();
+    },
+  };
+}
+
+function controllerFor(
+  records: RoomRecordManagementService,
+): RoomRecordRecoveryHostController {
+  let activeService: HostServiceInfo | null = null;
+  return {
+    current: () => activeService,
+    async manage(request) {
+      if (request.type === 'room-record.get') {
+        return { record: records.getRecord(String(request.roomId)) };
+      }
+      if (request.type === 'room-record.recover') {
+        return {
+          session: records.recoverRecord(
+            String(request.roomId),
+            recoveryService.joinUrl,
+          ),
+        };
+      }
+      throw new Error(
+        `Unsupported lifecycle management request: ${String(request.type)}`,
+      );
+    },
+    async start() {
+      activeService = recoveryService;
+      return recoveryService;
+    },
+    async stop() {
+      activeService = null;
+    },
+  };
+}
+
 describe('E2E06 host close and same-machine recovery', () => {
+  it('keeps one record distinguishable across Host interruption, desktop recovery, close, and archive', async () => {
+    const path = await databasePath();
+    const original = createRuntimeNode(path);
+    const created = original.records.createRecord(
+      createRecordRequest(),
+      recoveryService.joinUrl,
+    );
+    expect(original.records.listRecords(false)).toMatchObject([
+      { roomId: created.roomId, status: 'running' },
+    ]);
+
+    // The Host control socket is allowed to disappear without changing the
+    // persisted running-room state; process interruption is represented by
+    // disposing the runtime without a normal room.close command.
+    original.close();
+
+    const restarted = createRuntimeNode(path);
+    try {
+      expect(restarted.records.getRecord(created.roomId)).toMatchObject({
+        roomId: created.roomId,
+        status: 'recoverable',
+      });
+
+      const recovered = await recoverRoomRecordFromHost({
+        controller: controllerFor(restarted.records),
+        input: { roomId: created.roomId },
+        networkInterfaces: () => [recoveryNetwork],
+        createRequestId: (() => {
+          let requestNumber = 0;
+          return () => `lifecycle-recovery-${++requestNumber}`;
+        })(),
+      });
+      expect(recovered).toMatchObject({
+        roomId: created.roomId,
+        socketPath: '/socket.io',
+      });
+      expect(restarted.records.listRecords(false)).toMatchObject([
+        { roomId: created.roomId, status: 'running' },
+      ]);
+
+      expect(restarted.records.closeRunningRecord(created.roomId)).toBe(
+        created.roomId,
+      );
+      restarted.runtime.retireClosedRoom(created.roomId);
+      expect(restarted.records.getRecord(created.roomId)).toMatchObject({
+        roomId: created.roomId,
+        status: 'closed',
+      });
+
+      restarted.records.archiveRecord(created.roomId);
+      expect(restarted.records.listRecords(false)).toEqual([]);
+      expect(restarted.records.listRecords(true)).toMatchObject([
+        { roomId: created.roomId, status: 'archived' },
+      ]);
+    } finally {
+      restarted.close();
+    }
+  });
+
   it('recovers an active room after the host process exits abnormally', async () => {
     const path = await databasePath();
     const current = saveSnapshot(path);
