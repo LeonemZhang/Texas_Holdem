@@ -13,7 +13,7 @@
 
 - `pnpm --filter @texas-holdem/client exec vitest run src/room/GameRoom.test.tsx src/room/LobbyWaitingRoom.test.tsx src/connection/ConnectionGuard.test.tsx src/connection/reconnect-controller.test.ts src/connection/socket-io-adapter.test.ts`：5 个文件、40 个测试通过。
 - `pnpm --filter @texas-holdem/client test`：40 个文件、319 个测试通过。
-- `pnpm check`：当前在 Harness 阶段被 setup-only `android-host` 的 10 个未定义 INV 引用阻断，未进入格式、lint 和全 workspace typecheck。
+- `pnpm check`：本次复核已通过 Harness、格式检查、lint 和全 workspace typecheck；当前工作区已撤销 Android Host 计划，不再存在其 INV 引用阻断。
 
 ### 场景
 
@@ -44,7 +44,7 @@
 ### 自动化验证
 
 - 上述客户端 targeted command：`GameRoom.test.tsx` 与 `ConnectionGuard.test.tsx` 在 5 个文件、40 个测试结果中通过；另有全客户端 319 个测试通过。
-- `pnpm check`：当前在 Harness 阶段被 setup-only `android-host` 的 10 个未定义 INV 引用阻断。
+- `pnpm check`：本次复核已通过；当前工作区已撤销 Android Host 计划，不再存在其 INV 引用阻断。
 
 ### 场景
 
@@ -74,7 +74,7 @@
 
 ### 自动化验证
 
-- 既有 RECON 提交前 `pnpm harness:check` 与 `pnpm harness:test` 证据已保留；本次复跑 `pnpm check` 在 Harness 阶段被 setup-only `android-host` 的 10 个未定义 INV 引用阻断。
+- 既有 RECON 提交前 `pnpm harness:check` 与 `pnpm harness:test` 证据已保留；本次复跑 `pnpm check` 已通过全套根目录门禁。
 - 客户端专项验证：40 个文件、319 个测试通过；目标文件 typecheck、Prettier check 和 ESLint 均通过。
 
 ### 场景
@@ -95,4 +95,4 @@
 - [客户端设计](../../../design-docs/client.md)
 - [执行计划](plan.md)
 
-补充：RECON 计划自身的结构、链接、状态和证据已通过 Harness；在主工作区同步的 setup-only `android-host` 计划被加入后，后续全仓 Harness 复跑被其 10 个未定义 `INV-ARCH-003`/`INV-PERSIST-002` 引用阻断。该目录不属于 RECON 允许范围，未修改或暂存。
+补充：RECON 计划自身的结构、链接、状态和证据已通过 Harness；当前工作区不再包含 Android Host 计划，也不存在其 `INV-ARCH-003`/`INV-PERSIST-002` 引用阻断。

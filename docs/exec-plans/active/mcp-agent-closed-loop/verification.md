@@ -17,8 +17,8 @@
 - `pnpm --filter @texas-holdem/mcp-server build`：通过。
 - MCP 目标文件 `prettier --check` 与 `eslint`：通过。
 - `pnpm harness:check`：通过；计划结构、链接和状态符合仓库契约。
-- `pnpm check`：Harness check 与 Harness test（26 个测试）通过，随后在全仓格式检查处被 6 个既有非本任务文件阻断：`.codex/better-harness/review-2026-08-13/{findings.json,report.html,report.md}` 与 `spikes/android-host/{README.md,app/src/main/assets/nodejs-project/main.cjs,app/src/main/assets/nodejs-project/package.json}`。
-- 单独续跑 `pnpm lint`：仅 `spikes/android-host/app/src/main/assets/nodejs-project/main.cjs` 有 27 个既有 CommonJS/Node 全局规则错误；MCP 目标文件 lint 通过。单独续跑 `pnpm typecheck`：9 个 workspace 全部通过。
+- `pnpm check`：Harness check 与 Harness test（26 个测试）通过，随后在全仓格式检查处被 6 个既有非本任务文件阻断：`.codex/better-harness/review-2026-08-13/{findings.json,report.html,report.md}`
+- 单独续跑 `pnpm lint`：MCP 目标文件 lint 通过。单独续跑 `pnpm typecheck`：9 个 workspace 全部通过。
 
 ### 场景
 

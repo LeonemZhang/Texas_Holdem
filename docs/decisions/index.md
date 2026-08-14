@@ -21,6 +21,7 @@
 | ADR-004 | 短 All-in 不重新开放 Raise                   | `docs/product-specs/gameplay.md`           | `poker-domain`、`hand-lifecycle`    |
 | ADR-005 | Automatic runout 必须在下注轮关闭后发生      | `docs/product-specs/gameplay.md`           | `hand-lifecycle`                    |
 | ADR-006 | 桌面与浏览器共享客户端但保持 Electron 窄边界 | `docs/product-specs/desktop-experience.md` | `client`、`desktop`                 |
+| ADR-007 | Android/mobile 仅作为普通玩家客户端          | `docs/product-specs/room-experience.md`    | `client`、`desktop`                 |
 
 ## ADR 文档
 
