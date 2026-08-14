@@ -1,5 +1,7 @@
 pnpm-lock.yaml
+.codex/
 output/
 apps/client/public/
 apps/desktop/build/
+apps/mcp-server/agent/
 assets/branding/*.svg

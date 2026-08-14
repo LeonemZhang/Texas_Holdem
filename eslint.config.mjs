@@ -5,6 +5,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: [
+      '**/.codex/**',
       '**/dist/**',
       '**/coverage/**',
       '**/node_modules/**',
@@ -13,6 +14,7 @@ export default tseslint.config(
       '**/release/**',
       '**/output/**',
       '**/.playwright-cli/**',
+      'apps/mcp-server/agent/**',
     ],
   },
   js.configs.recommended,

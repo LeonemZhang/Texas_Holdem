@@ -257,7 +257,9 @@ export function createPokerMcpServer(
             const detail = session.lastConnectError
               ? ` (${session.lastConnectError})`
               : '';
-            reject(new Error(`Connection lost before initial snapshot${detail}`));
+            reject(
+              new Error(`Connection lost before initial snapshot${detail}`),
+            );
           });
         });
         return toolResult({
