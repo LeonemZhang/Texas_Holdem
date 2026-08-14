@@ -4,7 +4,7 @@
 
 ## 架构目标
 
-- 房主电脑是唯一权威服务端，不依赖公网基础设施。
+- 房主电脑是唯一权威服务端，不依赖公网基础设施；房主可以同时作为玩家，或只提供房间服务。
 - Windows 客户端、电脑浏览器和手机浏览器共享同一套 React 游戏界面。
 - `poker-core` 保持确定性、无 UI/网络/数据库依赖并可独立测试。
 - 网络重试不产生重复下注、转账或结算；断线不删除玩家和对局数据。
@@ -25,16 +25,18 @@
 
 共享包不能导入 `apps/*`。领域模块不能导入 Electron、Fastify、Socket.IO、React 或 SQLite。
 
+根目录 `pnpm architecture:check` 会扫描 `apps/*/src` 与 `packages/*/src` 的静态 import/export/require/dynamic import，拒绝共享包反向导入应用层，并拒绝 `poker-core` 依赖网络、数据库、UI、Electron、系统时间或全局随机源。
+
 ## 运行时拓扑
 
 ```mermaid
 flowchart LR
     subgraph HostPC["房主 Windows 电脑"]
         HD["Electron 主进程"]
-        HU["本地 React UI"]
+        HU["本地 React UI\n玩家视图 / 房主管理视图"]
         HS["房主服务进程"]
         DB["SQLite"]
-        HU -->|"命令 / 事件"| HS
+        HU -->|"Host 控制会话或玩家会话"| HS
         HD -->|"启动 / 停止 / 管理"| HS
         HS --> DB
     end
@@ -47,10 +49,13 @@ flowchart LR
 ## 架构决策摘要
 
 - 服务端执行发牌、洗牌、行动计时、下注校验、底池构造、牌型比较和结算；客户端只提交意图并投影权威快照。
+- 房主身份与玩家身份分离；`仅提供服务` 模式不创建房主玩家座位、筹码或准备状态，房主管理视图与玩家专属快照分开投影。
 - Electron renderer 使用 sandbox、context isolation 和 `nodeIntegration=false`；桌面能力只能通过窄化 preload API 暴露。
 - Electron 不加载外部远程 HTML，外部 HTTP(S) 交给系统浏览器打开。
 - 运行中的房间以内存权威状态为准，事件和关键快照持久化到房主本机 SQLite。
+- 房主控制会话断开不等同于 Host 进程关闭；房主恢复身份只允许原房主设备恢复，不支持其他设备接管。
 - 房主服务以独立 Node 进程运行，管理模式不监听 LAN；只有真实创建或恢复房间时才启动完整服务。
+- 仅提供服务的 Host 控制台可使用 Host 管理快照进入只读观战牌桌；观战 UI 不获得玩家私有快照或玩家操作能力。
 - 桌面和浏览器品牌资源从同一来源生成并由构建检查。
 
 ## 详细设计入口
@@ -66,4 +71,4 @@ flowchart LR
 
 ## 验证入口
 
-统一质量命令由根 `package.json` 提供。架构不变量和证据入口见 `INVARIANTS.md`、`docs/exec-plans/` 及现有 `docs/verification/`。
+统一质量命令由根 `package.json` 提供，其中 `pnpm check` 包含 `pnpm architecture:check`。架构不变量和证据入口见 `INVARIANTS.md`、`docs/exec-plans/` 及现有 `docs/verification/`。

@@ -28,6 +28,18 @@
 覆盖状态：complete
 证据：[玩家快照 schema](packages/protocol/src/player-snapshot.ts)、[服务端快照投影](apps/host/src/application/snapshot-projector.ts)、[快照投影测试](apps/host/src/application/snapshot-projector.test.ts)
 
+### INV-AUTH-003 — Host 管理投影不泄露玩家私有信息
+
+Host 管理会话只能收到房主管理和公共牌桌所需信息；服务型房主不通过 Host 管理快照获得玩家专属底牌、牌组顺序或其他未公开信息。
+
+完整行为规范：[协议与同步设计：事件与快照](docs/design-docs/protocol-and-sync.md#事件与快照)
+
+执行方式：test + architecture
+覆盖状态：complete
+证据：[Host 管理快照 schema](packages/protocol/src/host-snapshot.ts)、[Host 投影](apps/host/src/application/snapshot-projector.ts)、[Host Socket 测试](apps/host/src/server.test.ts)、[Host 控制台与观战牌桌测试](apps/client/src/room/HostConsole.test.tsx)
+
+责任边界：`packages/protocol` 定义 Host 管理快照，`apps/host` 负责按会话身份投影，`apps/client` 只渲染对应角色视图。
+
 ## INV-BET — 下注与牌局推进
 
 ### INV-BET-001 — 只有当前行动者可以行动
@@ -112,6 +124,18 @@
 覆盖状态：complete
 证据：[牌与牌组实现](packages/poker-core/src/cards/)、[单局状态机测试](packages/poker-core/src/hand/)
 
+### INV-HAND-003 — 当前盲注不按历史回算
+
+房间必须持久化基础盲注、权威当前盲注和下一次增长阈值；动态修改增长参数或当前小盲不能改变已创建牌局的盲注，也不能把已完成局数重新套回基础小盲。下一局只能从服务端保存的当前级别继续。
+
+完整行为规范：[玩法规格：盲注与筹码](docs/product-specs/gameplay.md#盲注与筹码)
+
+执行方式：test + architecture
+覆盖状态：complete
+证据：[盲注核心测试](packages/poker-core/src/table/blinds.test.ts)、[Host 当前盲注生命周期测试](apps/host/src/application/game-runtime.test.ts)、[房间配置领域测试](apps/host/src/domain/update-room-settings.test.ts)、[恢复设计](docs/design-docs/persistence-and-recovery.md)
+
+责任边界：`poker-core` 只提供单次增长的确定性规则，`apps/host` 保存当前级别和增长阈值并在下一局边界更新，`packages/protocol` 投影基础与当前级别，客户端不得自行计算。
+
 ## INV-ROOM — 房间与身份
 
 ### INV-ROOM-001 — 重连使用令牌身份
@@ -131,12 +155,35 @@
 完整行为规范：[房间体验：房间与记录生命周期](docs/product-specs/room-experience.md#房间与记录生命周期)
 
 执行方式：test + architecture
-覆盖状态：partial
-证据：[房间领域设计](docs/design-docs/room-domain.md)、[持久化与恢复设计](docs/design-docs/persistence-and-recovery.md)、[房间生命周期存储测试](apps/host/src/persistence/sqlite-room-lifecycle-store.test.ts)
+覆盖状态：complete
+证据：[房间领域设计](docs/design-docs/room-domain.md)、[持久化与恢复设计](docs/design-docs/persistence-and-recovery.md)、[房间生命周期存储测试](apps/host/src/persistence/sqlite-room-lifecycle-store.test.ts)、[Host/desktop 生命周期 E2E](e2e/e2e06-room-close-and-recovery.test.ts)、[Host 控制会话断开测试](apps/host/src/server.test.ts)
 
-缺口：存储层状态已有覆盖，但尚无单一生命周期场景同时区分正常关闭、异常中断、恢复和归档后的对外可观察状态。
+单一生命周期场景已区分运行中、Host 控制会话断开后的继续运行、异常中断可恢复、桌面恢复后的运行中、正常关闭和归档状态。
 责任边界：`apps/host` 负责房间与记录状态，`apps/desktop` 负责本机记录管理和恢复入口。
-跟进：下一次修改关闭、恢复或归档流程时，补跨 host/desktop 的生命周期集成用例。
+
+### INV-ROOM-003 — Host 身份与 Player 身份分离
+
+房主管理会话必须使用独立的 Host 身份和恢复令牌；昵称、`playerId` 或玩家恢复令牌不能替代 Host 身份。旧房主参与记录可以保留关联的 Host 和 Player 身份，但不能继续把二者当成同一授权主体。
+
+完整行为规范：[房间体验：角色与入口](docs/product-specs/room-experience.md#角色与入口)
+
+执行方式：test + architecture
+覆盖状态：complete
+证据：[Host/Player 会话 schema](packages/protocol/src/room-session.ts)、[运行时授权](apps/host/src/application/game-runtime.ts)、[Host token 持久化](apps/host/src/persistence/sqlite-host-reconnect-identity-store.ts)、[服务型 Host 集成测试](apps/host/src/application/host-participation.test.ts)
+
+责任边界：`packages/protocol` 定义身份形状，`apps/host` 负责授权和恢复，`apps/desktop` 负责本机 Host 会话保存与恢复。
+
+### INV-ROOM-004 — 服务型房主不进入玩家集合
+
+`仅提供服务` 模式的房主不占用玩家座位，不获得筹码，不进入准备人数、行动顺序、底池、牌局统计或玩家人数上限；首局开始条件只针对实际玩家计算。
+
+完整行为规范：[房间体验：座位与首局](docs/product-specs/room-experience.md#座位与首局)
+
+执行方式：test + architecture
+覆盖状态：complete
+证据：[领域建模测试](apps/host/src/domain/room.test.ts)、[服务型 Host 运行时测试](apps/host/src/application/host-participation.test.ts)、[Host 管理快照测试](packages/protocol/src/host-snapshot.test.ts)、[Host Socket 测试](apps/host/src/server.test.ts)
+
+责任边界：`apps/host/src/domain` 保证玩家集合和首局条件，`apps/host/src/application` 保证快照、统计和发现摘要按实际玩家投影。
 
 ## INV-PROTO — 协议与幂等
 
@@ -159,12 +206,11 @@
 完整行为规范：[持久化与恢复设计：写入规则](docs/design-docs/persistence-and-recovery.md#写入规则)
 
 执行方式：test + architecture
-覆盖状态：partial
-证据：[事件与命令事务测试](apps/host/src/persistence/sqlite-event-command-store.test.ts)、[持久化实现](apps/host/src/persistence/)
+覆盖状态：complete
+证据：[事件与命令事务测试](apps/host/src/persistence/sqlite-event-command-store.test.ts)、[Transport 持久化确认顺序测试](apps/host/src/server.test.ts)、[持久化实现](apps/host/src/persistence/)
 
-缺口：事务测试已覆盖确认写入失败时回滚事件，但尚无 transport 级用例证明外部成功响应一定发生在事务提交之后。
+Transport 测试已覆盖提交成功后才发送 `accepted`，以及提交前异常、回滚和提交失败均不发送成功确认且不留下残余写入。
 责任边界：`apps/host/src/application` 负责编排提交，`apps/host/src/persistence` 负责原子事务，网络层负责发送确认。
-跟进：下一次修改命令确认或持久化顺序时，补失败注入的服务端集成测试并断言未发出成功响应。
 
 ## INV-ARCH — 架构边界
 
@@ -175,12 +221,11 @@
 完整行为规范：[架构入口：工作区边界](ARCHITECTURE.md#工作区边界)
 
 执行方式：architecture
-覆盖状态：partial
-证据：[仓库路由规则](AGENTS.md)、[扑克领域设计](docs/design-docs/poker-domain.md)
+覆盖状态：complete
+证据：[仓库路由规则](AGENTS.md)、[扑克领域设计](docs/design-docs/poker-domain.md)、[workspace 边界检查脚本](scripts/check-workspace-boundaries.mjs)、[workspace 边界门禁测试](tests/architecture/workspace-boundaries.test.ts)
 
-缺口：依赖方向目前只由说明文档和 TypeScript 项目边界间接约束，没有自动扫描所有 workspace import 的架构门禁。
+根门禁已扫描当前 workspace 的 source import，并以 fixture 测试验证共享包反向导入应用层、`poker-core` 禁止运行时边界 import，以及系统时间/全局随机源调用均会失败。
 责任边界：根工具链负责依赖图检查，各 workspace 负责保持允许的导入方向。
-跟进：新增跨 workspace 依赖或调整构建边界前，先补自动依赖方向检查，再评估提升为 `complete`。
 
 ### INV-ARCH-002 — Electron 渲染进程使用窄桥接
 

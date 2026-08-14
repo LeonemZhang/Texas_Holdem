@@ -13,15 +13,17 @@
 
 ## 当前决策域
 
-| ID      | 决策主题                                     | 当前规范                                   | 影响设计                            |
-| ------- | -------------------------------------------- | ------------------------------------------ | ----------------------------------- |
-| ADR-001 | 房主服务端是唯一游戏权威                     | `docs/product-specs/gameplay.md`           | `poker-domain`、`protocol-and-sync` |
-| ADR-002 | 客户端只渲染服务端快照                       | `docs/product-specs/gameplay.md`           | `client`、`protocol-and-sync`       |
-| ADR-003 | 房间记录采用本地优先持久化                   | `docs/product-specs/room-experience.md`    | `persistence-and-recovery`          |
-| ADR-004 | 短 All-in 不重新开放 Raise                   | `docs/product-specs/gameplay.md`           | `poker-domain`、`hand-lifecycle`    |
-| ADR-005 | Automatic runout 必须在下注轮关闭后发生      | `docs/product-specs/gameplay.md`           | `hand-lifecycle`                    |
-| ADR-006 | 桌面与浏览器共享客户端但保持 Electron 窄边界 | `docs/product-specs/desktop-experience.md` | `client`、`desktop`                 |
-| ADR-007 | Android/mobile 仅作为普通玩家客户端          | `docs/product-specs/room-experience.md`    | `client`、`desktop`                 |
+| ID      | 决策主题                                     | 当前规范                                   | 影响设计                                                                 |
+| ------- | -------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------ |
+| ADR-001 | 房主服务端是唯一游戏权威                     | `docs/product-specs/gameplay.md`           | `poker-domain`、`protocol-and-sync`                                      |
+| ADR-002 | 客户端只渲染服务端快照                       | `docs/product-specs/gameplay.md`           | `client`、`protocol-and-sync`                                            |
+| ADR-003 | 房间记录采用本地优先持久化                   | `docs/product-specs/room-experience.md`    | `persistence-and-recovery`                                               |
+| ADR-004 | 短 All-in 不重新开放 Raise                   | `docs/product-specs/gameplay.md`           | `poker-domain`、`hand-lifecycle`                                         |
+| ADR-005 | Automatic runout 必须在下注轮关闭后发生      | `docs/product-specs/gameplay.md`           | `hand-lifecycle`                                                         |
+| ADR-006 | 桌面与浏览器共享客户端但保持 Electron 窄边界 | `docs/product-specs/desktop-experience.md` | `client`、`desktop`                                                      |
+| ADR-007 | Android/mobile 仅作为普通玩家客户端          | `docs/product-specs/room-experience.md`    | `client`、`desktop`                                                      |
+| ADR-008 | 房主参与模式与玩家身份分离                   | `docs/product-specs/room-experience.md`    | `room-domain`、`protocol-and-sync`、`persistence-and-recovery`、`client` |
+| ADR-009 | 房主动态房间配置的字段与生效边界             | `docs/product-specs/room-experience.md`    | `room-domain`、`hand-lifecycle`、`protocol-and-sync`、`client`           |
 
 ## ADR 文档
 
