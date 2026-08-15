@@ -240,6 +240,9 @@ pnpm package:win
 
 ## 项目文档
 
+- [v1.0.5 发布说明](./docs/releases/v1.0.5.md)
+- [v1.0.4 发布说明](./docs/releases/v1.0.4.md)
+- [v1.0.3 发布说明](./docs/releases/v1.0.3.md)
 - [v1.0.2 发布说明](./docs/releases/v1.0.2.md)
 - [v1.0.1 发布说明](./docs/releases/v1.0.1.md)
 - [产品规格地图](./docs/product-specs/index.md)

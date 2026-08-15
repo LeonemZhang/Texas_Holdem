@@ -4,10 +4,7 @@
 
 ## 进行中
 
-- [`mcp-agent-closed-loop`](active/mcp-agent-closed-loop/plan.md)：以真实 Host、独立 stdio MCP Agent 和本机 SQLite 完成三手四街对局，验证双方进程重启后的同身份恢复与持久化边界。
-- [`client-reconnection`](active/client-reconnection/plan.md)：为玩家与房主客户端补齐固定 `500 ms` 间隔、最多 `20` 次自动重连和同参数手动重连周期，并以权威快照匹配作为恢复操作门控；不修改 Host 权威、协议幂等或持久化。
-- [`current-hand-number`](active/current-hand-number/plan.md)：将当前局号改为 Host 权威投影，结算和准备阶段稳定显示刚结束的第 N 局，下一局创建后再显示第 N+1 局；不改变 `completedHands`、盲注增长、发牌时机或持久化。
-- [`automatic-runout-street-reveal`](active/automatic-runout-street-reveal/plan.md)：自动 Runout 时由服务端逐街公开公共牌并控制摊牌结算节奏；不改协议字段或客户端规则。
+当前没有进行中的执行计划；已完成计划见下方“已完成”。
 
 复杂变更需要多个可独立验收步骤时，复制[标准模板](template/plan.md)到 `active/<change>/`；普通小修、诊断、评审和文档整理直接以用户请求作为任务边界，不创建空计划或虚构 task ID。
 
@@ -32,6 +29,10 @@
 
 ## 已完成
 
+- [`mcp-agent-closed-loop`](completed/mcp-agent-closed-loop/plan.md)：以真实 Host、独立 stdio MCP Agent 和本机 SQLite 完成三手四街对局，验证双方进程重启后的同身份恢复与持久化边界。
+- [`client-reconnection`](completed/client-reconnection/plan.md)：为玩家与房主客户端补齐固定 `500 ms` 间隔、最多 `20` 次自动重连和同参数手动重连周期，并以权威快照匹配作为恢复操作门控；不修改 Host 权威、协议幂等或持久化。
+- [`current-hand-number`](completed/current-hand-number/plan.md)：将当前局号改为 Host 权威投影，结算和准备阶段稳定显示刚结束的第 N 局，下一局创建后再显示第 N+1 局；不改变 `completedHands`、盲注增长、发牌时机或持久化。
+- [`automatic-runout-street-reveal`](completed/automatic-runout-street-reveal/plan.md)：自动 Runout 时由服务端逐街公开公共牌并控制摊牌结算节奏；不改协议字段或客户端规则。
 - [`terra`](completed/terra/plan.md)：结构化证据契约建立前完成的 legacy 工程骨架计划。
 - [`luna`](completed/luna/plan.md)：已取代的历史增量计划；未回填状态只供追溯，不能作为当前待办。
 - [`host-participation`](completed/host-participation/plan.md)：完成 Windows 服务型 Host、Host/Player 身份分离、管理快照、本地 SQLite 恢复和客户端控制台。

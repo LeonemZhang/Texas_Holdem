@@ -8,6 +8,7 @@ const packagePaths = [
   resolve(rootDirectory, 'apps/client/package.json'),
   resolve(rootDirectory, 'apps/desktop/package.json'),
   resolve(rootDirectory, 'apps/host/package.json'),
+  resolve(rootDirectory, 'apps/mcp-server/package.json'),
   resolve(rootDirectory, 'packages/lan-discovery/package.json'),
   resolve(rootDirectory, 'packages/poker-core/package.json'),
   resolve(rootDirectory, 'packages/protocol/package.json'),
@@ -15,6 +16,10 @@ const packagePaths = [
   resolve(rootDirectory, 'packages/ui/package.json'),
 ];
 const hostVersionPath = resolve(rootDirectory, 'apps/host/src/app-version.ts');
+const mcpVersionPath = resolve(
+  rootDirectory,
+  'apps/mcp-server/src/app-version.ts',
+);
 const semverPattern =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
@@ -47,6 +52,10 @@ async function synchronize(version) {
     hostVersionPath,
     `export const APP_VERSION = '${version}' as const;\n`,
   );
+  await writeFile(
+    mcpVersionPath,
+    `export const APP_VERSION = '${version}' as const;\n`,
+  );
 }
 
 async function check(version) {
@@ -58,6 +67,9 @@ async function check(version) {
   const expectedHostSource = `export const APP_VERSION = '${version}' as const;\n`;
   if ((await readFile(hostVersionPath, 'utf8')) !== expectedHostSource) {
     mismatches.push(hostVersionPath);
+  }
+  if ((await readFile(mcpVersionPath, 'utf8')) !== expectedHostSource) {
+    mismatches.push(mcpVersionPath);
   }
   if (mismatches.length) {
     throw new Error(

@@ -146,6 +146,6 @@ apps/mcp-server/
 
 ## 版本
 
-- MCP Server 版本号跟随主应用：`1.0.4`
+- MCP Server 版本号跟随主应用：`1.0.5`
 - 协议版本：`protocolVersion: '3'`
 - 使用 `@modelcontextprotocol/sdk` ^1.30.0

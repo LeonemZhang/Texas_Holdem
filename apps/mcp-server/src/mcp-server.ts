@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import type { CommandResponse } from '@texas-holdem/protocol';
+import { APP_VERSION } from './app-version.js';
 import { PlayerSession } from './session.js';
 import {
   connectSocket,
@@ -184,7 +185,7 @@ export function createPokerMcpServer(
   };
   const server = new McpServer({
     name: 'texas-holdem-mcp',
-    version: '1.0.4',
+    version: APP_VERSION,
   });
 
   // poker_connect

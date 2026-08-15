@@ -25,7 +25,7 @@
 - 规格明确自动重连不能重发未确认命令；恢复后所有操作使用当前权威快照版本。
 - 客户端设计补充显式重连协调器、固定 `500 ms` 间隔、`20` 次自动尝试上限、自动到手动模式降级、同参数手动周期、generation/attempt ID、快照就绪门控、连接状态机和资源释放边界。
 - 文档不要求 Host 增加 `connectionStateRecovery`，不改变服务端权威性、协议幂等或 SQLite 契约。
-- `docs/exec-plans/active/client-reconnection/verification.md` 为 `RECON-001`、`RECON-002`、`RECON-003` 补齐逐任务结构化证据，状态表中最多一个任务为 `active`。
+- `docs/exec-plans/completed/client-reconnection/verification.md` 为 `RECON-001`、`RECON-002`、`RECON-003` 补齐逐任务结构化证据，状态表中最多一个任务为 `active`。
 
 ## 验证命令
 

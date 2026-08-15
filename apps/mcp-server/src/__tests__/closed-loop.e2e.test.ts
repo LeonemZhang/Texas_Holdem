@@ -265,7 +265,7 @@ async function createRoom(hostUrl: string): Promise<RoomSessionResponse> {
         initialChips: 1_000,
         smallBlind: 5,
         actionTimeoutSeconds: 10,
-        handReadyTimeoutSeconds: 10,
+        handReadyTimeoutSeconds: 60,
         blindGrowth: {
           enabled: false,
           intervalHands: 100,
