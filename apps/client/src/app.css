@@ -5746,12 +5746,6 @@ body:has(.lobby) .lobby-player--drop-target {
     font-size: var(--hand-ready-action-font-size, 0.8rem);
     white-space: nowrap;
   }
-
-  .hand-ready-card__actions .hand-ready-card__choice-button--join {
-    flex-basis: auto;
-    width: auto;
-    min-width: auto;
-  }
 }
 
 @media (min-width: 600px) and (min-aspect-ratio: 5/6) {

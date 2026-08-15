@@ -132,7 +132,7 @@ describe('HandReadyOverlay', () => {
     expect(screen.getByRole('button', { name: '就绪' })).toBeEnabled();
   });
 
-  it('lets a timed-out sitting-out player join the next hand again', () => {
+  it('lets a timed-out sitting-out player become ready again', () => {
     const onChoose = vi.fn();
     render(
       <HandReadyOverlay
@@ -148,7 +148,7 @@ describe('HandReadyOverlay', () => {
     expect(screen.getByLabelText('等待至少两名玩家就绪')).toHaveTextContent(
       '等待就绪',
     );
-    fireEvent.click(screen.getByRole('button', { name: '加入下一局' }));
+    fireEvent.click(screen.getByRole('button', { name: '就绪' }));
     expect(onChoose).toHaveBeenCalledWith('ready');
   });
 

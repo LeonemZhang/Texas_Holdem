@@ -329,20 +329,12 @@ export function HandReadyOverlay({
               aria-label="准备操作"
             >
               <button
-                className={`button button--primary hand-ready-card__choice-button${
-                  ownChoice === 'sitting-out'
-                    ? ' hand-ready-card__choice-button--join'
-                    : ''
-                }`}
+                className="button button--primary hand-ready-card__choice-button"
                 type="button"
                 disabled={ownChoice === 'ready' || ownChips < bigBlind}
                 onClick={() => onChoose('ready')}
               >
-                {ownChoice === 'ready'
-                  ? '已就绪'
-                  : ownChoice === 'sitting-out'
-                    ? '加入下一局'
-                    : '就绪'}
+                {ownChoice === 'ready' ? '已就绪' : '就绪'}
               </button>
               {settlement && onShowHoleCards ? (
                 <button
