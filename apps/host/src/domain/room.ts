@@ -175,6 +175,12 @@ export function isHostPlayer(room: RoomState, playerId: string): boolean {
   );
 }
 
+export function isVisibleRoomPlayer(
+  player: Pick<RoomPlayer, 'status'>,
+): boolean {
+  return !['left', 'removed'].includes(player.status);
+}
+
 export function createRoom(input: {
   readonly roomId: string;
   /** New callers provide this independently from the optional player id. */

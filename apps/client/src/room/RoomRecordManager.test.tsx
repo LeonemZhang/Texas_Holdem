@@ -137,7 +137,7 @@ describe('RoomRecordManager', () => {
     expect(screen.getByText('周末牌局')).toBeInTheDocument();
   });
 
-  it('keeps a removed player at the end of historical statistics', async () => {
+  it('does not show a removed player in historical statistics', async () => {
     const recordRuntime = runtime();
     recordRuntime.getRoomRecordStatistics = async () => ({
       players: [
@@ -185,11 +185,12 @@ describe('RoomRecordManager', () => {
     );
     fireEvent.click(await screen.findByRole('button', { name: '查看统计' }));
 
-    const rows = within(
+    const ranking = within(
       await screen.findByRole('tabpanel', { name: '牌局统计' }),
-    ).getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent('#1 Alice');
-    expect(rows[1]).toHaveTextContent('#2 Bob');
+    );
+    expect(ranking.getAllByRole('listitem')).toHaveLength(1);
+    expect(ranking.getByText('#1 Alice')).toBeInTheDocument();
+    expect(ranking.queryByText(/Bob/)).not.toBeInTheDocument();
   });
 
   it('opens the recovered host session instead of leaving the host in records', async () => {

@@ -260,7 +260,9 @@ afterAll(async () => {
   );
 });
 
-describe.concurrent('repository harness contract', () => {
+// Each case starts a separate Node checker process. Keep the suite serial so
+// Windows process startup and temporary-directory cleanup remain deterministic.
+describe('repository harness contract', () => {
   it('accepts a minimal valid repository contract and extended Skill YAML', async () => {
     const root = await createFixture();
 

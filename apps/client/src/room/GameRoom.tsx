@@ -66,6 +66,12 @@ const handTypeLabels: Record<string, string> = {
 };
 
 export function potContributionFlights(
+function isVisibleRoomPlayer(
+  player: Pick<PlayerSnapshot['room']['players'][number], 'status'>,
+): boolean {
+  return !['left', 'removed'].includes(player.status);
+}
+
   previous: PlayerSnapshot | null,
   next: PlayerSnapshot,
 ): readonly PotChipFlight[] {
@@ -87,7 +93,7 @@ export function potContributionFlights(
       player.totalCommitted,
     ]),
   );
-  return next.room.players.flatMap((player) => {
+  return next.room.players.filter(isVisibleRoomPlayer).flatMap((player) => {
     const amount =
       player.totalCommitted - (previousCommitted.get(player.playerId) ?? 0);
     return amount > 0
@@ -447,12 +453,62 @@ export function GameRoom({
   const own = snapshot.room.players.find(
     ({ playerId }) => playerId === session.playerId,
   );
+  const visiblePlayers = snapshot.room.players.filter(isVisibleRoomPlayer);
+  const visiblePlayerIds = new Set(
+    visiblePlayers.map(({ playerId }) => playerId),
+  );
   const ownStreetCommitted = own?.streetCommitted ?? 0;
   const ownRemainingChips = own?.chips ?? 0;
   const names = new Map(
     snapshot.room.players.map(({ playerId, nickname }) => [playerId, nickname]),
   );
-  const chipRequests = snapshot.chipRequests;
+  const visibleChipRequests = snapshot.chipRequests.filter(
+    ({ requesterId, targetPlayerId }) =>
+      visiblePlayerIds.has(requesterId) && visiblePlayerIds.has(targetPlayerId),
+  );
+  const visibleChipActivity = snapshot.chipActivity.filter((record) =>
+    record.kind === 'request'
+      ? visiblePlayerIds.has(record.requesterId) &&
+        visiblePlayerIds.has(record.targetPlayerId) &&
+        (record.completedByPlayerId === null ||
+          visiblePlayerIds.has(record.completedByPlayerId))
+      : visiblePlayerIds.has(record.fromPlayerId) &&
+        visiblePlayerIds.has(record.toPlayerId),
+  );
+  const visiblePendingRequests =
+    snapshot.handReady?.pendingRequests.filter(
+      ({ requesterId, targetPlayerId }) =>
+        visiblePlayerIds.has(requesterId) &&
+        visiblePlayerIds.has(targetPlayerId),
+    ) ?? [];
+  const visibleTitles = snapshot.statistics.titles.flatMap((title) => {
+    const playerIds = title.playerIds.filter((playerId) =>
+      visiblePlayerIds.has(playerId),
+    );
+    return playerIds.length > 0 ? [{ ...title, playerIds }] : [];
+  });
+  const visibleHandPeaks = snapshot.statistics.handPeaks
+    ? (() => {
+        const globalPlayerIds =
+          snapshot.statistics.handPeaks.global?.playerIds.filter((playerId) =>
+            visiblePlayerIds.has(playerId),
+          ) ?? [];
+        return {
+          ...snapshot.statistics.handPeaks,
+          global:
+            snapshot.statistics.handPeaks.global && globalPlayerIds.length > 0
+              ? {
+                  ...snapshot.statistics.handPeaks.global,
+                  playerIds: globalPlayerIds,
+                }
+              : null,
+          players: snapshot.statistics.handPeaks.players.filter(
+            ({ playerId }) => visiblePlayerIds.has(playerId),
+          ),
+        };
+      })()
+    : undefined;
+  const chipRequests = visibleChipRequests;
   const incomingChipRequest = chipRequests.find(
     (request) =>
       request.requesterId !== session.playerId &&
@@ -468,14 +524,14 @@ export function GameRoom({
         amount: incomingChipRequest.amount,
       }
     : null;
-  const statistics = snapshot.statistics.players.map((player) => ({
-    ...player,
-    nickname: names.get(player.playerId) ?? player.playerId,
-    removed:
-      snapshot.room.players.find(({ playerId }) => playerId === player.playerId)
-        ?.status === 'removed',
-    initialChips: snapshot.room.initialChips,
-  }));
+  const statistics = snapshot.statistics.players
+    .filter(({ playerId }) => visiblePlayerIds.has(playerId))
+    .map((player) => ({
+      ...player,
+      nickname: names.get(player.playerId) ?? player.playerId,
+      removed: false,
+      initialChips: snapshot.room.initialChips,
+    }));
 
   if (snapshot.room.phase === 'lobby') {
     return guarded(
@@ -488,16 +544,14 @@ export function GameRoom({
         <LobbyWaitingRoom
           roomName={snapshot.room.roomName}
           currentPlayerId={session.playerId}
-          players={snapshot.room.players
-            .filter((player) => !['left', 'removed'].includes(player.status))
-            .map((player) => ({
-              playerId: player.playerId,
-              nickname: player.nickname,
-              seatIndex: player.seatIndex,
-              isHost: player.isHost,
-              ready: player.lobbyReady,
-              connected: player.status !== 'disconnected',
-            }))}
+          players={visiblePlayers.map((player) => ({
+            playerId: player.playerId,
+            nickname: player.nickname,
+            seatIndex: player.seatIndex,
+            isHost: player.isHost,
+            ready: player.lobbyReady,
+            connected: player.status !== 'disconnected',
+          }))}
           {...(own?.isHost ? { joinUrl: session.joinUrl } : {})}
           {...(snapshot.room.settings
             ? { settings: snapshot.room.settings }
@@ -591,8 +645,8 @@ export function GameRoom({
         <StatisticsPanel
           open={statisticsOpen}
           players={statistics}
-          titles={snapshot.statistics.titles}
-          handPeaks={snapshot.statistics.handPeaks ?? undefined}
+          titles={visibleTitles}
+          handPeaks={visibleHandPeaks}
           collapsed={statisticsCollapsed}
           onCollapse={() => setStatisticsCollapsed(true)}
           onExpand={() => setStatisticsCollapsed(false)}
@@ -630,7 +684,7 @@ export function GameRoom({
         communityCards: game.communityCards,
         totalPot: game.totalPot,
         streetPots: game.streetPots,
-        players: snapshot.room.players.map((player) => {
+        players: visiblePlayers.map((player) => {
           const handType = settlementHandTypes.get(player.playerId);
           const bestFiveCards = settlementBestFiveCards.get(player.playerId);
           const holeCards = settlementHoleCards.get(player.playerId);
@@ -661,9 +715,7 @@ export function GameRoom({
     ),
   );
   const actionActor = game?.currentActorId
-    ? snapshot.room.players.find(
-        ({ playerId }) => playerId === game.currentActorId,
-      )
+    ? visiblePlayers.find(({ playerId }) => playerId === game.currentActorId)
     : null;
   const handLabel =
     snapshot.room.phase === 'paused'
@@ -711,29 +763,27 @@ export function GameRoom({
           <TableSeats
             actionRoundKey={game ? `${game.handId}:${game.street}` : null}
             ownPlayerId={session.playerId}
-            players={snapshot.room.players
-              .filter(({ status }) => status !== 'removed')
-              .map((player) => ({
-                ...player,
-                ...(gameSettlement
-                  ? (() => {
-                      const handType = settlementHandTypes.get(player.playerId);
-                      return {
-                        settlement: {
-                          netChange:
-                            gameSettlement.netChanges[player.playerId] ?? 0,
-                          ...(handType ? { handType } : {}),
-                        },
-                      };
-                    })()
-                  : {}),
-                isCurrentActor:
-                  snapshot.room.phase !== 'paused' &&
-                  game?.currentActorId === player.playerId,
-                isDealer: game?.buttonPlayerId === player.playerId,
-                isSmallBlind: game?.smallBlindPlayerId === player.playerId,
-                isBigBlind: game?.bigBlindPlayerId === player.playerId,
-              }))}
+            players={visiblePlayers.map((player) => ({
+              ...player,
+              ...(gameSettlement
+                ? (() => {
+                    const handType = settlementHandTypes.get(player.playerId);
+                    return {
+                      settlement: {
+                        netChange:
+                          gameSettlement.netChanges[player.playerId] ?? 0,
+                        ...(handType ? { handType } : {}),
+                      },
+                    };
+                  })()
+                : {}),
+              isCurrentActor:
+                snapshot.room.phase !== 'paused' &&
+                game?.currentActorId === player.playerId,
+              isDealer: game?.buttonPlayerId === player.playerId,
+              isSmallBlind: game?.smallBlindPlayerId === player.playerId,
+              isBigBlind: game?.bigBlindPlayerId === player.playerId,
+            }))}
           />
         }
         communityCards={
@@ -771,16 +821,14 @@ export function GameRoom({
               ownChoice={snapshot.handReady.ownChoice}
               ownChips={own?.chips ?? 0}
               bigBlind={snapshot.room.bigBlind}
-              pendingRequests={snapshot.handReady.pendingRequests.map(
-                (request) => ({
-                  requestId: request.requestId,
-                  requesterId: request.requesterId,
-                  requesterName:
-                    names.get(request.requesterId) ?? request.requesterId,
-                  targetPlayerId: request.targetPlayerId,
-                  amount: request.amount,
-                }),
-              )}
+              pendingRequests={visiblePendingRequests.map((request) => ({
+                requestId: request.requestId,
+                requesterId: request.requesterId,
+                requesterName:
+                  names.get(request.requesterId) ?? request.requesterId,
+                targetPlayerId: request.targetPlayerId,
+                amount: request.amount,
+              }))}
               complete={false}
               onChoose={(choice) =>
                 void send({ type: 'hand-ready.set-choice', choice })
@@ -819,8 +867,8 @@ export function GameRoom({
               }}
               phase={snapshot.room.phase}
               currentPlayerId={session.playerId}
-              players={snapshot.room.players}
-              records={snapshot.chipActivity}
+              players={visiblePlayers}
+              records={visibleChipActivity}
               onAction={sendChipIntent}
             />
           ) : activeUtilityPanel === 'host' ? (
@@ -841,17 +889,15 @@ export function GameRoom({
                 ? { settings: snapshot.room.settings }
                 : {})}
               currentSmallBlind={snapshot.room.smallBlind}
-              players={snapshot.room.players.filter(
-                ({ status }) => !['left', 'removed'].includes(status),
-              )}
+              players={visiblePlayers}
               onCommand={sendHostControl}
             />
           ) : activeUtilityPanel === 'statistics' ? (
             <StatisticsPanel
               open
               players={statistics}
-              titles={snapshot.statistics.titles}
-              handPeaks={snapshot.statistics.handPeaks ?? undefined}
+              titles={visibleTitles}
+              handPeaks={visibleHandPeaks}
               onCollapse={closeUtilityPanel}
             />
           ) : null

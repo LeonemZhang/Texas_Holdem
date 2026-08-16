@@ -139,16 +139,38 @@ export function StatisticsPanel({
         </button>
       </aside>
     );
-  const ranked = [...players].sort((left, right) => {
-    const removedOrder =
-      Number(Boolean(left.removed)) - Number(Boolean(right.removed));
-    return removedOrder || right.currentChips - left.currentChips;
+  const visiblePlayers = players.filter((player) => !player.removed);
+  const visiblePlayerIds = new Set(
+    visiblePlayers.map(({ playerId }) => playerId),
+  );
+  const visibleTitles = titles.flatMap((title) => {
+    const playerIds = title.playerIds.filter((playerId) =>
+      visiblePlayerIds.has(playerId),
+    );
+    return playerIds.length > 0 ? [{ ...title, playerIds }] : [];
   });
+  const visibleGlobalPlayerIds =
+    handPeaks.global?.playerIds.filter((playerId) =>
+      visiblePlayerIds.has(playerId),
+    ) ?? [];
+  const visibleHandPeaks = {
+    ...handPeaks,
+    global:
+      handPeaks.global && visibleGlobalPlayerIds.length > 0
+        ? { ...handPeaks.global, playerIds: visibleGlobalPlayerIds }
+        : null,
+    players: handPeaks.players.filter(({ playerId }) =>
+      visiblePlayerIds.has(playerId),
+    ),
+  };
+  const ranked = [...visiblePlayers].sort(
+    (left, right) => right.currentChips - left.currentChips,
+  );
   const nicknames = new Map(
-    players.map((player) => [player.playerId, player.nickname]),
+    visiblePlayers.map((player) => [player.playerId, player.nickname]),
   );
   const peakByPlayer = new Map(
-    handPeaks.players.map((peak) => [peak.playerId, peak]),
+    visibleHandPeaks.players.map((peak) => [peak.playerId, peak]),
   );
   const content = (
     <aside
@@ -246,7 +268,7 @@ export function StatisticsPanel({
           aria-labelledby="titles-tab"
         >
           <ul>
-            {titles.map((award) => (
+            {visibleTitles.map((award) => (
               <li key={award.title}>
                 <strong className="fun-titles__title">
                   <span>{titleNames[award.title] ?? award.title}</span>
@@ -304,29 +326,29 @@ export function StatisticsPanel({
           role="tabpanel"
           aria-labelledby="hands-tab"
         >
-          {handPeaks.hasLegacyCoverageGap ? (
+          {visibleHandPeaks.hasLegacyCoverageGap ? (
             <p className="statistics-hands__notice">
               历史牌型从版本更新后开始记录。
             </p>
           ) : null}
-          {handPeaks.global ? (
+          {visibleHandPeaks.global ? (
             <section className="statistics-hands__global" aria-label="最高牌型">
               <p>最高牌型</p>
               <strong>
-                {handTypeNames[handPeaks.global.handType] ??
-                  handPeaks.global.handType}
+                {handTypeNames[visibleHandPeaks.global.handType] ??
+                  visibleHandPeaks.global.handType}
               </strong>
               <span>
                 归属：
-                {handPeaks.global.playerIds
+                {visibleHandPeaks.global.playerIds
                   .map((id) => nicknames.get(id) ?? id)
                   .join('、')}
               </span>
               <HandCards
                 cards={sortBestFiveCards(
-                  handPeaks.global.bestFiveCards,
-                  handTypeNames[handPeaks.global.handType] ??
-                    handPeaks.global.handType,
+                  visibleHandPeaks.global.bestFiveCards,
+                  handTypeNames[visibleHandPeaks.global.handType] ??
+                    visibleHandPeaks.global.handType,
                 )}
                 label="最高牌型"
               />
@@ -335,7 +357,7 @@ export function StatisticsPanel({
             <p className="statistics-hands__empty">暂无可评估牌型。</p>
           )}
           <ul>
-            {players.map((player) => {
+            {visiblePlayers.map((player) => {
               const peak = peakByPlayer.get(player.playerId);
               return (
                 <li key={player.playerId} className="statistics-hands__player">

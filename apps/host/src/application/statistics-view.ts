@@ -4,7 +4,7 @@ import {
   type RoomRecordStatistics,
 } from '@texas-holdem/protocol';
 
-import type { RoomState } from '../domain/room.js';
+import { isVisibleRoomPlayer, type RoomState } from '../domain/room.js';
 import type { RebuiltStatistics } from './statistics-store.js';
 
 const handTypes = {
@@ -23,8 +23,26 @@ export function createStatisticsView(
   room: RoomState,
   rebuilt: RebuiltStatistics,
 ): RoomRecordStatistics {
+  const visiblePlayers = room.players.filter(isVisibleRoomPlayer);
+  const visiblePlayerIds = new Set(
+    visiblePlayers.map(({ playerId }) => playerId),
+  );
+  const visibleTitles = rebuilt.titles.flatMap((title) => {
+    const playerIds = title.playerIds.filter((playerId) =>
+      visiblePlayerIds.has(playerId),
+    );
+    return playerIds.length > 0 ? [{ ...title, playerIds }] : [];
+  });
+  const visibleGlobal = rebuilt.handPeaks.global
+    ? {
+        ...rebuilt.handPeaks.global,
+        playerIds: rebuilt.handPeaks.global.playerIds.filter((playerId) =>
+          visiblePlayerIds.has(playerId),
+        ),
+      }
+    : null;
   return RoomRecordStatisticsSchema.parse({
-    players: room.players.map((player) => ({
+    players: visiblePlayers.map((player) => ({
       playerId: player.playerId,
       nickname: player.nickname,
       removed: player.status === 'removed',
@@ -48,16 +66,17 @@ export function createStatisticsView(
         allIn: 0,
       },
     })),
-    titles: rebuilt.titles,
+    titles: visibleTitles,
     handPeaks: {
-      global: rebuilt.handPeaks.global
-        ? {
-            playerIds: rebuilt.handPeaks.global.playerIds,
-            handType: handTypes[rebuilt.handPeaks.global.rank[0]],
-            bestFiveCards: rebuilt.handPeaks.global.bestFiveCards,
-          }
-        : null,
-      players: room.players.flatMap((player) => {
+      global:
+        visibleGlobal && visibleGlobal.playerIds.length > 0
+          ? {
+              playerIds: visibleGlobal.playerIds,
+              handType: handTypes[visibleGlobal.rank[0]],
+              bestFiveCards: visibleGlobal.bestFiveCards,
+            }
+          : null,
+      players: visiblePlayers.flatMap((player) => {
         const peak = rebuilt.handPeaks.players[player.playerId];
         return peak
           ? [

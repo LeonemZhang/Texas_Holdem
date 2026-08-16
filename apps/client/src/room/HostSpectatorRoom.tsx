@@ -70,9 +70,10 @@ function settlementFor(
 
 function spectatorSeats(
   snapshot: HostManagementSnapshot,
+  players: readonly HostManagementSnapshot['room']['players'][number][],
 ): readonly TableSeatPlayer[] {
   const game = snapshot.game;
-  return snapshot.room.players.map((player) => {
+  return players.map((player) => {
     const settlement = settlementFor(snapshot, player.playerId);
     return {
       playerId: player.playerId,
@@ -103,11 +104,13 @@ export function HostSpectatorRoom({
     useState<TableUtilityPanel | null>(null);
   const [settlementCollapsed, setSettlementCollapsed] = useState(false);
   const game = snapshot.game;
-  const seats = spectatorSeats(snapshot);
+  const visiblePlayers = snapshot.room.players.filter(
+    ({ status }) => !['left', 'removed'].includes(status),
+  );
+  const seats = spectatorSeats(snapshot, visiblePlayers);
   const actorName = game?.currentActorId
-    ? (snapshot.room.players.find(
-        (player) => player.playerId === game.currentActorId,
-      )?.nickname ?? '玩家')
+    ? (visiblePlayers.find((player) => player.playerId === game.currentActorId)
+        ?.nickname ?? '玩家')
     : '玩家';
   const actionTimer =
     game?.actionDeadlineMs !== null &&
@@ -135,7 +138,7 @@ export function HostSpectatorRoom({
         communityCards: game?.communityCards ?? [],
         totalPot: game?.totalPot ?? 0,
         streetPots: game?.streetPots ?? [],
-        players: snapshot.room.players.map((player) => {
+        players: visiblePlayers.map((player) => {
           const result = settlementResults.find(
             (candidate) => candidate.playerId === player.playerId,
           );
@@ -225,7 +228,7 @@ export function HostSpectatorRoom({
               {...(joinUrl ? { joinUrl } : {})}
               settings={snapshot.room.settings}
               currentSmallBlind={snapshot.room.currentSmallBlind}
-              players={snapshot.room.players}
+              players={visiblePlayers}
               onCommand={onCommand}
             />
           ) : null

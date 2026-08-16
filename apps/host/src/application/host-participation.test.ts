@@ -122,4 +122,100 @@ describe('service-only Host runtime boundary', () => {
     expect(snapshot?.game && 'ownHoleCards' in snapshot.game).toBe(false);
     expect(snapshot?.game && 'legalActions' in snapshot.game).toBe(false);
   });
+
+  it('hides a left player after another nickname joins the same room', () => {
+    const runtime = new GameRuntime();
+    const host = runtime.create(
+      {
+        hostNickname: 'Service Host',
+        hostParticipation: 'service-only',
+        settings,
+      },
+      'http://127.0.0.1:32100',
+    );
+    const left = runtime.join(host.roomId, { nickname: 'Alice' }, host.joinUrl);
+    const staying = runtime.join(
+      host.roomId,
+      { nickname: 'Bob' },
+      host.joinUrl,
+    );
+
+    expect(
+      command(runtime, host.roomId, left.playerId, 'room.exit').status,
+    ).toBe('accepted');
+    const replacement = runtime.join(
+      host.roomId,
+      { nickname: 'Carol' },
+      host.joinUrl,
+    );
+
+    expect(
+      runtime
+        .hostSnapshot(host.roomId, host.hostId!)
+        ?.room.players.map(({ playerId, nickname }) => ({
+          playerId,
+          nickname,
+        })),
+    ).toEqual([
+      { playerId: staying.playerId, nickname: 'Bob' },
+      { playerId: replacement.playerId, nickname: 'Carol' },
+    ]);
+    runtime.dispose();
+  });
+
+  it('hides a player removed after the first hand from Host and statistics views', () => {
+    const runtime = new GameRuntime();
+    const host = runtime.create(
+      {
+        hostNickname: 'Service Host',
+        hostParticipation: 'service-only',
+        settings,
+      },
+      'http://127.0.0.1:32100',
+    );
+    const first = runtime.join(
+      host.roomId,
+      { nickname: 'Alice' },
+      host.joinUrl,
+    );
+    const second = runtime.join(host.roomId, { nickname: 'Bob' }, host.joinUrl);
+    command(runtime, host.roomId, first.playerId, 'room.set-lobby-ready', {
+      ready: true,
+    });
+    command(runtime, host.roomId, second.playerId, 'room.set-lobby-ready', {
+      ready: true,
+    });
+    expect(
+      command(runtime, host.roomId, host.playerId, 'room.start-first-hand', {
+        actorType: 'host',
+        handId: 'service-hand-for-removal',
+      }).status,
+    ).toBe('accepted');
+
+    const actorId = runtime.hostSnapshot(host.roomId, host.hostId!)?.game
+      ?.currentActorId;
+    expect(actorId).toBeTruthy();
+    expect(command(runtime, host.roomId, actorId!, 'game.fold').status).toBe(
+      'accepted',
+    );
+    expect(runtime.rooms.get(host.roomId)?.phase).toBe('hand-ready');
+    expect(
+      command(runtime, host.roomId, host.playerId, 'room.remove-player', {
+        actorType: 'host',
+        targetPlayerId: actorId,
+      }).status,
+    ).toBe('accepted');
+
+    const snapshot = runtime.hostSnapshot(host.roomId, host.hostId!);
+    expect(snapshot?.room.players).toHaveLength(1);
+    expect(
+      snapshot?.room.players.some(({ playerId }) => playerId === actorId),
+    ).toBe(false);
+    expect(
+      runtime
+        .snapshot(host.roomId, second.playerId)
+        ?.statistics.players.some(({ playerId }) => playerId === actorId),
+    ).toBe(false);
+    runtime.dispose();
+  });
 });

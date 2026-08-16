@@ -21,6 +21,7 @@ import {
 import type { ChipRequestBook } from '../domain/chip-requests.js';
 import type { HandReadyState } from '../domain/hand-ready.js';
 import {
+  isVisibleRoomPlayer,
   normalizeRoomBlindState,
   roomBlindLevel,
   type RoomPlayer,
@@ -315,6 +316,7 @@ export function projectPlayerSnapshot(
       : undefined;
   const currentViewer = handPlayer(hand, input.viewerPlayerId);
   const actionOrder = actionOrderByPlayerId(hand);
+  const visibleRoomPlayers = input.room.players.filter(isVisibleRoomPlayer);
   const blindLevel =
     hand && input.room.phase !== 'hand-ready'
       ? hand
@@ -322,7 +324,7 @@ export function projectPlayerSnapshot(
   const currentChips = (player: RoomPlayer) => player.chips;
   const statistics =
     input.statistics ??
-    input.room.players.map((player) => ({
+    visibleRoomPlayers.map((player) => ({
       playerId: player.playerId,
       currentChips: currentChips(player),
       netWinLoss: 0,
@@ -498,9 +500,14 @@ export function projectHostManagementSnapshot(
     input.room,
     input.completedHands ?? 0,
   );
-  const players =
+  const visiblePlayerIds = new Set(
+    input.room.players
+      .filter(isVisibleRoomPlayer)
+      .map(({ playerId }) => playerId),
+  );
+  const players = (
     playerSnapshot?.room.players ??
-    input.room.players.map((player) => ({
+    input.room.players.filter(isVisibleRoomPlayer).map((player) => ({
       playerId: player.playerId,
       nickname: player.nickname,
       seatIndex: player.seatIndex,
@@ -512,7 +519,8 @@ export function projectHostManagementSnapshot(
       status: player.status,
       isHost: player.playerId === input.room.hostPlayerId,
       lobbyReady: player.lobbyReady,
-    }));
+    }))
+  ).filter(({ playerId }) => visiblePlayerIds.has(playerId));
 
   return HostManagementSnapshotSchema.parse({
     protocolVersion: PROTOCOL_VERSION,
@@ -556,10 +564,9 @@ export function projectHostManagementSnapshot(
     handReady: input.handReady
       ? {
           deadlineMs: input.handReady.deadlineMs,
-          players: input.handReady.players.map(({ playerId, choice }) => ({
-            playerId,
-            choice,
-          })),
+          players: input.handReady.players
+            .filter(({ playerId }) => visiblePlayerIds.has(playerId))
+            .map(({ playerId, choice }) => ({ playerId, choice })),
         }
       : null,
   });

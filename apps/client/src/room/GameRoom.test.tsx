@@ -805,7 +805,7 @@ describe('GameRoom', () => {
     expect(connection.sendCommand).not.toHaveBeenCalled();
   });
 
-  it('does not render a removed player on the table or offer removal again', async () => {
+  it('does not render left or removed players on the table or offer removal again', async () => {
     let consumeSnapshot: (value: PlayerSnapshot) => void = () => undefined;
     const connection: ConnectionAdapter = {
       connect: vi.fn(async () =>
@@ -815,11 +815,20 @@ describe('GameRoom', () => {
           room: {
             ...snapshot.room,
             phase: 'hand-ready',
-            players: snapshot.room.players.map((player) =>
-              player.playerId === 'bob'
-                ? { ...player, status: 'removed' as const }
-                : player,
-            ),
+            players: [
+              ...snapshot.room.players.map((player) =>
+                player.playerId === 'bob'
+                  ? { ...player, status: 'removed' as const }
+                  : player,
+              ),
+              {
+                ...snapshot.room.players[0]!,
+                playerId: 'left-player',
+                nickname: 'Left player',
+                seatIndex: 2,
+                status: 'left' as const,
+              },
+            ],
           },
         }),
       ),
@@ -849,6 +858,7 @@ describe('GameRoom', () => {
 
     expect(await screen.findAllByText('Alice')).not.toHaveLength(0);
     expect(screen.queryByText('Bob')).not.toBeInTheDocument();
+    expect(screen.queryByText('Left player')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
     expect(screen.queryByRole('button', { name: '踢出 Bob' })).toBeNull();
   });

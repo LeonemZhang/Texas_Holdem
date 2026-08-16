@@ -60,7 +60,7 @@ describe('StatisticsPanel', () => {
     ]);
   });
 
-  it('places removed players after active players regardless of chip totals', () => {
+  it('does not render removed players in statistics', () => {
     render(
       <StatisticsPanel
         open
@@ -73,11 +73,10 @@ describe('StatisticsPanel', () => {
       />,
     );
 
-    const rows = within(
-      screen.getByRole('tabpanel', { name: '牌局统计' }),
-    ).getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent('#1 Alice');
-    expect(rows[1]).toHaveTextContent('#2 Bob');
+    const ranking = within(screen.getByRole('tabpanel', { name: '牌局统计' }));
+    expect(ranking.getAllByRole('listitem')).toHaveLength(1);
+    expect(ranking.getByText('#1 Alice')).toBeInTheDocument();
+    expect(ranking.queryByText(/Bob/)).not.toBeInTheDocument();
   });
 
   it('uses settlement-only net win or loss rather than exchanged chips', () => {

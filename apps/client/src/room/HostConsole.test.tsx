@@ -168,6 +168,62 @@ describe('HostConsole', () => {
     );
   });
 
+  it('hides left and removed players from the spectator table and Host controls', () => {
+    render(
+      <HostSpectatorRoom
+        snapshot={{
+          ...snapshot,
+          room: {
+            ...snapshot.room,
+            phase: 'playing',
+            players: [
+              ...snapshot.room.players,
+              {
+                ...snapshot.room.players[0]!,
+                playerId: 'left-player',
+                nickname: 'Left player',
+                seatIndex: 2,
+                status: 'left',
+              },
+              {
+                ...snapshot.room.players[1]!,
+                playerId: 'removed-player',
+                nickname: 'Removed player',
+                seatIndex: 3,
+                status: 'removed',
+              },
+            ],
+          },
+          game: {
+            handId: 'hand-1',
+            handNumber: 1,
+            street: 'flop',
+            buttonPlayerId: 'player-1',
+            smallBlindPlayerId: 'player-1',
+            bigBlindPlayerId: 'player-2',
+            currentActorId: 'player-2',
+            actionDeadlineMs: 60_000,
+            communityCards: ['2c', '7d', 'Jh'],
+            totalPot: 20,
+            streetPots: [{ street: 'preflop', amount: 20 }],
+          },
+        }}
+        onBack={vi.fn()}
+        onCommand={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('Left player')).not.toBeInTheDocument();
+    expect(screen.queryByText('Removed player')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
+    expect(
+      screen.queryByRole('button', { name: '踢出 Left player' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '踢出 Removed player' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows collapsible public settlement cards without ready controls or table duplicates', () => {
     const { container } = render(
       <HostSpectatorRoom

@@ -706,7 +706,7 @@ describe('GameRuntime', () => {
       runtime
         .statisticsForRoom(host.roomId)
         ?.players.find(({ playerId }) => playerId === guest.playerId),
-    ).toMatchObject({ removed: true });
+    ).toBeUndefined();
     expect(() =>
       runtime.resume(
         host.roomId,
