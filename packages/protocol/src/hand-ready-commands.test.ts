@@ -43,6 +43,11 @@ describe('HandReadyCommandSchema', () => {
 
   it.each([
     { ...identity, type: 'hand-ready.set-choice', choice: 'ready' },
+    {
+      ...identity,
+      type: 'hand-ready.set-chip-reset-vote',
+      vote: 'approve',
+    },
     { ...identity, type: 'chips.revoke', requestId: 'request-1' },
     { ...identity, type: 'chips.reject', requestId: 'request-1' },
     {

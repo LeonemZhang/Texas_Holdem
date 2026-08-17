@@ -194,6 +194,56 @@ describe('PlayerSnapshotSchema', () => {
     ).not.toHaveProperty('handNumber');
   });
 
+  it('accepts an authoritative chip reset vote in hand readiness', () => {
+    const parsed = PlayerSnapshotSchema.parse({
+      ...snapshot,
+      room: { ...snapshot.room, phase: 'hand-ready' },
+      handReady: {
+        deadlineMs: 30_000,
+        ownChoice: 'pending',
+        chipResetVote: {
+          initialChips: 100,
+          insufficientPlayerIds: ['p2'],
+          ownVote: 'approve',
+          players: [
+            { playerId: 'p1', vote: 'approve' },
+            { playerId: 'p2', vote: 'pending' },
+          ],
+        },
+        pendingRequests: [],
+      },
+    });
+
+    expect(parsed.handReady?.chipResetVote).toMatchObject({
+      ownVote: 'approve',
+      insufficientPlayerIds: ['p2'],
+    });
+  });
+
+  it('accepts a failed authoritative chip reset vote result', () => {
+    const parsed = PlayerSnapshotSchema.parse({
+      ...snapshot,
+      room: { ...snapshot.room, phase: 'hand-ready' },
+      handReady: {
+        deadlineMs: 30_000,
+        ownChoice: 'pending',
+        chipResetVote: {
+          status: 'failed',
+          initialChips: 100,
+          insufficientPlayerIds: ['p2'],
+          ownVote: 'pending',
+          players: [
+            { playerId: 'p1', vote: 'pending' },
+            { playerId: 'p2', vote: 'reject' },
+          ],
+        },
+        pendingRequests: [],
+      },
+    });
+
+    expect(parsed.handReady?.chipResetVote?.status).toBe('failed');
+  });
+
   it('rejects a non-positive or unsafe current hand number', () => {
     expect(
       PlayerSnapshotSchema.safeParse({

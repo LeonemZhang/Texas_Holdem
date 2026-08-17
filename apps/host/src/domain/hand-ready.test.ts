@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { beginHandReadyPhase } from './hand-ready.js';
+import { joinRoom } from './join-room.js';
 import { createRoom } from './room.js';
 
 function playingRoom(timeout = 30) {
@@ -44,5 +45,40 @@ describe('beginHandReadyPhase', () => {
     const second = beginHandReadyPhase(playingRoom(45), 'hand-1', 5_000);
     expect(first.handReady).toEqual(second.handReady);
     expect(first.handReady.deadlineMs).toBe(50_000);
+  });
+
+  it('starts a chip reset vote only when the policy allows continued play', () => {
+    const withShortStack = joinRoom(playingRoom(), {
+      playerId: 'bob',
+      nickname: 'Bob',
+    });
+    const depleted = Object.freeze({
+      ...withShortStack,
+      phase: 'playing' as const,
+      players: Object.freeze(
+        withShortStack.players.map((player) =>
+          player.playerId === 'bob'
+            ? Object.freeze({ ...player, chips: 0 })
+            : player,
+        ),
+      ),
+    });
+    const vote = beginHandReadyPhase(depleted, 'hand-1', 1_000);
+    expect(vote.handReady.chipResetVote).toMatchObject({
+      initialChips: 2_000,
+      insufficientPlayerIds: ['bob'],
+      players: [
+        { playerId: 'host', vote: 'pending' },
+        { playerId: 'bob', vote: 'pending' },
+      ],
+    });
+
+    const eliminated = Object.freeze({
+      ...depleted,
+      settings: { ...depleted.settings, zeroChipPolicy: 'eliminate' as const },
+    });
+    expect(
+      beginHandReadyPhase(eliminated, 'hand-1', 1_000).handReady.chipResetVote,
+    ).toBeNull();
   });
 });

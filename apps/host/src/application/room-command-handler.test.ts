@@ -270,4 +270,164 @@ describe('RoomCommandHandler', () => {
       'completed',
     );
   });
+
+  it('requires every player to approve a chip reset before restoring initial stacks', () => {
+    const rooms = new InMemoryRoomRegistry();
+    const handler = new RoomCommandHandler(rooms, random);
+    handler.handle(createCommand(), null);
+    let room = rooms.get('room-1')!;
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'join',
+        playerId: 'bob',
+        type: 'room.join',
+        nickname: 'Bob',
+      },
+      room,
+    );
+    room = rooms.get('room-1')!;
+    const depleted = Object.freeze({
+      ...room,
+      phase: 'playing' as const,
+      firstHandStarted: true,
+      players: Object.freeze(
+        room.players.map((player) =>
+          player.playerId === 'bob'
+            ? Object.freeze({ ...player, chips: 0 })
+            : player,
+        ),
+      ),
+    });
+    handler.enterHandReady(beginHandReadyPhase(depleted, 'hand-1', 1_000));
+    room = rooms.get('room-1')!;
+    expect(handler.getHandReady('room-1')?.chipResetVote).toBeTruthy();
+
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'vote-host',
+        expectedVersion: room.version,
+        type: 'hand-ready.set-chip-reset-vote',
+        vote: 'approve',
+      },
+      room,
+    );
+    room = rooms.get('room-1')!;
+    expect(handler.getHandReady('room-1')?.chipResetVote?.players).toEqual([
+      { playerId: 'host', vote: 'approve' },
+      { playerId: 'bob', vote: 'pending' },
+    ]);
+
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'vote-bob',
+        playerId: 'bob',
+        expectedVersion: room.version,
+        type: 'hand-ready.set-chip-reset-vote',
+        vote: 'approve',
+      },
+      room,
+    );
+    expect(rooms.get('room-1')?.players.map(({ chips }) => chips)).toEqual([
+      100, 100,
+    ]);
+    expect(handler.getHandReady('room-1')?.chipResetVote).toBeNull();
+    expect(handler.getHandReady('room-1')?.players).toEqual([
+      { playerId: 'host', choice: 'pending' },
+      { playerId: 'bob', choice: 'pending' },
+    ]);
+    expect(handler.getChipRequests('room-1')?.requests).toEqual([]);
+  });
+
+  it('retains a failed reset vote after any player rejects it', () => {
+    const rooms = new InMemoryRoomRegistry();
+    const handler = new RoomCommandHandler(rooms, random);
+    handler.handle(createCommand(), null);
+    let room = rooms.get('room-1')!;
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'join',
+        playerId: 'bob',
+        type: 'room.join',
+        nickname: 'Bob',
+      },
+      room,
+    );
+    room = rooms.get('room-1')!;
+    const depleted = Object.freeze({
+      ...room,
+      phase: 'playing' as const,
+      firstHandStarted: true,
+      players: Object.freeze(
+        room.players.map((player) =>
+          player.playerId === 'bob'
+            ? Object.freeze({ ...player, chips: 0 })
+            : player,
+        ),
+      ),
+    });
+    handler.enterHandReady(beginHandReadyPhase(depleted, 'hand-1', 1_000));
+    room = rooms.get('room-1')!;
+
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'reject-vote',
+        expectedVersion: room.version,
+        type: 'hand-ready.set-chip-reset-vote',
+        vote: 'reject',
+      },
+      room,
+    );
+
+    expect(handler.getHandReady('room-1')?.chipResetVote).toMatchObject({
+      status: 'failed',
+    });
+    expect(rooms.get('room-1')?.players.map(({ chips }) => chips)).toEqual([
+      100, 0,
+    ]);
+  });
+
+  it('maps the Host chip recharge vote command during hand readiness', () => {
+    const rooms = new InMemoryRoomRegistry();
+    const handler = new RoomCommandHandler(rooms, random);
+    handler.handle(createCommand(), null);
+    let room = rooms.get('room-1')!;
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'join',
+        playerId: 'bob',
+        type: 'room.join',
+        nickname: 'Bob',
+      },
+      room,
+    );
+    room = rooms.get('room-1')!;
+    const handReadyRoom = Object.freeze({
+      ...room,
+      phase: 'playing' as const,
+      firstHandStarted: true,
+    });
+    handler.enterHandReady(beginHandReadyPhase(handReadyRoom, 'hand-1', 1_000));
+    room = rooms.get('room-1')!;
+
+    handler.handle(
+      {
+        ...identity,
+        commandId: 'start-chip-reset-vote',
+        expectedVersion: room.version,
+        type: 'room.start-chip-reset-vote',
+      },
+      room,
+    );
+
+    expect(handler.getHandReady('room-1')?.chipResetVote?.players).toEqual([
+      { playerId: 'host', vote: 'pending' },
+      { playerId: 'bob', vote: 'pending' },
+    ]);
+  });
 });

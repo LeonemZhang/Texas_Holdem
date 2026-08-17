@@ -218,4 +218,91 @@ describe('service-only Host runtime boundary', () => {
     ).toBe(false);
     runtime.dispose();
   });
+
+  it.each(['player', 'service-only'] as const)(
+    'allows a %s Host to initiate a chip recharge vote from management',
+    (hostParticipation) => {
+      const runtime = new GameRuntime();
+      const host = runtime.create(
+        {
+          hostNickname: 'Host',
+          ...(hostParticipation === 'service-only'
+            ? { hostParticipation }
+            : {}),
+          settings,
+        },
+        'http://127.0.0.1:32100',
+      );
+      const firstPlayer =
+        hostParticipation === 'player'
+          ? host
+          : runtime.join(host.roomId, { nickname: 'Alice' }, host.joinUrl);
+      const secondPlayer = runtime.join(
+        host.roomId,
+        { nickname: 'Bob' },
+        host.joinUrl,
+      );
+
+      expect(
+        command(
+          runtime,
+          host.roomId,
+          firstPlayer.playerId,
+          'room.set-lobby-ready',
+          {
+            ready: true,
+          },
+        ).status,
+      ).toBe('accepted');
+      expect(
+        command(
+          runtime,
+          host.roomId,
+          secondPlayer.playerId,
+          'room.set-lobby-ready',
+          { ready: true },
+        ).status,
+      ).toBe('accepted');
+      expect(
+        command(runtime, host.roomId, host.playerId, 'room.start-first-hand', {
+          ...(hostParticipation === 'service-only'
+            ? { actorType: 'host' }
+            : {}),
+          handId: `hand-${hostParticipation}`,
+        }).status,
+      ).toBe('accepted');
+
+      const actorId = runtime.hostSnapshot(
+        host.roomId,
+        host.hostId ?? host.playerId,
+      )?.game?.currentActorId;
+      expect(actorId).toBeTruthy();
+      expect(command(runtime, host.roomId, actorId!, 'game.fold').status).toBe(
+        'accepted',
+      );
+      expect(runtime.rooms.get(host.roomId)?.phase).toBe('hand-ready');
+
+      expect(
+        command(
+          runtime,
+          host.roomId,
+          host.playerId,
+          'room.start-chip-reset-vote',
+          {
+            ...(hostParticipation === 'service-only'
+              ? { actorType: 'host' }
+              : {}),
+          },
+        ).status,
+      ).toBe('accepted');
+      expect(
+        runtime.hostSnapshot(host.roomId, host.hostId ?? host.playerId)
+          ?.handReady?.chipResetVote?.players,
+      ).toEqual([
+        { playerId: firstPlayer.playerId, vote: 'pending' },
+        { playerId: secondPlayer.playerId, vote: 'pending' },
+      ]);
+      runtime.dispose();
+    },
+  );
 });

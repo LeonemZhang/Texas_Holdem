@@ -10,17 +10,31 @@ export interface HandReadyRequestView {
   readonly amount: number;
 }
 
+export interface ChipResetVoteView {
+  readonly status?: 'failed';
+  readonly initialChips: number;
+  readonly insufficientPlayerNames: readonly string[];
+  readonly ownVote: 'pending' | 'approve' | 'reject';
+  readonly players: readonly {
+    readonly playerId: string;
+    readonly nickname: string;
+    readonly vote: 'pending' | 'approve' | 'reject';
+  }[];
+}
+
 export interface HandReadyOverlayProps {
   readonly spectator?: boolean;
   readonly ownPlayerId?: string;
   readonly deadlineMs: number;
   readonly ownChoice: 'pending' | 'ready' | 'sitting-out';
   readonly pendingRequests: readonly HandReadyRequestView[];
+  readonly chipResetVote?: ChipResetVoteView | null;
   readonly complete: boolean;
   readonly ownChips: number;
   readonly bigBlind?: number;
   readonly nowMs?: number;
   readonly onChoose: (choice: 'ready' | 'sitting-out') => void;
+  readonly onChipResetVote?: (vote: 'approve' | 'reject') => void;
   readonly onShowHoleCards?: () => void;
   readonly requestToReview?: HandReadyRequestView | null;
   readonly onApproveRequest?: (requestId: string) => void;
@@ -162,6 +176,8 @@ export function HandReadyOverlay({
   bigBlind = 1,
   nowMs,
   onChoose,
+  chipResetVote = null,
+  onChipResetVote,
   onShowHoleCards,
   requestToReview = null,
   onApproveRequest,
@@ -172,8 +188,53 @@ export function HandReadyOverlay({
 }: HandReadyOverlayProps) {
   const currentTime = useCurrentTime(nowMs);
   const [settlementCollapsed, setSettlementCollapsed] = useState(false);
+  const [chipResetVoteCollapsed, setChipResetVoteCollapsed] = useState(false);
   const isSettlementCollapsed =
     controlledSettlementCollapsed === true || settlementCollapsed;
+  const chipResetVoteStatus = chipResetVote
+    ? chipResetVote.status === 'failed'
+      ? 'failed'
+      : 'active'
+    : null;
+  const chipResetVoteActive = chipResetVoteStatus === 'active';
+  const chipResetVotePlayers = chipResetVote
+    ? [
+        ...chipResetVote.players.filter(
+          (player) => player.playerId === ownPlayerId,
+        ),
+        ...chipResetVote.players.filter(
+          (player) => player.playerId !== ownPlayerId,
+        ),
+      ]
+    : [];
+  const currentOwnChipResetVote = chipResetVote?.ownVote ?? null;
+  const previousOwnChipResetVote = useRef<ChipResetVoteView['ownVote'] | null>(
+    null,
+  );
+  const previousChipResetVoteStatus = useRef<typeof chipResetVoteStatus>(null);
+  useEffect(() => {
+    const previous = previousOwnChipResetVote.current;
+    const previousStatus = previousChipResetVoteStatus.current;
+    previousOwnChipResetVote.current = currentOwnChipResetVote;
+    previousChipResetVoteStatus.current = chipResetVoteStatus;
+    if (chipResetVoteStatus === null) {
+      setChipResetVoteCollapsed(false);
+    } else if (
+      chipResetVoteStatus === 'active' &&
+      previousStatus !== 'active'
+    ) {
+      setChipResetVoteCollapsed(false);
+    } else if (
+      chipResetVoteStatus === 'active' &&
+      currentOwnChipResetVote === 'approve' &&
+      (previous === null || previous === 'pending')
+    ) {
+      setChipResetVoteCollapsed(true);
+    }
+  }, [chipResetVoteStatus, currentOwnChipResetVote]);
+  const handleChipResetVote = (vote: 'approve' | 'reject') => {
+    onChipResetVote?.(vote);
+  };
   const actionsHeaderRef = useRef<HTMLElement | null>(null);
   const settlementCommunityCards = settlement?.communityCards ?? [];
   const ownSettlementNetChange =
@@ -331,7 +392,11 @@ export function HandReadyOverlay({
               <button
                 className="button button--primary hand-ready-card__choice-button"
                 type="button"
-                disabled={ownChoice === 'ready' || ownChips < bigBlind}
+                disabled={
+                  chipResetVoteActive ||
+                  ownChoice === 'ready' ||
+                  ownChips < bigBlind
+                }
                 onClick={() => onChoose('ready')}
               >
                 {ownChoice === 'ready' ? '已就绪' : '就绪'}
@@ -348,7 +413,7 @@ export function HandReadyOverlay({
               <button
                 className="button button--secondary"
                 type="button"
-                disabled={ownChoice === 'sitting-out'}
+                disabled={chipResetVoteActive || ownChoice === 'sitting-out'}
                 onClick={() => onChoose('sitting-out')}
               >
                 暂不参与
@@ -384,6 +449,108 @@ export function HandReadyOverlay({
                 拒绝
               </button>
             </div>
+          </section>
+        ) : null}
+
+        {!spectator && chipResetVote ? (
+          <section
+            className="hand-ready-card__request-prompt hand-ready-card__request-prompt--chip-reset"
+            role="alertdialog"
+            aria-label="筹码重置投票"
+          >
+            <header className="hand-ready-card__vote-header">
+              <strong>
+                筹码重置投票
+                {chipResetVoteStatus === 'failed' ? (
+                  <span className="hand-ready-card__vote-result">失败</span>
+                ) : null}
+              </strong>
+              <button
+                className="button button--secondary hand-ready-card__vote-toggle"
+                type="button"
+                aria-expanded={!chipResetVoteCollapsed}
+                aria-label={`${chipResetVoteCollapsed ? '展开' : '收起'}筹码重置投票`}
+                onClick={() =>
+                  setChipResetVoteCollapsed((collapsed) => !collapsed)
+                }
+              >
+                {chipResetVoteCollapsed ? '展开' : '收起'}
+              </button>
+            </header>
+            {!chipResetVoteCollapsed ? (
+              <>
+                <p>
+                  {chipResetVoteStatus === 'failed' ? (
+                    '本次投票失败，筹码未被重置。'
+                  ) : (
+                    <>
+                      {chipResetVote.insufficientPlayerNames.length > 0
+                        ? `${chipResetVote.insufficientPlayerNames.join('、')} 的剩余筹码不足以参加下一局。`
+                        : '房主发起了筹码重置投票。'}{' '}
+                      全员同意后，所有玩家筹码恢复为初始值（
+                      {chipResetVote.initialChips.toLocaleString('zh-CN')}
+                      ），本次重置不计入净输赢。
+                    </>
+                  )}
+                </p>
+                <table className="hand-ready-card__vote-table">
+                  <tbody>
+                    {chipResetVotePlayers.map((player) => {
+                      const voteStatusClassName =
+                        player.vote === 'approve'
+                          ? 'hand-ready-card__vote-status hand-ready-card__vote-status--approved'
+                          : player.vote === 'reject'
+                            ? 'hand-ready-card__vote-status hand-ready-card__vote-status--rejected'
+                            : 'hand-ready-card__vote-status';
+                      const voteStatusLabel =
+                        player.vote === 'approve'
+                          ? '已同意'
+                          : player.vote === 'reject'
+                            ? '已拒绝'
+                            : '待投票';
+                      return (
+                        <tr key={player.playerId}>
+                          <th scope="row">
+                            {player.playerId === ownPlayerId
+                              ? '我'
+                              : player.nickname}
+                          </th>
+                          <td>
+                            <span className={voteStatusClassName}>
+                              {voteStatusLabel}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div>
+                  <button
+                    className="button button--primary"
+                    type="button"
+                    disabled={
+                      !chipResetVoteActive ||
+                      chipResetVote.ownVote !== 'pending'
+                    }
+                    onClick={() => handleChipResetVote('approve')}
+                  >
+                    {chipResetVote.ownVote === 'approve' ? '已同意' : '同意'}
+                  </button>
+                  <button
+                    className="button button--secondary"
+                    type="button"
+                    disabled={
+                      !chipResetVoteActive ||
+                      chipResetVote.ownVote !== 'pending'
+                    }
+                    onClick={() => handleChipResetVote('reject')}
+                  >
+                    拒绝
+                  </button>
+                </div>
+              </>
+            ) : null}
           </section>
         ) : null}
 

@@ -227,6 +227,10 @@ export function HostSpectatorRoom({
               phase={snapshot.room.phase}
               {...(joinUrl ? { joinUrl } : {})}
               settings={snapshot.room.settings}
+              chipResetVoteActive={Boolean(
+                snapshot.handReady?.chipResetVote &&
+                snapshot.handReady.chipResetVote.status !== 'failed',
+              )}
               currentSmallBlind={snapshot.room.currentSmallBlind}
               players={visiblePlayers}
               onCommand={onCommand}

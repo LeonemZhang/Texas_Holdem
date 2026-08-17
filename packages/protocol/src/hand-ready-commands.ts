@@ -14,6 +14,12 @@ export const SetHandReadyChoiceCommandSchema = z.object({
   choice: z.enum(['ready', 'sitting-out']),
 });
 
+export const SetChipResetVoteCommandSchema = z.object({
+  ...identity,
+  type: z.literal('hand-ready.set-chip-reset-vote'),
+  vote: z.enum(['approve', 'reject']),
+});
+
 export const CreateChipRequestCommandSchema = z
   .object({
     ...identity,
@@ -46,6 +52,7 @@ export const GiveChipsCommandSchema = z.object({
 
 export const HandReadyCommandSchema = z.union([
   SetHandReadyChoiceCommandSchema,
+  SetChipResetVoteCommandSchema,
   CreateChipRequestCommandSchema,
   RevokeChipRequestCommandSchema,
   RejectChipRequestCommandSchema,
@@ -55,6 +62,9 @@ export const HandReadyCommandSchema = z.union([
 
 export type SetHandReadyChoiceCommand = z.infer<
   typeof SetHandReadyChoiceCommandSchema
+>;
+export type SetChipResetVoteCommand = z.infer<
+  typeof SetChipResetVoteCommandSchema
 >;
 export type CreateChipRequestCommand = z.infer<
   typeof CreateChipRequestCommandSchema

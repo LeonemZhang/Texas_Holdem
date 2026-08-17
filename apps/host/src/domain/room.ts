@@ -181,6 +181,31 @@ export function isVisibleRoomPlayer(
   return !['left', 'removed'].includes(player.status);
 }
 
+export function isVisibleStatisticsPlayer(
+  player: Pick<RoomPlayer, 'status'>,
+): boolean {
+  return player.status !== 'removed';
+}
+
+export function resetPlayersToInitialChips(
+  room: RoomState,
+  playerIds: readonly string[],
+): RoomState {
+  if (playerIds.length === 0) {
+    throw new RangeError('At least one player is required for a chip reset');
+  }
+  const resetIds = new Set(playerIds);
+  return freezeRoom({
+    ...room,
+    players: room.players.map((player) =>
+      resetIds.has(player.playerId)
+        ? { ...player, chips: room.settings.initialChips }
+        : player,
+    ),
+    version: room.version + 1,
+  });
+}
+
 export function createRoom(input: {
   readonly roomId: string;
   /** New callers provide this independently from the optional player id. */

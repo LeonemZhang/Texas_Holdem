@@ -21,9 +21,14 @@ import type {
 import {
   canBeginNextHand,
   addPlayerToHandReady,
+  chipResetVoteApproved,
+  failChipResetVote,
   normalizeHandReadyAtDeadline,
   removePlayerFromHandReady,
+  resetHandReadyAfterChipReset,
   restorePlayerToHandReady,
+  startChipResetVote,
+  setChipResetVote,
   setHandReadyChoice,
 } from '../domain/hand-ready-actions.js';
 import { joinRoom } from '../domain/join-room.js';
@@ -35,6 +40,7 @@ import {
   advanceRoomBlindGrowth,
   createRoom,
   freezeRoom,
+  resetPlayersToInitialChips,
   type RoomState,
 } from '../domain/room.js';
 import {
@@ -90,6 +96,7 @@ export class RoomCommandHandler {
       room,
     ) => room.currentBigBlind,
     private readonly completedHands: CompletedHandsResolver = () => 0,
+    private readonly nowMs: () => number = Date.now,
   ) {}
 
   getCurrentHand(roomId: string): StartedHandState | null {
@@ -240,6 +247,34 @@ export class RoomCommandHandler {
   private accepted(room: RoomState): CommandHandlerResult {
     this.rooms.save(room);
     return { stateVersion: room.version, sequence: 0 };
+  }
+
+  private applyPlayerRemovalToHandReady(
+    room: RoomState,
+    nextRoom: RoomState,
+    playerId: string,
+  ): RoomState {
+    if (room.phase !== 'hand-ready') return nextRoom;
+    const context = this.requireHandReady(room.roomId);
+    const nextReady = removePlayerFromHandReady(context.ready, playerId);
+    if (chipResetVoteApproved(nextReady)) {
+      const voterIds = nextReady.chipResetVote?.players.map(
+        ({ playerId: voterId }) => voterId,
+      );
+      if (!voterIds || voterIds.length === 0) {
+        throw new RangeError('Chip reset vote has no voters');
+      }
+      const resetReady = resetHandReadyAfterChipReset(nextReady, this.nowMs());
+      this.#handReady.set(room.roomId, resetReady);
+      this.#chipRequests.set(room.roomId, createChipRequestBook(resetReady));
+      return resetPlayersToInitialChips(nextRoom, voterIds);
+    }
+    this.#handReady.set(room.roomId, nextReady);
+    this.#chipRequests.set(
+      room.roomId,
+      revokeChipRequestsForPlayer(context.requests, playerId),
+    );
+    return nextRoom;
   }
 
   private hasHandReadyContext(roomId: string, room: RoomState): boolean {
@@ -412,32 +447,40 @@ export class RoomCommandHandler {
         this.#paused.delete(room.roomId);
         return this.accepted(resumed);
       }
-      case 'room.exit':
-        return this.accepted(leaveRoom(room, command.playerId));
+      case 'room.exit': {
+        const nextRoom = leaveRoom(room, command.playerId);
+        return this.accepted(
+          this.applyPlayerRemovalToHandReady(room, nextRoom, command.playerId),
+        );
+      }
       case 'room.remove-player': {
         const nextRoom = removePlayer(
           room,
           command.playerId,
           command.targetPlayerId,
         );
-        if (room.phase === 'hand-ready') {
-          const context = this.requireHandReady(room.roomId);
-          this.#handReady.set(
-            room.roomId,
-            removePlayerFromHandReady(context.ready, command.targetPlayerId),
-          );
-          this.#chipRequests.set(
-            room.roomId,
-            revokeChipRequestsForPlayer(
-              context.requests,
-              command.targetPlayerId,
-            ),
-          );
-        }
-        return this.accepted(nextRoom);
+        return this.accepted(
+          this.applyPlayerRemovalToHandReady(
+            room,
+            nextRoom,
+            command.targetPlayerId,
+          ),
+        );
       }
       case 'room.close':
         return this.accepted(closeRoom(room, command.playerId).room);
+      case 'room.start-chip-reset-vote': {
+        const context = this.requireHandReady(room.roomId);
+        this.#handReady.set(
+          room.roomId,
+          startChipResetVote(
+            room,
+            context.ready,
+            this.currentBigBlind(room.roomId, room),
+          ),
+        );
+        return this.accepted(incrementVersion(room));
+      }
       case 'game.show-hole-cards': {
         const hand = this.#hands.get(room.roomId);
         if (room.phase !== 'hand-ready' || !hand || !('settlement' in hand)) {
@@ -484,6 +527,37 @@ export class RoomCommandHandler {
             command.choice,
             this.currentBigBlind(room.roomId, room),
           ),
+        );
+        return this.accepted(incrementVersion(room));
+      }
+      case 'hand-ready.set-chip-reset-vote': {
+        const context = this.requireHandReady(room.roomId);
+        const voted = setChipResetVote(
+          room,
+          context.ready,
+          command.playerId,
+          command.vote,
+        );
+        if (chipResetVoteApproved(voted)) {
+          const voterIds = voted.chipResetVote?.players.map(
+            ({ playerId }) => playerId,
+          );
+          if (!voterIds || voterIds.length === 0) {
+            throw new RangeError('Chip reset vote has no voters');
+          }
+          const resetReady = resetHandReadyAfterChipReset(voted, this.nowMs());
+          this.#handReady.set(room.roomId, resetReady);
+          this.#chipRequests.set(
+            room.roomId,
+            createChipRequestBook(resetReady),
+          );
+          return this.accepted(resetPlayersToInitialChips(room, voterIds));
+        }
+        this.#handReady.set(
+          room.roomId,
+          command.vote === 'reject'
+            ? failChipResetVote(voted, this.nowMs())
+            : voted,
         );
         return this.accepted(incrementVersion(room));
       }

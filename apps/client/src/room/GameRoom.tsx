@@ -829,9 +829,37 @@ export function GameRoom({
                 targetPlayerId: request.targetPlayerId,
                 amount: request.amount,
               }))}
+              chipResetVote={
+                snapshot.handReady.chipResetVote
+                  ? {
+                      ...(snapshot.handReady.chipResetVote.status === 'failed'
+                        ? { status: 'failed' as const }
+                        : {}),
+                      initialChips:
+                        snapshot.handReady.chipResetVote.initialChips,
+                      insufficientPlayerNames:
+                        snapshot.handReady.chipResetVote.insufficientPlayerIds
+                          .filter((playerId) => visiblePlayerIds.has(playerId))
+                          .map((playerId) => names.get(playerId) ?? playerId),
+                      ownVote: snapshot.handReady.chipResetVote.ownVote,
+                      players: snapshot.handReady.chipResetVote.players
+                        .filter(({ playerId }) =>
+                          visiblePlayerIds.has(playerId),
+                        )
+                        .map((player) => ({
+                          ...player,
+                          nickname:
+                            names.get(player.playerId) ?? player.playerId,
+                        })),
+                    }
+                  : null
+              }
               complete={false}
               onChoose={(choice) =>
                 void send({ type: 'hand-ready.set-choice', choice })
+              }
+              onChipResetVote={(vote) =>
+                void send({ type: 'hand-ready.set-chip-reset-vote', vote })
               }
               {...(canShowOwnHoleCards
                 ? {
@@ -888,6 +916,10 @@ export function GameRoom({
               {...(snapshot.room.settings
                 ? { settings: snapshot.room.settings }
                 : {})}
+              chipResetVoteActive={Boolean(
+                snapshot.handReady?.chipResetVote &&
+                snapshot.handReady.chipResetVote.status !== 'failed',
+              )}
               currentSmallBlind={snapshot.room.smallBlind}
               players={visiblePlayers}
               onCommand={sendHostControl}

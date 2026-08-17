@@ -91,6 +91,20 @@ export const HostManagementSnapshotSchema = z.object({
           choice: z.enum(['pending', 'ready', 'sitting-out']),
         }),
       ),
+      chipResetVote: z
+        .object({
+          status: z.literal('failed').optional(),
+          initialChips: AmountSchema,
+          insufficientPlayerIds: z.array(IdSchema),
+          players: z.array(
+            z.object({
+              playerId: IdSchema,
+              vote: z.enum(['pending', 'approve', 'reject']),
+            }),
+          ),
+        })
+        .nullable()
+        .optional(),
     })
     .nullable(),
 });

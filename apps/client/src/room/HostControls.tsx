@@ -16,6 +16,7 @@ export type HostControlIntent =
       readonly currentSmallBlind?: number;
     }
   | { readonly type: 'room.remove-player'; readonly targetPlayerId: string }
+  | { readonly type: 'room.start-chip-reset-vote' }
   | { readonly type: 'room.close' };
 
 export interface HostControlPlayer {
@@ -29,6 +30,7 @@ export interface HostControlsProps {
   readonly phase: 'lobby' | 'playing' | 'hand-ready' | 'paused' | 'closed';
   readonly joinUrl?: string;
   readonly settings?: RoomSettingsMessage;
+  readonly chipResetVoteActive?: boolean;
   readonly currentSmallBlind?: number;
   readonly players: readonly HostControlPlayer[];
   readonly presentation?: 'inline' | 'drawer';
@@ -43,6 +45,7 @@ export function HostControls({
   phase,
   joinUrl,
   settings,
+  chipResetVoteActive = false,
   currentSmallBlind,
   players,
   presentation = 'inline',
@@ -69,6 +72,10 @@ export function HostControls({
         )?.nickname
       : null;
   const canRemovePlayer = phase === 'lobby' || phase === 'hand-ready';
+  const canStartChipResetVote =
+    phase === 'hand-ready' &&
+    !chipResetVoteActive &&
+    settings?.zeroChipPolicy !== 'eliminate';
   const drawer = presentation === 'drawer';
   const open = controlledOpen ?? internalOpen;
   const showCurrentSmallBlind =
@@ -107,49 +114,6 @@ export function HostControls({
               className="host-controls__invite"
             />
           ) : null}
-          {settings ? (
-            <section className="host-controls__settings" aria-label="房间配置">
-              <button
-                className="button button--secondary"
-                type="button"
-                aria-expanded={settingsOpen}
-                onClick={() => setSettingsOpen((open) => !open)}
-              >
-                {settingsOpen ? '收起房间配置' : '修改房间配置'}
-              </button>
-              {settingsOpen ? (
-                <ModalDialog
-                  title="修改房间配置"
-                  className="modal-dialog--room-settings"
-                  confirmAction={{
-                    label: '保存房间配置',
-                    type: 'submit',
-                    form: settingsFormId,
-                  }}
-                  onCancel={() => setSettingsOpen(false)}
-                >
-                  <RoomSettingsEditor
-                    key={`${settings.roomName}-${settings.actionTimeoutSeconds}-${settings.handReadyTimeoutSeconds}-${settings.blindGrowth.enabled}-${settings.blindGrowth.intervalHands}-${settings.blindGrowth.mode ?? 'multiplier'}-${settings.blindGrowth.multiplier ?? ''}-${settings.blindGrowth.increment ?? ''}-${settings.blindGrowth.maxSmallBlind ?? ''}-${settings.zeroChipPolicy}-${showCurrentSmallBlind ? (currentSmallBlind ?? '') : 'hidden'}`}
-                    settings={settings}
-                    {...(!showCurrentSmallBlind ? {} : { currentSmallBlind })}
-                    lockedFields={['maxPlayers', 'initialChips', 'smallBlind']}
-                    formId={settingsFormId}
-                    showSubmitButton={false}
-                    onSubmit={(nextSettings, nextCurrentSmallBlind) => {
-                      onCommand({
-                        type: 'room.update-settings',
-                        settings: nextSettings,
-                        ...(nextCurrentSmallBlind === undefined
-                          ? {}
-                          : { currentSmallBlind: nextCurrentSmallBlind }),
-                      });
-                      setSettingsOpen(false);
-                    }}
-                  />
-                </ModalDialog>
-              ) : null}
-            </section>
-          ) : null}
           <div
             className="host-controls__game-actions"
             role="group"
@@ -158,7 +122,7 @@ export function HostControls({
             <h3>游戏控制</h3>
             {phase === 'paused' ? (
               <button
-                className="button button--secondary"
+                className="button button--secondary host-controls__button host-controls__button--resume"
                 type="button"
                 onClick={() => onCommand({ type: 'room.resume' })}
               >
@@ -166,7 +130,7 @@ export function HostControls({
               </button>
             ) : (
               <button
-                className="button button--secondary"
+                className="button button--secondary host-controls__button host-controls__button--pause"
                 type="button"
                 disabled={phase !== 'playing' && phase !== 'hand-ready'}
                 onClick={() => onCommand({ type: 'room.pause' })}
@@ -175,11 +139,69 @@ export function HostControls({
               </button>
             )}
             <button
-              className="button button--danger"
+              className="button button--danger host-controls__button host-controls__button--end"
               type="button"
               onClick={() => setDangerousIntent({ type: 'room.close' })}
             >
               结束游戏
+            </button>
+            {settings ? (
+              <section
+                className="host-controls__settings"
+                aria-label="房间配置"
+              >
+                <button
+                  className="button button--secondary host-controls__button host-controls__button--settings"
+                  type="button"
+                  aria-expanded={settingsOpen}
+                  onClick={() => setSettingsOpen((open) => !open)}
+                >
+                  {settingsOpen ? '收起房间配置' : '修改房间配置'}
+                </button>
+                {settingsOpen ? (
+                  <ModalDialog
+                    title="修改房间配置"
+                    className="modal-dialog--room-settings"
+                    confirmAction={{
+                      label: '保存房间配置',
+                      type: 'submit',
+                      form: settingsFormId,
+                    }}
+                    onCancel={() => setSettingsOpen(false)}
+                  >
+                    <RoomSettingsEditor
+                      key={`${settings.roomName}-${settings.actionTimeoutSeconds}-${settings.handReadyTimeoutSeconds}-${settings.blindGrowth.enabled}-${settings.blindGrowth.intervalHands}-${settings.blindGrowth.mode ?? 'multiplier'}-${settings.blindGrowth.multiplier ?? ''}-${settings.blindGrowth.increment ?? ''}-${settings.blindGrowth.maxSmallBlind ?? ''}-${settings.zeroChipPolicy}-${showCurrentSmallBlind ? (currentSmallBlind ?? '') : 'hidden'}`}
+                      settings={settings}
+                      {...(!showCurrentSmallBlind ? {} : { currentSmallBlind })}
+                      lockedFields={[
+                        'maxPlayers',
+                        'initialChips',
+                        'smallBlind',
+                      ]}
+                      formId={settingsFormId}
+                      showSubmitButton={false}
+                      onSubmit={(nextSettings, nextCurrentSmallBlind) => {
+                        onCommand({
+                          type: 'room.update-settings',
+                          settings: nextSettings,
+                          ...(nextCurrentSmallBlind === undefined
+                            ? {}
+                            : { currentSmallBlind: nextCurrentSmallBlind }),
+                        });
+                        setSettingsOpen(false);
+                      }}
+                    />
+                  </ModalDialog>
+                ) : null}
+              </section>
+            ) : null}
+            <button
+              className="button button--secondary host-controls__button host-controls__button--vote"
+              type="button"
+              disabled={!canStartChipResetVote}
+              onClick={() => onCommand({ type: 'room.start-chip-reset-vote' })}
+            >
+              发起筹码重置投票
             </button>
           </div>
 
@@ -204,7 +226,7 @@ export function HostControls({
                     </span>
                     {!isHostPlayer ? (
                       <button
-                        className="button button--danger"
+                        className="button button--danger host-controls__button host-controls__button--kick"
                         type="button"
                         aria-label={`踢出 ${player.nickname}`}
                         disabled={!canRemovePlayer}

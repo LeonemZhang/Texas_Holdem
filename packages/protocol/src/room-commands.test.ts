@@ -40,6 +40,7 @@ describe('RoomCommandSchema', () => {
       seatIndex: 9,
     },
     { ...identity, type: 'room.shuffle-seats' },
+    { ...identity, type: 'room.start-chip-reset-vote' },
     { ...identity, type: 'room.exit' },
     { ...identity, type: 'room.close' },
   ])('parses $type with command and optimistic identity', (command) => {

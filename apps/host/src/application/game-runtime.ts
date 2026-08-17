@@ -146,6 +146,7 @@ export class GameRuntime implements RoomSessionBootstrapService {
         'room.resume',
         'room.remove-player',
         'room.close',
+        'room.start-chip-reset-vote',
       ];
       if (command.actorType === 'host') {
         return Boolean(

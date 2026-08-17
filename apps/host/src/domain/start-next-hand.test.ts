@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createChipRequest, createChipRequestBook } from './chip-requests.js';
 import {
+  clearChipResetVote,
   normalizeHandReadyAtDeadline,
   removePlayerFromHandReady,
   setHandReadyChoice,
@@ -50,6 +51,7 @@ describe('startNextRoomHand', () => {
     const { room, handReady } = phase();
     let ready = setHandReadyChoice(room, handReady, 'host', 'ready');
     ready = setHandReadyChoice(room, ready, 'carol', 'ready');
+    ready = clearChipResetVote(ready);
     ready = normalizeHandReadyAtDeadline(room, ready, 30_000);
     const result = startNextRoomHand(
       room,
@@ -112,6 +114,7 @@ describe('startNextRoomHand', () => {
     let ready = removePlayerFromHandReady(handReady, 'bob');
     ready = setHandReadyChoice(removedRoom, ready, 'host', 'ready');
     ready = setHandReadyChoice(removedRoom, ready, 'carol', 'ready');
+    ready = normalizeHandReadyAtDeadline(removedRoom, ready, 30_000);
 
     const result = startNextRoomHand(
       removedRoom,

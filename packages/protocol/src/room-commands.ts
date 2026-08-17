@@ -118,6 +118,9 @@ export const ReseatPlayerCommandSchema = z.object({
   seatIndex: z.number().int().min(0).max(9),
 });
 export const ShuffleSeatsCommandSchema = simpleCommand('room.shuffle-seats');
+export const StartChipResetVoteCommandSchema = simpleCommand(
+  'room.start-chip-reset-vote',
+);
 
 export const RoomCommandSchema = z.discriminatedUnion('type', [
   CreateRoomCommandSchema,
@@ -130,6 +133,7 @@ export const RoomCommandSchema = z.discriminatedUnion('type', [
   RemovePlayerCommandSchema,
   ReseatPlayerCommandSchema,
   ShuffleSeatsCommandSchema,
+  StartChipResetVoteCommandSchema,
   ExitRoomCommandSchema,
   CloseRoomCommandSchema,
 ]);
@@ -144,4 +148,7 @@ export type UpdateRoomSettingsCommand = z.infer<
 export type StartFirstHandCommand = z.infer<typeof StartFirstHandCommandSchema>;
 export type ReseatPlayerCommand = z.infer<typeof ReseatPlayerCommandSchema>;
 export type ShuffleSeatsCommand = z.infer<typeof ShuffleSeatsCommandSchema>;
+export type StartChipResetVoteCommand = z.infer<
+  typeof StartChipResetVoteCommandSchema
+>;
 export type RoomCommand = z.infer<typeof RoomCommandSchema>;

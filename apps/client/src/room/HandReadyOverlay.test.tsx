@@ -184,6 +184,222 @@ describe('HandReadyOverlay', () => {
     expect(onRejectRequest).toHaveBeenCalledWith('request-1');
   });
 
+  it('reuses the chip-request prompt style for an all-player reset vote', () => {
+    const onChipResetVote = vi.fn();
+    render(
+      <HandReadyOverlay
+        ownPlayerId="alice"
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        chipResetVote={{
+          initialChips: 100,
+          insufficientPlayerNames: ['Bob'],
+          ownVote: 'pending',
+          players: [
+            { playerId: 'alice', nickname: 'Alice', vote: 'pending' },
+            { playerId: 'bob', nickname: 'Bob', vote: 'pending' },
+          ],
+        }}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+        onChipResetVote={onChipResetVote}
+      />,
+    );
+
+    const prompt = screen.getByRole('alertdialog', { name: '筹码重置投票' });
+    expect(prompt).toHaveClass('hand-ready-card__request-prompt');
+    expect(prompt).toHaveClass('hand-ready-card__request-prompt--chip-reset');
+    expect(prompt).toHaveTextContent('Bob 的剩余筹码不足以参加下一局');
+    fireEvent.click(within(prompt).getByRole('button', { name: '同意' }));
+    fireEvent.click(within(prompt).getByRole('button', { name: '拒绝' }));
+    expect(onChipResetVote).toHaveBeenNthCalledWith(1, 'approve');
+    expect(onChipResetVote).toHaveBeenNthCalledWith(2, 'reject');
+    expect(screen.getByRole('button', { name: '就绪' })).toBeDisabled();
+  });
+
+  it('puts me first and aligns voted status in the reset vote table', () => {
+    render(
+      <HandReadyOverlay
+        ownPlayerId="alice"
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        chipResetVote={{
+          initialChips: 100,
+          insufficientPlayerNames: ['Bob'],
+          ownVote: 'pending',
+          players: [
+            { playerId: 'bob', nickname: 'Bob', vote: 'approve' },
+            { playerId: 'alice', nickname: 'Alice', vote: 'pending' },
+            { playerId: 'carol', nickname: 'Carol', vote: 'reject' },
+          ],
+        }}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+      />,
+    );
+
+    const prompt = screen.getByRole('alertdialog', { name: '筹码重置投票' });
+    expect(
+      within(prompt).getByRole('button', { name: '收起筹码重置投票' }),
+    ).toBeInTheDocument();
+    const rows = within(prompt).getAllByRole('row');
+    const ownRow = rows[0];
+    const bobRow = rows[1];
+    const carolRow = rows[2];
+    if (!ownRow || !bobRow || !carolRow) {
+      throw new Error('Expected three chip reset vote rows');
+    }
+    expect(ownRow).toHaveTextContent('我');
+    expect(ownRow).toHaveTextContent('待投票');
+    expect(bobRow).toHaveTextContent('Bob');
+    expect(bobRow).toHaveTextContent('已同意');
+    expect(within(bobRow).getByText('已同意')).toHaveClass(
+      'hand-ready-card__vote-status--approved',
+    );
+    expect(carolRow).toHaveTextContent('Carol');
+    expect(carolRow).toHaveTextContent('已拒绝');
+    expect(within(carolRow).getByText('已拒绝')).toHaveClass(
+      'hand-ready-card__vote-status--rejected',
+    );
+  });
+
+  it('hides the reset vote panel after the authoritative vote reaches a terminal result', () => {
+    const { rerender } = render(
+      <HandReadyOverlay
+        ownPlayerId="alice"
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        chipResetVote={{
+          initialChips: 100,
+          insufficientPlayerNames: ['Bob'],
+          ownVote: 'pending',
+          players: [
+            { playerId: 'alice', nickname: 'Alice', vote: 'pending' },
+            { playerId: 'bob', nickname: 'Bob', vote: 'pending' },
+          ],
+        }}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('alertdialog', { name: '筹码重置投票' }),
+    ).toBeInTheDocument();
+    rerender(
+      <HandReadyOverlay
+        ownPlayerId="alice"
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        chipResetVote={null}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.queryByRole('alertdialog', { name: '筹码重置投票' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '展开筹码重置投票' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the local collapse state when the authoritative vote fails', () => {
+    const { rerender } = render(
+      <HandReadyOverlay
+        ownPlayerId="alice"
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        chipResetVote={{
+          initialChips: 100,
+          insufficientPlayerNames: ['Bob'],
+          ownVote: 'pending',
+          players: [
+            { playerId: 'alice', nickname: 'Alice', vote: 'pending' },
+            { playerId: 'bob', nickname: 'Bob', vote: 'pending' },
+          ],
+        }}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+      />,
+    );
+
+    rerender(
+      <HandReadyOverlay
+        ownPlayerId="alice"
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        chipResetVote={{
+          initialChips: 100,
+          insufficientPlayerNames: ['Bob'],
+          ownVote: 'reject',
+          players: [
+            { playerId: 'alice', nickname: 'Alice', vote: 'reject' },
+            { playerId: 'bob', nickname: 'Bob', vote: 'pending' },
+          ],
+        }}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: '收起筹码重置投票' }),
+    ).toBeInTheDocument();
+    const prompt = screen.getByRole('alertdialog', { name: '筹码重置投票' });
+    fireEvent.click(
+      within(prompt).getByRole('button', { name: '收起筹码重置投票' }),
+    );
+    rerender(
+      <HandReadyOverlay
+        ownPlayerId="alice"
+        deadlineMs={30_000}
+        nowMs={5_000}
+        ownChoice="pending"
+        pendingRequests={[]}
+        chipResetVote={{
+          status: 'failed',
+          initialChips: 100,
+          insufficientPlayerNames: ['Bob'],
+          ownVote: 'reject',
+          players: [
+            { playerId: 'alice', nickname: 'Alice', vote: 'reject' },
+            { playerId: 'bob', nickname: 'Bob', vote: 'reject' },
+          ],
+        }}
+        complete={false}
+        ownChips={100}
+        onChoose={vi.fn()}
+      />,
+    );
+
+    const failedPrompt = screen.getByRole('alertdialog', {
+      name: '筹码重置投票',
+    });
+    expect(failedPrompt).toHaveTextContent('筹码重置投票失败');
+    expect(
+      within(failedPrompt).getByRole('button', { name: '展开筹码重置投票' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '就绪' })).toBeEnabled();
+  });
+
   it('shows the settlement summary until the next round starts', () => {
     const props = {
       ownPlayerId: 'alice',

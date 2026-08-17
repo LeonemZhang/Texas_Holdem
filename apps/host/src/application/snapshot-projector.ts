@@ -411,6 +411,21 @@ export function projectPlayerSnapshot(
             ready.players.find(
               ({ playerId }) => playerId === input.viewerPlayerId,
             )?.choice ?? 'sitting-out',
+          chipResetVote: ready.chipResetVote
+            ? {
+                ...(ready.chipResetVote.status === 'failed'
+                  ? { status: 'failed' as const }
+                  : {}),
+                initialChips: ready.chipResetVote.initialChips,
+                insufficientPlayerIds:
+                  ready.chipResetVote.insufficientPlayerIds,
+                ownVote:
+                  ready.chipResetVote.players.find(
+                    ({ playerId }) => playerId === input.viewerPlayerId,
+                  )?.vote ?? 'pending',
+                players: ready.chipResetVote.players,
+              }
+            : null,
           pendingRequests: (requests?.requests ?? [])
             .filter(({ status }) => status === 'pending')
             .map(
@@ -567,6 +582,19 @@ export function projectHostManagementSnapshot(
           players: input.handReady.players
             .filter(({ playerId }) => visiblePlayerIds.has(playerId))
             .map(({ playerId, choice }) => ({ playerId, choice })),
+          chipResetVote: input.handReady.chipResetVote
+            ? {
+                ...(input.handReady.chipResetVote.status === 'failed'
+                  ? { status: 'failed' as const }
+                  : {}),
+                initialChips: input.handReady.chipResetVote.initialChips,
+                insufficientPlayerIds:
+                  input.handReady.chipResetVote.insufficientPlayerIds,
+                players: input.handReady.chipResetVote.players.filter(
+                  ({ playerId }) => visiblePlayerIds.has(playerId),
+                ),
+              }
+            : null,
         }
       : null,
   });

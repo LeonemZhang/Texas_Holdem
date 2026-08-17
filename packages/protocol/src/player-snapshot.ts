@@ -89,6 +89,19 @@ export const ChipActivitySchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
+const ChipResetVoteChoiceSchema = z.enum(['pending', 'approve', 'reject']);
+const ChipResetVotePlayerSchema = z.object({
+  playerId: IdSchema,
+  vote: ChipResetVoteChoiceSchema,
+});
+const ChipResetVoteSchema = z.object({
+  status: z.literal('failed').optional(),
+  initialChips: AmountSchema,
+  insufficientPlayerIds: z.array(IdSchema),
+  ownVote: ChipResetVoteChoiceSchema,
+  players: z.array(ChipResetVotePlayerSchema),
+});
+
 export const PlayerSnapshotSchema = z.object({
   protocolVersion: ProtocolVersionSchema,
   roomId: IdSchema,
@@ -170,6 +183,7 @@ export const PlayerSnapshotSchema = z.object({
     .object({
       deadlineMs: z.number().int().nonnegative().safe(),
       ownChoice: z.enum(['pending', 'ready', 'sitting-out']),
+      chipResetVote: ChipResetVoteSchema.nullable().optional(),
       pendingRequests: z.array(
         z.object({
           requestId: IdSchema,
