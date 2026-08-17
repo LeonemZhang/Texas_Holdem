@@ -185,6 +185,40 @@ describe('SqliteRoomRecordCatalog', () => {
     }
   });
 
+  it('counts effective record players without counting removed players', async () => {
+    const { database, catalog } = await catalogContext();
+    try {
+      insertRoom(database, {
+        roomId: 'room-1',
+        roomName: 'Friends',
+        updatedAtMs: 2_000,
+      });
+      const insertPlayer = database.prepare(
+        `
+        INSERT INTO players (
+          room_id, player_id, nickname, seat_index, chips, status, is_host
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      );
+      insertPlayer.run('room-1', 'left-player', 'Left', 1, 2_000, 'left', 0);
+      insertPlayer.run(
+        'room-1',
+        'removed-player',
+        'Removed',
+        2,
+        2_000,
+        'removed',
+        0,
+      );
+
+      expect(catalog.list()).toEqual([
+        expect.objectContaining({ roomId: 'room-1', playerCount: 2 }),
+      ]);
+    } finally {
+      database.close();
+    }
+  });
+
   it('deletes an archived record with its persisted history', async () => {
     const { database, catalog } = await catalogContext();
     try {

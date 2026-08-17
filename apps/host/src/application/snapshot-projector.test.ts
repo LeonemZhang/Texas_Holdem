@@ -312,6 +312,115 @@ describe('projectPlayerSnapshot', () => {
     });
   });
 
+  it('keeps a left player in statistics while filtering room and settlement projections', () => {
+    const started = startedRoom();
+    const room = {
+      ...started.room,
+      players: started.room.players.map((player) =>
+        player.playerId === 'bob'
+          ? { ...player, status: 'left' as const }
+          : player,
+      ),
+    };
+    const settled = {
+      ...started.hand,
+      settlement: {
+        reason: 'showdown',
+        winnerIds: ['host'],
+        payouts: { host: 100, bob: 0 },
+        revealedHoleCards: Object.fromEntries(
+          started.hand.players.map((player) => [
+            player.playerId,
+            player.holeCards,
+          ]),
+        ),
+      },
+    } as unknown as ShowdownSettledHand;
+
+    const snapshot = projectPlayerSnapshot({
+      room,
+      viewerPlayerId: 'host',
+      sequence: 2,
+      completedHands: 1,
+      hand: settled,
+    });
+
+    expect(snapshot.statistics.players.map(({ playerId }) => playerId)).toEqual(
+      expect.arrayContaining(['host', 'bob']),
+    );
+    expect(
+      snapshot.room.players.find(({ playerId }) => playerId === 'bob'),
+    ).toMatchObject({ status: 'left', actionOrder: null });
+    expect(snapshot.game?.showdownHoleCards).not.toHaveProperty('bob');
+    expect(snapshot.game?.settlement?.payouts).not.toHaveProperty('bob');
+    expect(snapshot.game?.settlement?.netChanges).not.toHaveProperty('bob');
+  });
+
+  it('filters removed players from every statistics projection while keeping left players', () => {
+    const started = startedRoom();
+    const room = {
+      ...started.room,
+      players: [
+        ...started.room.players.map((player) =>
+          player.playerId === 'bob'
+            ? { ...player, status: 'removed' as const }
+            : player,
+        ),
+        {
+          ...started.room.players[0]!,
+          playerId: 'left-player',
+          nickname: 'Left player',
+          seatIndex: 2,
+          status: 'left' as const,
+        },
+      ],
+    };
+    const snapshot = projectPlayerSnapshot({
+      room,
+      viewerPlayerId: 'host',
+      sequence: 3,
+      titles: [
+        {
+          title: 'shared title',
+          playerIds: ['host', 'bob', 'left-player'],
+          value: 1,
+        },
+        { title: 'removed title', playerIds: ['bob'], value: 1 },
+      ],
+      handPeaks: {
+        global: {
+          playerIds: ['bob'],
+          handType: 'one-pair',
+          bestFiveCards: ['As', 'Ad', 'Ac', 'Ks', 'Qd'],
+        },
+        players: [
+          {
+            playerId: 'bob',
+            handType: 'one-pair',
+            bestFiveCards: ['As', 'Ad', 'Ac', 'Ks', 'Qd'],
+          },
+          {
+            playerId: 'left-player',
+            handType: 'one-pair',
+            bestFiveCards: ['As', 'Ad', 'Ac', 'Ks', 'Qd'],
+          },
+        ],
+        hasLegacyCoverageGap: false,
+      },
+    });
+
+    expect(snapshot.statistics.players.map(({ playerId }) => playerId)).toEqual(
+      ['host', 'left-player'],
+    );
+    expect(snapshot.statistics.titles).toEqual([
+      { title: 'shared title', playerIds: ['host', 'left-player'], value: 1 },
+    ]);
+    expect(snapshot.statistics.handPeaks?.global).toBeNull();
+    expect(snapshot.statistics.handPeaks?.players).toEqual([
+      expect.objectContaining({ playerId: 'left-player' }),
+    ]);
+  });
+
   it('excludes an unmatched all-in layer from the settled total pot', () => {
     const started = startedRoom();
     const settled = {

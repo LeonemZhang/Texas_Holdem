@@ -4,7 +4,7 @@ import {
   type RoomRecordStatistics,
 } from '@texas-holdem/protocol';
 
-import { isVisibleRoomPlayer, type RoomState } from '../domain/room.js';
+import { isVisibleStatisticsPlayer, type RoomState } from '../domain/room.js';
 import type { RebuiltStatistics } from './statistics-store.js';
 
 const handTypes = {
@@ -23,7 +23,7 @@ export function createStatisticsView(
   room: RoomState,
   rebuilt: RebuiltStatistics,
 ): RoomRecordStatistics {
-  const visiblePlayers = room.players.filter(isVisibleRoomPlayer);
+  const visiblePlayers = room.players.filter(isVisibleStatisticsPlayer);
   const visiblePlayerIds = new Set(
     visiblePlayers.map(({ playerId }) => playerId),
   );

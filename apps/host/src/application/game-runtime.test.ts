@@ -573,6 +573,14 @@ describe('GameRuntime', () => {
     });
 
     expect(exit.status).toBe('accepted');
+    expect(
+      runtime
+        .statisticsForRoom(host.roomId)
+        ?.players.find(({ playerId }) => playerId === guest.playerId),
+    ).toMatchObject({
+      nickname: 'Bob',
+      removed: false,
+    });
     const restored = runtime.resume(
       host.roomId,
       { playerId: guest.playerId, token: guest.token, nickname: 'Bobby' },
@@ -633,6 +641,13 @@ describe('GameRuntime', () => {
       seatIndex: 1,
       status: 'left',
     });
+    expect(
+      runtime
+        .snapshot(context.host.roomId, context.host.playerId)
+        ?.statistics.players.find(
+          ({ playerId }) => playerId === context.guest.playerId,
+        ),
+    ).toBeDefined();
     expect(() =>
       runtime.resume(
         context.host.roomId,

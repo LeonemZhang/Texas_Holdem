@@ -65,13 +65,19 @@ const handTypeLabels: Record<string, string> = {
   'straight-flush': '同花顺',
 };
 
-export function potContributionFlights(
 function isVisibleRoomPlayer(
   player: Pick<PlayerSnapshot['room']['players'][number], 'status'>,
 ): boolean {
   return !['left', 'removed'].includes(player.status);
 }
 
+function isVisibleStatisticsPlayer(
+  player: Pick<PlayerSnapshot['room']['players'][number], 'status'>,
+): boolean {
+  return player.status !== 'removed';
+}
+
+export function potContributionFlights(
   previous: PlayerSnapshot | null,
   next: PlayerSnapshot,
 ): readonly PotChipFlight[] {
@@ -457,6 +463,12 @@ export function GameRoom({
   const visiblePlayerIds = new Set(
     visiblePlayers.map(({ playerId }) => playerId),
   );
+  const visibleStatisticsPlayers = snapshot.room.players.filter(
+    isVisibleStatisticsPlayer,
+  );
+  const visibleStatisticsPlayerIds = new Set(
+    visibleStatisticsPlayers.map(({ playerId }) => playerId),
+  );
   const ownStreetCommitted = own?.streetCommitted ?? 0;
   const ownRemainingChips = own?.chips ?? 0;
   const names = new Map(
@@ -483,7 +495,7 @@ export function GameRoom({
     ) ?? [];
   const visibleTitles = snapshot.statistics.titles.flatMap((title) => {
     const playerIds = title.playerIds.filter((playerId) =>
-      visiblePlayerIds.has(playerId),
+      visibleStatisticsPlayerIds.has(playerId),
     );
     return playerIds.length > 0 ? [{ ...title, playerIds }] : [];
   });
@@ -491,7 +503,7 @@ export function GameRoom({
     ? (() => {
         const globalPlayerIds =
           snapshot.statistics.handPeaks.global?.playerIds.filter((playerId) =>
-            visiblePlayerIds.has(playerId),
+            visibleStatisticsPlayerIds.has(playerId),
           ) ?? [];
         return {
           ...snapshot.statistics.handPeaks,
@@ -503,7 +515,7 @@ export function GameRoom({
                 }
               : null,
           players: snapshot.statistics.handPeaks.players.filter(
-            ({ playerId }) => visiblePlayerIds.has(playerId),
+            ({ playerId }) => visibleStatisticsPlayerIds.has(playerId),
           ),
         };
       })()
@@ -525,7 +537,7 @@ export function GameRoom({
       }
     : null;
   const statistics = snapshot.statistics.players
-    .filter(({ playerId }) => visiblePlayerIds.has(playerId))
+    .filter(({ playerId }) => visibleStatisticsPlayerIds.has(playerId))
     .map((player) => ({
       ...player,
       nickname: names.get(player.playerId) ?? player.playerId,

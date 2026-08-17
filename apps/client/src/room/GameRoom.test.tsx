@@ -830,6 +830,35 @@ describe('GameRoom', () => {
               },
             ],
           },
+          statistics: {
+            players: [
+              {
+                playerId: 'bob',
+                currentChips: 100,
+                netWinLoss: 0,
+                participatedHands: 0,
+                wonHands: 0,
+                largestSingleHandProfit: 0,
+                largestSingleHandLoss: 0,
+                showdownCount: 0,
+                showdownWinRate: null,
+                actions: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },
+              },
+              {
+                playerId: 'left-player',
+                currentChips: 100,
+                netWinLoss: 20,
+                participatedHands: 1,
+                wonHands: 1,
+                largestSingleHandProfit: 20,
+                largestSingleHandLoss: 0,
+                showdownCount: 1,
+                showdownWinRate: 1,
+                actions: { fold: 0, check: 1, call: 0, raiseTo: 0, allIn: 0 },
+              },
+            ],
+            titles: [],
+          },
         }),
       ),
       disconnect: vi.fn(),
@@ -859,6 +888,9 @@ describe('GameRoom', () => {
     expect(await screen.findAllByText('Alice')).not.toHaveLength(0);
     expect(screen.queryByText('Bob')).not.toBeInTheDocument();
     expect(screen.queryByText('Left player')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看统计' }));
+    expect(screen.getByText('#1 Left player')).toBeInTheDocument();
+    expect(screen.queryByText('Bob')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '房主管理' }));
     expect(screen.queryByRole('button', { name: '踢出 Bob' })).toBeNull();
   });

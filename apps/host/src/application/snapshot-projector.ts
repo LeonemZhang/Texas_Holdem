@@ -22,6 +22,7 @@ import type { ChipRequestBook } from '../domain/chip-requests.js';
 import type { HandReadyState } from '../domain/hand-ready.js';
 import {
   isVisibleRoomPlayer,
+  isVisibleStatisticsPlayer,
   normalizeRoomBlindState,
   roomBlindLevel,
   type RoomPlayer,
@@ -132,13 +133,17 @@ function isSettledHand(
 
 function showdownHoleCards(
   hand: StartedHandState | null,
+  visiblePlayerIds: ReadonlySet<string>,
 ): Readonly<Record<string, readonly string[]>> {
   if (!hand || !isShowdownSettledHand(hand)) return Object.freeze({});
   return Object.freeze(
     Object.fromEntries(
-      Object.entries(hand.settlement.revealedHoleCards).map(
-        ([playerId, cards]) => [playerId, Object.freeze(cards.map(formatCard))],
-      ),
+      Object.entries(hand.settlement.revealedHoleCards)
+        .filter(([playerId]) => visiblePlayerIds.has(playerId))
+        .map(([playerId, cards]) => [
+          playerId,
+          Object.freeze(cards.map(formatCard)),
+        ]),
     ),
   );
 }
@@ -164,6 +169,7 @@ function currentViewerHandType(
 function settlementSummary(
   hand: StartedHandState | null,
   voluntarilyRevealedHoleCardPlayerIds: readonly string[],
+  visiblePlayerIds: ReadonlySet<string>,
 ): {
   readonly reason: 'uncontested' | 'showdown';
   readonly winnerIds: readonly string[];
@@ -185,22 +191,25 @@ function settlementSummary(
 } | null {
   if (!hand || !isSettledHand(hand)) return null;
   const netChanges = Object.fromEntries(
-    hand.players.map((player) => [
-      player.playerId,
-      (hand.settlement.payouts[player.playerId] ?? 0) - player.totalCommitted,
-    ]),
+    hand.players
+      .filter(({ playerId }) => visiblePlayerIds.has(playerId))
+      .map((player) => [
+        player.playerId,
+        (hand.settlement.payouts[player.playerId] ?? 0) - player.totalCommitted,
+      ]),
   );
   const showdownResults = isShowdownSettledHand(hand)
-    ? Object.entries(hand.settlement.bestHands ?? {}).map(
-        ([playerId, best]) => ({
+    ? Object.entries(hand.settlement.bestHands ?? {})
+        .filter(([playerId]) => visiblePlayerIds.has(playerId))
+        .map(([playerId, best]) => ({
           playerId,
           handType: handTypeByCategory[best.rank[0]],
           bestFiveCards: best.cards.map(formatCard),
-        }),
-      )
+        }))
     : [];
   const revealedHandResults = voluntarilyRevealedHoleCardPlayerIds.flatMap(
     (playerId) => {
+      if (!visiblePlayerIds.has(playerId)) return [];
       const player = hand.players.find(
         (candidate) => candidate.playerId === playerId,
       );
@@ -219,6 +228,7 @@ function settlementSummary(
   );
   const voluntaryRevealedHoleCards = Object.fromEntries(
     voluntarilyRevealedHoleCardPlayerIds.flatMap((playerId) => {
+      if (!visiblePlayerIds.has(playerId)) return [];
       const player = hand.players.find(
         (candidate) => candidate.playerId === playerId,
       );
@@ -227,10 +237,18 @@ function settlementSummary(
         : [];
     }),
   );
+  const winnerIds = hand.settlement.winnerIds.filter((playerId) =>
+    visiblePlayerIds.has(playerId),
+  );
+  if (winnerIds.length === 0) return null;
   return {
     reason: hand.settlement.reason,
-    winnerIds: hand.settlement.winnerIds,
-    payouts: hand.settlement.payouts,
+    winnerIds,
+    payouts: Object.fromEntries(
+      Object.entries(hand.settlement.payouts).filter(([playerId]) =>
+        visiblePlayerIds.has(playerId),
+      ),
+    ),
     netChanges,
     showdownResults,
     revealedHandResults,
@@ -240,6 +258,7 @@ function settlementSummary(
 
 function actionOrderByPlayerId(
   hand: StartedHandState | null,
+  visiblePlayerIds: ReadonlySet<string>,
 ): ReadonlyMap<string, number> {
   if (!hand) return new Map();
   const activePlayerIds = new Set(
@@ -258,7 +277,9 @@ function actionOrderByPlayerId(
       })),
       hand.positions,
       hand.street,
-    ).map(({ playerId }, index) => [playerId, index + 1]),
+    )
+      .filter(({ playerId }) => visiblePlayerIds.has(playerId))
+      .map(({ playerId }, index) => [playerId, index + 1]),
   );
 }
 
@@ -315,16 +336,26 @@ export function projectPlayerSnapshot(
         : completedHands + 1
       : undefined;
   const currentViewer = handPlayer(hand, input.viewerPlayerId);
-  const actionOrder = actionOrderByPlayerId(hand);
-  const visibleRoomPlayers = input.room.players.filter(isVisibleRoomPlayer);
+  const visibleRoomPlayerIds = new Set(
+    input.room.players
+      .filter(isVisibleRoomPlayer)
+      .map(({ playerId }) => playerId),
+  );
+  const actionOrder = actionOrderByPlayerId(hand, visibleRoomPlayerIds);
+  const visibleStatisticsPlayers = input.room.players.filter(
+    isVisibleStatisticsPlayer,
+  );
+  const visibleStatisticsPlayerIds = new Set(
+    visibleStatisticsPlayers.map(({ playerId }) => playerId),
+  );
   const blindLevel =
     hand && input.room.phase !== 'hand-ready'
       ? hand
       : roomBlindLevel(normalizeRoomBlindState(input.room, completedHands));
   const currentChips = (player: RoomPlayer) => player.chips;
-  const statistics =
+  const statistics = (
     input.statistics ??
-    visibleRoomPlayers.map((player) => ({
+    visibleStatisticsPlayers.map((player) => ({
       playerId: player.playerId,
       currentChips: currentChips(player),
       netWinLoss: 0,
@@ -335,7 +366,38 @@ export function projectPlayerSnapshot(
       showdownCount: 0,
       showdownWinRate: null,
       actions: { fold: 0, check: 0, call: 0, raiseTo: 0, allIn: 0 },
-    }));
+    }))
+  ).filter(({ playerId }) => visibleStatisticsPlayerIds.has(playerId));
+  const titles = (input.titles ?? []).flatMap((title) => {
+    const playerIds = title.playerIds.filter((playerId) =>
+      visibleStatisticsPlayerIds.has(playerId),
+    );
+    return playerIds.length > 0 ? [{ ...title, playerIds }] : [];
+  });
+  const handPeaks = input.handPeaks
+    ? {
+        ...input.handPeaks,
+        global:
+          input.handPeaks.global &&
+          input.handPeaks.global.playerIds.some((playerId) =>
+            visibleStatisticsPlayerIds.has(playerId),
+          )
+            ? {
+                ...input.handPeaks.global,
+                playerIds: input.handPeaks.global.playerIds.filter((playerId) =>
+                  visibleStatisticsPlayerIds.has(playerId),
+                ),
+              }
+            : null,
+        players: input.handPeaks.players.filter(({ playerId }) =>
+          visibleStatisticsPlayerIds.has(playerId),
+        ),
+      }
+    : {
+        global: null,
+        players: [],
+        hasLegacyCoverageGap: false,
+      };
 
   return PlayerSnapshotSchema.parse({
     protocolVersion: PROTOCOL_VERSION,
@@ -392,10 +454,11 @@ export function projectPlayerSnapshot(
             ? currentViewer.holeCards.map(formatCard)
             : null,
           ownHandType: currentViewerHandType(hand, input.viewerPlayerId),
-          showdownHoleCards: showdownHoleCards(hand),
+          showdownHoleCards: showdownHoleCards(hand, visibleRoomPlayerIds),
           settlement: settlementSummary(
             hand,
             input.room.voluntarilyRevealedHoleCardPlayerIds,
+            visibleRoomPlayerIds,
           ),
           legalActions:
             viewer.status === 'active' &&
@@ -477,12 +540,8 @@ export function projectPlayerSnapshot(
     ),
     statistics: {
       players: statistics,
-      titles: input.titles ?? [],
-      handPeaks: input.handPeaks ?? {
-        global: null,
-        players: [],
-        hasLegacyCoverageGap: false,
-      },
+      titles,
+      handPeaks,
     },
   });
 }
