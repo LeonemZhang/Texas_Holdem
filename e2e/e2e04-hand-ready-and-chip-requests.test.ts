@@ -8,7 +8,9 @@ import {
 import { approveChipRequest } from '../apps/host/src/domain/chip-transfers.js';
 import {
   canBeginNextHand,
+  failChipResetVote,
   normalizeHandReadyAtDeadline,
+  setChipResetVote,
   setHandReadyChoice,
 } from '../apps/host/src/domain/hand-ready-actions.js';
 import { beginHandReadyPhase } from '../apps/host/src/domain/hand-ready.js';
@@ -50,6 +52,13 @@ function createHandReadyTable() {
   return beginHandReadyPhase(room, 'hand-1', 0);
 }
 
+function rejectAutomaticChipResetVote(
+  room: ReturnType<typeof createRoom>,
+  ready: ReturnType<typeof beginHandReadyPhase>['handReady'],
+) {
+  return failChipResetVote(setChipResetVote(room, ready, 'host', 'reject'), 0);
+}
+
 describe('E2E04 hand readiness and chip requests', () => {
   it('blocks an early deal until a chip request is approved and everyone is ready', () => {
     const phase = createHandReadyTable();
@@ -60,6 +69,7 @@ describe('E2E04 hand readiness and chip requests', () => {
       'ready',
     );
     ready = setHandReadyChoice(phase.room, ready, 'carol', 'ready');
+    ready = rejectAutomaticChipResetVote(phase.room, ready);
     let requests = createChipRequestBook(ready);
     requests = createChipRequest(phase.room, ready, requests, {
       requestId: 'request-1',
@@ -112,6 +122,7 @@ describe('E2E04 hand readiness and chip requests', () => {
       'ready',
     );
     ready = setHandReadyChoice(phase.room, ready, 'carol', 'ready');
+    ready = rejectAutomaticChipResetVote(phase.room, ready);
     let requests = createChipRequest(
       phase.room,
       ready,
